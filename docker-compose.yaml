@@ -12,4 +12,6 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
     expose:
       - "8000"
+    labels:
+      - coolify.managed=true
     restart: unless-stopped
