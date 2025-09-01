@@ -16,7 +16,7 @@ services:
     environment:
       # Ajuste pelo UI do Coolify (ou use .env no repo)
       APP_NAME: ${APP_NAME:-svc-kg}
-      DATABASE_URL: ${DATABASE_URL} # Ex.: postgresql://svc_kg:***@<host>:5432/postgres?sslmode=require
+      DATABASE_URL: ${DATABASE_URL:postgresql://svc_kg:%40sgv-kg01@supabase-db:5432/postgres?sslmode=disable} # Ex.: postgresql://svc_kg:***@<host>:5432/postgres?sslmode=require
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-4}
       DB_POOL_MAX: ${DB_POOL_MAX:-20}
       CACHE_TTL: ${CACHE_TTL:-30}
