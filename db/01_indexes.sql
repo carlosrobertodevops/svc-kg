@@ -1,11 +1,3 @@
--- create role svc_kg
--- login password '@sgv-kg01';
--- grant usage on schema public to svc_kg;
--- grant execute on function public.get_graph_membros
--- (bigint, boolean, int) to svc_kg;
--- grant select on public.membros, public.funcoes, public.faccoes to svc_kg;
-
-
 -- Se RLS ativo, crie policies USING (true) para select nessas tabelas p/ role svc_kg
 -- db/01_indexes.sql
 create index
