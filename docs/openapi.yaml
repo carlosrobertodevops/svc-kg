@@ -1,0 +1,74 @@
+openapi: 3.0.3
+info:
+  title: svc-kg
+  version: "1.1.0"
+  description: Microserviço de Knowledge Graph (membros, facções, funções)
+servers: [ { url: / } ]
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  service: { type: string }
+  /v1/graph/membros:
+    get:
+      summary: Retorna grafo via função SQL get_graph_membros
+      parameters:
+      - { name: faccao_id, in: query, schema: { type: integer, format: int64, nullable: true } }
+      - { name: include_co, in: query, schema: { type: boolean, default: true } }
+      - { name: max_pairs, in: query, schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 } }
+      - { name: max_nodes, in: query, schema: { type: integer, default: 2000 } }
+      - { name: max_edges, in: query, schema: { type: integer, default: 4000 } }
+      - { name: cache, in: query, schema: { type: boolean, default: true } }
+      responses:
+        "200":
+          description: Grafo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GraphResponse" }
+  /v1/nodes/{node_id}/neighbors:
+    get:
+      summary: Subgrafo de vizinhança (raio=1)
+      parameters:
+      - { name: node_id, in: path, required: true, schema: { type: string } }
+      - { name: include_co, in: query, schema: { type: boolean, default: true } }
+      - { name: max_pairs, in: query, schema: { type: integer, default: 3000 } }
+      responses:
+        "200":
+          description: Subgrafo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GraphResponse" }
+components:
+  schemas:
+    Node:
+      type: object
+      required: [ id, label, type ]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        type: { type: string, enum: [ membro, faccao, funcao ] }
+        group: { type: integer, nullable: true }
+        size: { type: number, format: float, nullable: true }
+    Edge:
+      type: object
+      required: [ source, target ]
+      properties:
+        source: { type: string }
+        target: { type: string }
+        relation: { type: string, nullable: true }
+        weight: { type: number, format: float, nullable: true }
+    GraphResponse:
+      type: object
+      required: [ nodes, edges ]
+      properties:
+        nodes: { type: array, items: { $ref: "#/components/schemas/Node" } }
+        edges: { type: array, items: { $ref: "#/components/schemas/Edge" } }
