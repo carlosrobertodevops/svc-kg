@@ -13,8 +13,14 @@ RUN pip install --no-cache-dir \
     orjson==3.10.7
 
 WORKDIR /app
-COPY src/ /app/
+
+# Copia TUDO do contexto (independe de existir src/ ou não)
+COPY . /app/
+
+# Por padrão, assume que o arquivo está em src/app.py (src.app:app).
+# Se o seu app.py estiver na raiz do repo, ajuste no Coolify: APP_MODULE=app:app
+ENV APP_MODULE="src.app:app"
 
 EXPOSE 8080
-ENV WEB_CONCURRENCY=2
-CMD ["bash","-lc","gunicorn -w ${WEB_CONCURRENCY} -k uvicorn.workers.UvicornWorker app:app -b 0.0.0.0:8080 --timeout 60 --log-level info"]
+# Usa bash para interpolar envs (APP_MODULE, WEB_CONCURRENCY)
+CMD ["bash","-lc","gunicorn -w ${WEB_CONCURRENCY:-2} -k uvicorn.workers.UvicornWorker ${APP_MODULE} -b 0.0.0.0:8080 --timeout 60 --log-level info"]
