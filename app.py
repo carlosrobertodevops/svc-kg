@@ -17,14 +17,15 @@ CACHE_TTL   = int(os.getenv("CACHE_TTL", "30"))
 DB_POOL_MAX = int(os.getenv("DB_POOL_MAX", "10"))
 
 app = FastAPI(
-    title="svc-kg",
-    version="1.1.1",
-    description="Microserviço de Knowledge Graph",
-    default_response_class=ORJSONResponse,
-    swagger_ui_parameters={"docExpansion": "none", "displayRequestDuration": True}
+  title="svc-kg",
+  version="1.1.1",
+  description="Microserviço de Knowledge Graph",
+  default_response_class=ORJSONResponse,
+  swagger_ui_parameters={"docExpansion": "none", "displayRequestDuration": True}
 )
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
+                   allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(GZipMiddleware, minimum_size=512)
 
 # ---- POOL: LAZY + resiliente (alterado) --------------------------------------
@@ -65,23 +66,23 @@ async def _ensure_pool_open() -> bool:
 # -----------------------------------------------------------------------------
 
 class Node(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str; label: str; type: str
-    group: Optional[int] = None
-    size: Optional[float] = None
+  model_config = ConfigDict(extra="ignore")
+  id: str; label: str; type: str
+  group: Optional[int] = None
+  size: Optional[float] = None
 
 class Edge(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    source: str; target: str
-    weight: Optional[float] = 1.0
-    relation: Optional[str] = None
+  model_config = ConfigDict(extra="ignore")
+  source: str; target: str
+  weight: Optional[float] = 1.0
+  relation: Optional[str] = None
 
 class GraphResponse(BaseModel):
-    nodes: List[Node]; edges: List[Edge]
+  nodes: List[Node]; edges: List[Edge]
 
 _CACHE: dict[str, Tuple[float, dict]] = {}
-def cache_get(k: str):
-    it = _CACHE.get(k);
+def cache_get(k: str): 
+    it = _CACHE.get(k); 
     if not it: return None
     ts, v = it
     if time() - ts > CACHE_TTL:
@@ -125,7 +126,8 @@ async def _fetch_graph(faccao_id: Optional[int], include_co: bool, max_pairs: in
     assert pool is not None
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
-            await cur.execute("select public.get_graph_membros(%s,%s,%s);",(faccao_id, include_co, max_pairs))
+            await cur.execute("select public.get_graph_membros(%s,%s,%s);",
+                              (faccao_id, include_co, max_pairs))
             row = await cur.fetchone()
             data = row[0] if row else {"nodes": [], "edges": []}
             if isinstance(data, str): data = json.loads(data)
@@ -134,36 +136,36 @@ async def _fetch_graph(faccao_id: Optional[int], include_co: bool, max_pairs: in
 
 @app.get("/v1/graph/membros", response_model=GraphResponse)
 async def graph_membros(
-    response: Response,
-    faccao_id: Optional[int] = Query(default=None),
-    include_co: bool = Query(default=True),
-    max_pairs: int = Query(default=8000, ge=1, le=200000),
-    max_nodes: int = Query(default=2000, ge=100, le=20000),
-    max_edges: int = Query(default=4000, ge=100, le=200000),
-    cache: bool = Query(default=True)
+  response: Response,
+  faccao_id: Optional[int] = Query(default=None),
+  include_co: bool = Query(default=True),
+  max_pairs: int = Query(default=8000, ge=1, le=200000),
+  max_nodes: int = Query(default=2000, ge=100, le=20000),
+  max_edges: int = Query(default=4000, ge=100, le=200000),
+  cache: bool = Query(default=True)
 ):
-    key = f"{faccao_id}:{include_co}:{max_pairs}"
-    data = cache_get(key) if cache else None
-    if data is None:
-        data = await _fetch_graph(faccao_id, include_co, max_pairs)
+  key = f"{faccao_id}:{include_co}:{max_pairs}"
+  data = cache_get(key) if cache else None
+  if data is None:
+    data = await _fetch_graph(faccao_id, include_co, max_pairs)
     if cache: cache_set(key, data)
-        data = truncate_preview(data, max_nodes, max_edges)
-    response.headers["ETag"] = etag(data)
-    response.headers["Cache-Control"] = "public, max-age=30"
-    return data
+  data = truncate_preview(data, max_nodes, max_edges)
+  response.headers["ETag"] = etag(data)
+  response.headers["Cache-Control"] = "public, max-age=30"
+  return data
 
 @app.get("/v1/nodes/{node_id}/neighbors", response_model=GraphResponse)
 async def neighbors(response: Response, node_id: str,
                     include_co: bool = True, max_pairs: int = 3000):
-    data = await _fetch_graph(None, include_co, max_pairs)
-    nodes = data.get("nodes", []); edges = data.get("edges", [])
-    keep = {node_id}
-    for e in edges:
-        if e.get("source") == node_id: keep.add(e.get("target"))
-        if e.get("target") == node_id: keep.add(e.get("source"))
-    nodes2 = [n for n in nodes if n.get("id") in keep]
-    edges2 = [e for e in edges if e.get("source") in keep and e.get("target") in keep]
-    out = {"nodes": nodes2, "edges": edges2}
-    response.headers["ETag"] = etag(out)
-    response.headers["Cache-Control"] = "public, max-age=30"
-    return out
+  data = await _fetch_graph(None, include_co, max_pairs)
+  nodes = data.get("nodes", []); edges = data.get("edges", [])
+  keep = {node_id}
+  for e in edges:
+    if e.get("source") == node_id: keep.add(e.get("target"))
+    if e.get("target") == node_id: keep.add(e.get("source"))
+  nodes2 = [n for n in nodes if n.get("id") in keep]
+  edges2 = [e for e in edges if e.get("source") in keep and e.get("target") in keep]
+  out = {"nodes": nodes2, "edges": edges2}
+  response.headers["ETag"] = etag(out)
+  response.headers["Cache-Control"] = "public, max-age=30"
+  return out
