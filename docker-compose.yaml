@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   svc-kg:
     # O Coolify vai clonar o repositório e construir a imagem a partir do Dockerfile na raiz
