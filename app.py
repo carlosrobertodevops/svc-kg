@@ -13,6 +13,7 @@ from config import Settings, get_settings
 from supabase_client import SupabaseRPC
 from graph_builder import build_pyvis_html, normalize_graph_schema, truncate_preview
 from utils import make_cache_headers, compute_etag
+from fastapi.responses import JSONResponse
 
 settings: Settings = get_settings()
 
@@ -56,18 +57,36 @@ async def on_shutdown():
     await cache.close()
     await rpc_client.close()
 
+
+
 @app.get("/health")
 async def health():
-    """
-    Health leve (sem quebrar por atributo inexistente).
-    """
-    details = {
-        "status": "ok",
-        "version": "1.0.0",
-        "redis_enabled": settings.enable_redis_cache,
-        "supabase_url": settings.supabase_url,
-    }
-    return details
+    # status básico do app
+    status = {"status": "ok"}
+
+    # Se você tiver um httpx.AsyncClient global chamado http_client:
+    try:
+        ok_client = (http_client is not None) and (not http_client.is_closed)
+    except Exception:
+        ok_client = False
+    status["http_client_ok"] = ok_client
+
+    # Opcional: teste rápido ao Supabase (leve e com timeout curto).
+    # Se quiser deixar ainda mais simples, remova este bloco.
+    try:
+        if SUPABASE_URL and SUPABASE_KEY:
+            import httpx, asyncio
+            async with httpx.AsyncClient(timeout=2.0) as c:
+                # chamada mínima só para validar conectividade (HEAD ou GET leve)
+                r = await c.get(SUPABASE_URL.rstrip("/") + "/status", timeout=2.0)
+            status["supabase_ok"] = (r.status_code < 500)
+        else:
+            status["supabase_ok"] = True
+    except Exception:
+        status["supabase_ok"] = False
+
+    return JSONResponse(status_code=200, content=status)
+
 
 # --------- Endpoints de Grafo ---------
 
