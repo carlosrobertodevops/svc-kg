@@ -3,20 +3,28 @@
 
 svc-kg/
 ├─ app.py
-├─ config.py
-├─ cache.py
-├─ supabase_client.py
-├─ graph_builder.py
-├─ utils.py
-├─ requirements.txt
 ├─ Dockerfile
-├─ docker-compose.yaml
+├─ docker-compose.local.yml
+├─ docker-compose.coolify.yml
 ├─ .env.example
-├─ static/.gitkeep
-├─ assets/.gitkeep
-└─ docs/
-   ├─ openapi.yaml
-   └─ README.md
+├─ .gitignore
+├─ .dockerignore
+├─ README.md
+├─ assets/           # (montado no container)
+│  └─ .keep
+├─ static/           # (montado no container)
+│  └─ .keep
+├─ tmp/              # (montado no container)
+│  └─ .gitkeep
+├─ docs/
+│  └─ openapi.yaml   # Swagger spec estático (usado no /docs)
+└─ db/
+   ├─ 00_init.sql    # schema + seed + get_graph_membros
+   ├─ 01_indexes.sql # índices
+   └─ 02_alias.sql   # et_graph_membros -> get_graph_membros
+
+
+
 
 
 Micro-serviço FastAPI para exibir grafos (pyVis) a partir de RPC no Supabase.
@@ -71,3 +79,17 @@ Endpoints principais:
 
 ```
 ---
+
+# svc-kg
+
+Microserviço de **Knowledge Graph** (membros, funções, facções) com **FastAPI**.
+
+- Docs: **Swagger** `/docs`, **ReDoc** `/redoc`, **OpenAPI** `/openapi.json`
+- Performance: **ORJSON**, **GZip**, **psycopg_pool** (async), **cache TTL**, **multi-workers**
+- Preview seguro no navegador: `max_nodes` e `max_edges` (evita travar o Swagger)
+
+## Rodar local (Postgres + serviço)
+
+```bash
+docker compose -f docker-compose.local.yml up --build
+

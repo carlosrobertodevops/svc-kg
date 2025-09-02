@@ -1,58 +1,66 @@
+
+---
+
+## 🧾 `docs/openapi.yaml` (Swagger estático)
+
+```yaml
 openapi: 3.0.3
 info:
   title: svc-kg
-  version: "1.1.0"
-  description: Microserviço de grafos (pyVis) com dados do Supabase RPC.
+  version: "1.3.0"
+  description: >
+    Microserviço de Knowledge Graph (membros, facções, funções).
+    A UI /docs deste serviço carrega este arquivo, se presente.
 servers:
-- url: /
+  - url: /
 paths:
   /health:
     get:
-      summary: Healthcheck
+      summary: Health check
       responses:
         "200":
-          description: OK
+          description: ok
           content:
             application/json:
               schema:
                 type: object
-  /openapi.yaml:
+                properties:
+                  status: { type: string }
+                  service: { type: string }
+                  env: { type: string }
+                  cache: { type: string }
+                  backend: { type: string }
+  /v1/graph/membros:
     get:
-      summary: Baixa o OpenAPI YAML deste serviço
-      responses:
-        "200":
-          description: YAML
-          content:
-            text/plain:
-              schema:
-                type: string
-  /graph/members:
-    get:
-      summary: Grafo (JSON) de membros/ relações
+      summary: Retorna grafo (via et_graph_membros/get_graph_membros)
       parameters:
-      - in: query
-        name: p_faccao_id
-        required: true
-        schema: { type: string }
-      - in: query
-        name: p_include_co
-        required: false
-        schema: { type: boolean, default: true }
-      - in: query
-        name: p_max_pairs
-        required: false
-        schema: { type: integer, default: 500, minimum: 1, maximum: 20000 }
-      - in: query
-        name: max_nodes
-        required: false
-        schema: { type: integer, default: 0, minimum: 0 }
-      - in: query
-        name: max_edges
-        required: false
-        schema: { type: integer, default: 0, minimum: 0 }
+        - name: faccao_id
+          in: query
+          required: false
+          schema: { type: integer, format: int64, nullable: true }
+        - name: include_co
+          in: query
+          required: false
+          schema: { type: boolean, default: true }
+        - name: max_pairs
+          in: query
+          required: false
+          schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
+        - name: max_nodes
+          in: query
+          required: false
+          schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 }
+        - name: max_edges
+          in: query
+          required: false
+          schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 }
+        - name: cache
+          in: query
+          required: false
+          schema: { type: boolean, default: true }
       responses:
         "200":
-          description: Grafo normalizado
+          description: Grafo
           content:
             application/json:
               schema:
@@ -61,56 +69,56 @@ paths:
                   nodes:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        id: { type: string }
-                        label: { type: string }
-                        group: { type: string }
-                        title: { type: string }
+                      $ref: '#/components/schemas/Node'
                   edges:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        source: { type: string }
-                        target: { type: string }
-                        label: { type: string }
-                  meta:
-                    type: object
-        "4XX": { description: Erro de entrada/RPC }
-        "5XX": { description: Erro interno/RPC }
-  /graph/members/html:
+                      $ref: '#/components/schemas/Edge'
+  /v1/nodes/{node_id}/neighbors:
     get:
-      summary: Grafo em HTML (pyVis)
+      summary: Subgrafo de vizinhança (raio=1)
       parameters:
-      - in: query
-        name: p_faccao_id
-        required: true
-        schema: { type: string }
-      - in: query
-        name: p_include_co
-        required: false
-        schema: { type: boolean, default: true }
-      - in: query
-        name: p_max_pairs
-        required: false
-        schema: { type: integer, default: 500, minimum: 1, maximum: 20000 }
-      - in: query
-        name: max_nodes
-        required: false
-        schema: { type: integer, default: 0, minimum: 0 }
-      - in: query
-        name: max_edges
-        required: false
-        schema: { type: integer, default: 0, minimum: 0 }
-      - in: query
-        name: title
-        required: false
-        schema: { type: string, default: "Relações: Membros x Facções x Funções" }
+        - name: node_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: include_co
+          in: query
+          required: false
+          schema: { type: boolean, default: true }
+        - name: max_pairs
+          in: query
+          required: false
+          schema: { type: integer, default: 3000 }
       responses:
         "200":
-          description: HTML interativo
+          description: Subgrafo
           content:
-            text/html:
+            application/json:
               schema:
-                type: string
+                $ref: '#/components/schemas/GraphResponse'
+components:
+  schemas:
+    Node:
+      type: object
+      required: [id, label, type]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        type: { type: string, enum: [membro, faccao, funcao] }
+        group: { type: integer, nullable: true }
+        size: { type: number, format: float, nullable: true }
+    Edge:
+      type: object
+      required: [source, target]
+      properties:
+        source: { type: string }
+        target: { type: string }
+        relation: { type: string, nullable: true }
+        weight: { type: number, format: float, nullable: true }
+    GraphResponse:
+      type: object
+      required: [nodes, edges]
+      properties:
+        nodes: { type: array, items: { $ref: '#/components/schemas/Node' } }
+        edges: { type: array, items: { $ref: '#/components/schemas/Edge' } }
