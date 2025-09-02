@@ -1,295 +1,167 @@
-# from __future__ import annotations
+# app.py
+import uvicorn
+from fastapi import FastAPI, Query, Body, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse
+from typing import Any, Dict, Optional
+from src.settings import settings
+from src.supabase_client import rpc_client
+from src.graph_utils import normalize_graph, truncate_preview, build_pyvis_html
+from src.cache import cache
 
-# import os
-# from typing import Any, Dict, List, Optional, Set
+app = FastAPI(title="svc-kg", version="1.1.0")
 
-# from fastapi import FastAPI, HTTPException, Query
-# from fastapi.responses import ORJSONResponse
-# from pydantic import BaseModel, Field
+# --- CORS ---
+allow_origins = settings.cors_allow_origins
+if allow_origins == ["*"]:
+    allow_credentials = False
+else:
+    allow_credentials = True
 
-# # -----------------------------------------------------------------------------
-# # Modelos
-# # -----------------------------------------------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins,
+    allow_credentials=allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# class Node(BaseModel):
-#     id: str | int = Field(..., description="Identificador único do nó")
-#     label: Optional[str] = None
-#     data: Dict[str, Any] = Field(default_factory=dict)
+def _cache_control_value() -> str:
+    swr = settings.http_stale_while_revalidate_seconds
+    base = f"public, max-age={settings.http_cache_seconds}"
+    return f"{base}, stale-while-revalidate={swr}" if swr > 0 else base
 
+@app.get("/", response_class=PlainTextResponse)
+async def root():
+    return "svc-kg up. veja /docs"
 
-# class Edge(BaseModel):
-#     id: Optional[str | int] = None
-#     source: str | int = Field(..., description="ID do nó origem")
-#     target: str | int = Field(..., description="ID do nó destino")
-#     label: Optional[str] = None
-#     data: Dict[str, Any] = Field(default_factory=dict)
-
-
-# class GraphPayload(BaseModel):
-#     nodes: List[Node] = Field(default_factory=list)
-#     edges: List[Edge] = Field(default_factory=list)
-
-
-# class GraphResponse(BaseModel):
-#     nodes: List[Node]
-#     edges: List[Edge]
-#     meta: Dict[str, Any] = Field(default_factory=dict)
-
-
-# # -----------------------------------------------------------------------------
-# # Funções utilitárias
-# # -----------------------------------------------------------------------------
-
-# def truncate_preview(
-#     payload: GraphPayload,
-#     max_nodes: int,
-#     max_edges: int,
-# ) -> GraphPayload:
-#     """
-#     Limita a quantidade de nós e arestas para pré-visualização.
-#     - Mantém apenas nós até max_nodes.
-#     - Filtra arestas para usar somente nós mantidos e corta em max_edges.
-#     """
-#     original_nodes = payload.nodes
-#     original_edges = payload.edges
-
-#     if max_nodes < 0 or max_edges < 0:
-#         return payload  # nada a fazer
-
-#     kept_nodes = original_nodes[:max_nodes] if len(original_nodes) > max_nodes else original_nodes
-#     kept_ids: Set[str | int] = {n.id for n in kept_nodes}
-
-#     filtered_edges = [e for e in original_edges if e.source in kept_ids and e.target in kept_ids]
-#     kept_edges = filtered_edges[:max_edges] if len(filtered_edges) > max_edges else filtered_edges
-
-#     return GraphPayload(nodes=kept_nodes, edges=kept_edges)
-
-
-# def build_meta(before: GraphPayload, after: GraphPayload) -> Dict[str, Any]:
-#     return {
-#         "received_nodes": len(before.nodes),
-#         "received_edges": len(before.edges),
-#         "returned_nodes": len(after.nodes),
-#         "returned_edges": len(after.edges),
-#         "truncated": (len(after.nodes) < len(before.nodes)) or (len(after.edges) < len(before.edges)),
-#     }
-
-
-# # -----------------------------------------------------------------------------
-# # App FastAPI
-# # -----------------------------------------------------------------------------
-
-# APP_NAME = os.getenv("APP_NAME", "svc-kg")
-# DEFAULT_MAX_NODES = int(os.getenv("PREVIEW_MAX_NODES", "200"))
-# DEFAULT_MAX_EDGES = int(os.getenv("PREVIEW_MAX_EDGES", "400"))
-
-# app = FastAPI(
-#     title=APP_NAME,
-#     default_response_class=ORJSONResponse,
-# )
-
-
-# @app.get("/health")
-# async def health() -> Dict[str, str]:
-#     # Health check simples e confiável: não depende de atributos de pool
-#     return {"status": "ok", "service": APP_NAME}
-
-
-# @app.get("/")
-# def root() -> Dict[str, Any]:
-#     return {
-#         "service": APP_NAME,
-#         "endpoints": {
-#             "GET /health": "status simples",
-#             "POST /graph": "recebe grafo {nodes, edges}; usa preview opcional",
-#         },
-#     }
-
-
-# @app.post("/graph", response_model=GraphResponse)
-# def post_graph(
-#     payload: GraphPayload,
-#     preview: bool = Query(True, description="Se verdadeiro, limita nós/arestas para prévia."),
-#     max_nodes: int = Query(DEFAULT_MAX_NODES, ge=0, description="Máximo de nós na prévia."),
-#     max_edges: int = Query(DEFAULT_MAX_EDGES, ge=0, description="Máximo de arestas na prévia."),
-# ) -> GraphResponse:
-#     """
-#     Recebe um grafo e, se preview=true, devolve versão reduzida.
-#     """
-#     if payload is None:
-#         raise HTTPException(status_code=400, detail="Corpo inválido")
-
-#     before = payload
-#     if preview:
-#         payload = truncate_preview(payload, max_nodes, max_edges)
-
-#     return GraphResponse(nodes=payload.nodes, edges=payload.edges, meta=build_meta(before, payload))
-
-
-# # -----------------------------------------------------------------------------
-# # Suporte opcional a execução direta (dev). Em produção, use gunicorn/uvicorn.
-# # -----------------------------------------------------------------------------
-# if __name__ == "__main__":
-#     import uvicorn
-
-#     uvicorn.run(
-#         "app:app",
-#         host="0.0.0.0",
-#         port=int(os.getenv("PORT", "8080")),
-#         reload=bool(int(os.getenv("DEV_RELOAD", "0"))),
-#     )
-
-# --- imports (no topo, se ainda não tiver) ---
-import os, json
-from typing import Any, Dict, List, Optional
-import httpx
-from fastapi import Query
-from fastapi.responses import HTMLResponse
-
-SUPABASE_REST_URL = os.getenv("SUPABASE_REST_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-SUPABASE_RPC_FUNCTION = os.getenv("SUPABASE_RPC_FUNCTION", "get_graph_membros")
-SUPABASE_SCHEMA = os.getenv("SUPABASE_SCHEMA", "public")
-
-async def call_supabase_rpc(fn: str, payload: Dict[str, Any]) -> Any:
-    assert SUPABASE_REST_URL and SUPABASE_SERVICE_ROLE_KEY, "SUPABASE_* envs faltando"
-    url = f"{SUPABASE_REST_URL}/rpc/{fn}"
-    headers = {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-        "Content-Type": "application/json",
-        "Accept-Profile": SUPABASE_SCHEMA,
-        "Content-Profile": SUPABASE_SCHEMA,
-        "Prefer": "return=representation"
+@app.get("/health")
+async def health(deep: bool = Query(default=False)):
+    info = {
+        "status": "ok",
+        "version": app.version,
+        "supabase_url": settings.supabase_url or "",
+        "rpc_function": settings.supabase_rpc_function,
     }
-    async with httpx.AsyncClient(timeout=60) as client:
-        r = await client.post(url, headers=headers, json=payload)
-        r.raise_for_status()
-        return r.json()
-
-def _coerce_to_graph(data: Any) -> Dict[str, Any]:
-    """
-    Suporta dois formatos comuns vindo do RPC:
-    A) {"nodes":[...], "edges":[...]}
-    B) [{"source":"...","target":"...","label":"..."}]  -> gera nodes únicos
-    Ajuste os nomes dos campos conforme sua função.
-    """
-    if isinstance(data, dict) and "nodes" in data and "edges" in data:
-        nodes = data.get("nodes") or []
-        edges = data.get("edges") or []
-    else:
-        rows = data if isinstance(data, list) else []
-        edges = []
-        node_ids = {}
-        for row in rows:
-            s = str(row.get("source") or row.get("from") or row.get("membro_id") or "")
-            t = str(row.get("target") or row.get("to")   or row.get("relacionado_id") or "")
-            lab = row.get("label") or row.get("relacao") or row.get("tipo") or ""
-            if s and t:
-                edges.append({"source": s, "target": t, "label": str(lab)})
-                node_ids.setdefault(s, {"id": s, "label": row.get("source_label") or s, "data": {}})
-                node_ids.setdefault(t, {"id": t, "label": row.get("target_label") or t, "data": {}})
-        nodes = list(node_ids.values())
-
-    # tipagem simples por heurística (opcional)
-    for n in nodes:
-        if "data" not in n: n["data"] = {}
-        if "tipo" not in n["data"]:
-            nid = str(n.get("id","")).lower()
-            if "facc" in nid: n["data"]["tipo"] = "faccao"
-            elif "func" in nid: n["data"]["tipo"] = "funcao"
-            else: n["data"]["tipo"] = "membro"
-    return {"nodes": nodes, "edges": edges}
-
-def _truncate_graph(nodes: List[Dict], edges: List[Dict], max_nodes: int, max_edges: int):
-    if max_nodes and len(nodes) > max_nodes:
-        keep = {n["id"] for n in nodes[:max_nodes]}
-        nodes = nodes[:max_nodes]
-        edges = [e for e in edges if e["source"] in keep and e["target"] in keep]
-    if max_edges and len(edges) > max_edges:
-        edges = edges[:max_edges]
-    return nodes, edges
-
-def _vis_html(nodes: List[Dict[str,Any]], edges: List[Dict[str,Any]], title="Grafo Membros") -> str:
-    # HTML leve com vis-network (CDN). “Look & feel” similar ao pyVis.
-    return f"""<!doctype html>
-<html><head><meta charset="utf-8"><title>{title}</title>
-<style> html,body,#net{{height:100%;margin:0;padding:0}} </style>
-<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-</head><body>
-<div id="net"></div>
-<script>
-const nodes = new vis.DataSet({json.dumps([{"id":n["id"],"label":n.get("label",""),"group":n.get("data",{}).get("tipo","membro")} for n in nodes])});
-const edges = new vis.DataSet({json.dumps([{"from":e["source"],"to":e["target"],"label":e.get("label","")} for e in edges])});
-const data = {{nodes, edges}};
-const options = {{
-  edges: {{arrows:'to', smooth:true}},
-  physics: {{ stabilization: true }},
-  interaction: {{ hover: true, tooltipDelay: 120 }},
-  groups: {{
-    membro: {{ shape:'dot', size:12 }},
-    faccao: {{ shape:'triangle', size:16 }},
-    funcao: {{ shape:'square', size:12 }}
-  }}
-}};
-new vis.Network(document.getElementById('net'), data, options);
-</script>
-</body></html>"""
+    if deep:
+        ok, detail = await rpc_client.ping()
+        info["supabase"] = {"ok": ok, "detail": detail}
+        return JSONResponse(info, status_code=200 if ok else 503)
+    return JSONResponse(info)
 
 @app.get("/graph/membros")
-async def graph_membros(
-    membro_id: Optional[str] = Query(default=None),
-    faccao_id: Optional[str] = Query(default=None),
-    funcao: Optional[str] = Query(default=None),
-    depth: int = Query(default=2, ge=0, le=6),
+async def get_graph_membros(
+    p_faccao_id: Optional[str] = Query(default=None),
+    p_include_co: Optional[bool] = Query(default=None),
+    p_max_pairs: Optional[int] = Query(default=None),
+    depth: Optional[int] = Query(default=None),
     preview: bool = Query(default=True),
-    max_nodes: int = Query(default=500, ge=1),
-    max_edges: int = Query(default=1000, ge=1),
-):
-    payload = {"membro_id": membro_id, "faccao_id": faccao_id, "funcao": funcao, "depth": depth}
-    # remove None
-    payload = {k:v for k,v in payload.items() if v is not None}
-    raw = await call_supabase_rpc(SUPABASE_RPC_FUNCTION, payload)
-    g = _coerce_to_graph(raw)
-    nodes, edges = g["nodes"], g["edges"]
+    max_nodes: int = Query(default=500, ge=10, le=5000),
+    max_edges: int = Query(default=1000, ge=10, le=20000),
+    nocache: bool = Query(default=False),
+    cache_ttl: Optional[int] = Query(default=None),
+) -> JSONResponse:
+    payload: Dict[str, Any] = {}
+    if p_faccao_id is not None: payload["p_faccao_id"] = p_faccao_id
+    if p_include_co is not None: payload["p_include_co"] = p_include_co
+    if p_max_pairs is not None: payload["p_max_pairs"] = p_max_pairs
+    if depth is not None: payload["depth"] = depth
+
+    key = cache.key_for(settings.supabase_rpc_function, payload)
+    hit = False
+    raw = None
+
+    if not nocache:
+        raw = await cache.get(key)
+        if raw is not None:
+            hit = True
+
+    if raw is None:
+        lock = await cache.acquire_key_lock(key)
+        async with lock:
+            raw = await cache.get(key)
+            if raw is None:
+                raw = await rpc_client.call_rpc(settings.supabase_rpc_function, payload)
+                await cache.set(key, raw, ttl=cache_ttl)
+
+    graph = normalize_graph(raw)
+    returned = graph
     truncated = False
     if preview:
-        nodes, edges = _truncate_graph(nodes, edges, max_nodes, max_edges)
-        truncated = (len(nodes) < len(g["nodes"])) or (len(edges) < len(g["edges"]))
-    return {
-        "nodes": nodes, "edges": edges,
-        "meta": {
-            "rpc": SUPABASE_RPC_FUNCTION,
-            "params": payload,
-            "truncated": truncated,
-            "received_nodes": len(g["nodes"]),
-            "received_edges": len(g["edges"]),
-            "returned_nodes": len(nodes),
-            "returned_edges": len(edges)
-        }
+        returned, truncated = truncate_preview(graph, max_nodes=max_nodes, max_edges=max_edges)
+
+    meta = {
+        "rpc": settings.supabase_rpc_function,
+        "params": payload,
+        "truncated": truncated,
+        "received_nodes": len(graph.get("nodes", [])),
+        "received_edges": len(graph.get("edges", [])),
+        "returned_nodes": len(returned.get("nodes", [])),
+        "returned_edges": len(returned.get("edges", [])),
+        "cache": "HIT" if hit else "MISS",
     }
+    returned["meta"] = meta
+
+    resp = JSONResponse(returned)
+    resp.headers["Cache-Control"] = _cache_control_value()
+    resp.headers["X-Cache"] = "HIT" if hit else "MISS"
+    return resp
 
 @app.get("/graph/membros/vis", response_class=HTMLResponse)
-async def graph_membros_vis(
-    membro_id: Optional[str] = None,
-    faccao_id: Optional[str] = None,
-    funcao: Optional[str] = None,
-    depth: int = 2,
-    preview: bool = True,
-    max_nodes: int = 500,
-    max_edges: int = 1000,
-):
-    payload = {"membro_id": membro_id, "faccao_id": faccao_id, "funcao": funcao, "depth": depth}
-    payload = {k:v for k,v in payload.items() if v is not None}
-    raw = await call_supabase_rpc(SUPABASE_RPC_FUNCTION, payload)
-    g = _coerce_to_graph(raw)
-    nodes, edges = g["nodes"], g["edges"]
+async def get_graph_membros_vis(
+    p_faccao_id: Optional[str] = Query(default=None),
+    p_include_co: Optional[bool] = Query(default=None),
+    p_max_pairs: Optional[int] = Query(default=None),
+    depth: Optional[int] = Query(default=None),
+    preview: bool = Query(default=True),
+    max_nodes: int = Query(default=500, ge=10, le=5000),
+    max_edges: int = Query(default=1000, ge=10, le=20000),
+    physics: bool = Query(default=True),
+    nocache: bool = Query(default=False),
+    cache_ttl: Optional[int] = Query(default=None),
+) -> HTMLResponse:
+    payload: Dict[str, Any] = {}
+    if p_faccao_id is not None: payload["p_faccao_id"] = p_faccao_id
+    if p_include_co is not None: payload["p_include_co"] = p_include_co
+    if p_max_pairs is not None: payload["p_max_pairs"] = p_max_pairs
+    if depth is not None: payload["depth"] = depth
+
+    key = cache.key_for(settings.supabase_rpc_function, payload)
+    hit = False
+    raw = None
+
+    if not nocache:
+        raw = await cache.get(key)
+        if raw is not None:
+            hit = True
+
+    if raw is None:
+        lock = await cache.acquire_key_lock(key)
+        async with lock:
+            raw = await cache.get(key)
+            if raw is None:
+                raw = await rpc_client.call_rpc(settings.supabase_rpc_function, payload)
+                await cache.set(key, raw, ttl=cache_ttl)
+
+    graph = normalize_graph(raw)
     if preview:
-        nodes, edges = _truncate_graph(nodes, edges, max_nodes, max_edges)
-    return HTMLResponse(content=_vis_html(nodes, edges, title="Grafo Membros"), status_code=200)
+        graph, _ = truncate_preview(graph, max_nodes=max_nodes, max_edges=max_edges)
+    html = build_pyvis_html(graph, physics=physics, height="100%", width="100%")
+
+    resp = HTMLResponse(html)
+    resp.headers["Cache-Control"] = _cache_control_value()
+    resp.headers["X-Cache"] = "HIT" if hit else "MISS"
+    return resp
 
 @app.post("/rpc/get_graph_membros")
-async def rpc_get_graph_membros(body: Dict[str, Any]):
-    data = await call_supabase_rpc("get_graph_membros", body or {})
-    return data
- 
+async def rpc_get_graph_membros(body: Dict[str, Any] = Body(default=None)):
+    try:
+        result = await rpc_client.call_rpc(settings.supabase_rpc_function, body or {})
+        return JSONResponse(result)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="0.0.0.0", port=8080, reload=False)

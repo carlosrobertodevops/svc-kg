@@ -1,74 +1,329 @@
 openapi: 3.0.3
 info:
-  title: svc-kg
+  title: svc-kg API
   version: "1.1.0"
-  description: Microserviço de Knowledge Graph (membros, facções, funções)
-servers: [ { url: / } ]
+  description: |
+    Micro-serviço para grafos com pyVis consumindo dados do Supabase (RPC `get_graph_membros`).
+    Endpoints prontos para uso no FlutterFlow (API Call / WebView) e externo (cURL/Postman).
+  contact:
+    name: svc-kg
+    url: https://github.com/carlosrobertodevops/svc-kg
+servers:
+- url: https://svc-kg.example.com
+  description: Produção
+- url: http://localhost:8080
+  description: Local
+
+tags:
+- name: Health
+- name: Graph
+- name: RPC
+
 paths:
   /health:
     get:
+      tags: [ Health ]
       summary: Health check
+      description: Retorna status do serviço. Use `?deep=1` para verificar conectividade com Supabase.
+      parameters:
+      - $ref: '#/components/parameters/deep'
       responses:
-        "200":
-          description: ok
+        '200':
+          description: Serviço OK
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status: { type: string }
-                  service: { type: string }
-  /v1/graph/membros:
-    get:
-      summary: Retorna grafo via função SQL get_graph_membros
-      parameters:
-      - { name: faccao_id, in: query, schema: { type: integer, format: int64, nullable: true } }
-      - { name: include_co, in: query, schema: { type: boolean, default: true } }
-      - { name: max_pairs, in: query, schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 } }
-      - { name: max_nodes, in: query, schema: { type: integer, default: 2000 } }
-      - { name: max_edges, in: query, schema: { type: integer, default: 4000 } }
-      - { name: cache, in: query, schema: { type: boolean, default: true } }
-      responses:
-        "200":
-          description: Grafo
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    version: "1.1.0"
+                    supabase_url: "https://supabase.mondaha.com"
+                    rpc_function: "get_graph_membros"
+        '503':
+          description: Supabase indisponível (quando `deep=1`)
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/GraphResponse" }
-  /v1/nodes/{node_id}/neighbors:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /graph/membros:
     get:
-      summary: Subgrafo de vizinhança (raio=1)
+      tags: [ Graph ]
+      summary: Retorna grafo em JSON (nodes/edges)
+      description: |
+        Executa o RPC configurado (padrão `get_graph_membros`) no Supabase, normaliza o resultado e aplica **preview** (truncamento) opcional.
+        Ideal para **API Call** no FlutterFlow.
       parameters:
-      - { name: node_id, in: path, required: true, schema: { type: string } }
-      - { name: include_co, in: query, schema: { type: boolean, default: true } }
-      - { name: max_pairs, in: query, schema: { type: integer, default: 3000 } }
+      - $ref: '#/components/parameters/p_faccao_id'
+      - $ref: '#/components/parameters/p_include_co'
+      - $ref: '#/components/parameters/p_max_pairs'
+      - $ref: '#/components/parameters/depth'
+      - $ref: '#/components/parameters/preview'
+      - $ref: '#/components/parameters/max_nodes'
+      - $ref: '#/components/parameters/max_edges'
+      - $ref: '#/components/parameters/nocache'
+      - $ref: '#/components/parameters/cache_ttl'
       responses:
-        "200":
-          description: Subgrafo
+        '200':
+          description: Grafo normalizado
+          headers:
+            Cache-Control:
+              schema: { type: string }
+              description: Diretivas de cache para browser/CDN.
+            X-Cache:
+              schema:
+                type: string
+                enum: [ HIT, MISS ]
+              description: Indica se houve acerto no cache in-memory do servidor.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/GraphResponse" }
+              schema:
+                $ref: '#/components/schemas/GraphResponse'
+              examples:
+                sample:
+                  value:
+                    nodes:
+                    - { id: "m1", label: "João", group: "membro" }
+                    - { id: "f1", label: "Facção X", group: "faccao" }
+                    edges:
+                    - { source: "m1", target: "f1", label: "membro_de", arrows: "to" }
+                    meta:
+                      rpc: get_graph_membros
+                      params: { p_faccao_id: "abc123", p_include_co: true }
+                      truncated: false
+                      received_nodes: 1200
+                      received_edges: 3000
+                      returned_nodes: 500
+                      returned_edges: 1000
+                      cache: "MISS"
+
+  /graph/membros/vis:
+    get:
+      tags: [ Graph ]
+      summary: Retorna HTML com pyVis (visualização)
+      description: |
+        Gera uma página HTML com pyVis pronta para embutir em **WebView** (FlutterFlow).
+        Usa os mesmos parâmetros de filtragem e preview do endpoint JSON.
+      parameters:
+      - $ref: '#/components/parameters/p_faccao_id'
+      - $ref: '#/components/parameters/p_include_co'
+      - $ref: '#/components/parameters/p_max_pairs'
+      - $ref: '#/components/parameters/depth'
+      - $ref: '#/components/parameters/preview'
+      - $ref: '#/components/parameters/max_nodes'
+      - $ref: '#/components/parameters/max_edges'
+      - $ref: '#/components/parameters/physics'
+      - $ref: '#/components/parameters/nocache'
+      - $ref: '#/components/parameters/cache_ttl'
+      responses:
+        '200':
+          description: Página HTML com o grafo renderizado em pyVis
+          headers:
+            Cache-Control:
+              schema: { type: string }
+            X-Cache:
+              schema:
+                type: string
+                enum: [ HIT, MISS ]
+          content:
+            text/html:
+              schema:
+                type: string
+                format: html
+              examples:
+                embed:
+                  value: "<!doctype html>..."
+
+  /rpc/get_graph_membros:
+    post:
+      tags: [ RPC ]
+      summary: Pass-through para o RPC no Supabase
+      description: |
+        Encaminha o body diretamente para o endpoint `/rest/v1/rpc/get_graph_membros` do Supabase.
+        Útil para **debug/validação** do payload. Este endpoint **não** aplica cache.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetGraphMembrosRPCRequest'
+            examples:
+              example1:
+                value: { p_faccao_id: "abc123", p_include_co: true, p_max_pairs: 200, depth: 2 }
+      responses:
+        '200':
+          description: Resposta do RPC (normalmente nodes/edges)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/GraphResponse'
+                - type: object
+        '4XX':
+          description: Erro retornado pelo Supabase
+          content:
+            application/json:
+              schema: { type: object }
+        '5XX':
+          description: Erro de gateway/servidor
+          content:
+            application/json:
+              schema: { type: object }
+
 components:
+  parameters:
+    deep:
+      name: deep
+      in: query
+      description: Executa verificação ativa de conectividade com Supabase.
+      required: false
+      schema: { type: boolean, default: false }
+
+    p_faccao_id:
+      name: p_faccao_id
+      in: query
+      required: false
+      description: ID da facção para filtrar o grafo.
+      schema: { type: string }
+      example: "abc123"
+
+    p_include_co:
+      name: p_include_co
+      in: query
+      required: false
+      description: Inclui relações co-ocorrentes no grafo.
+      schema: { type: boolean }
+      example: true
+
+    p_max_pairs:
+      name: p_max_pairs
+      in: query
+      required: false
+      description: Limite máximo de pares no RPC.
+      schema: { type: integer, minimum: 1 }
+      example: 200
+
+    depth:
+      name: depth
+      in: query
+      required: false
+      description: Profundidade/nível do grafo solicitado ao RPC.
+      schema: { type: integer, minimum: 0 }
+      example: 2
+
+    preview:
+      name: preview
+      in: query
+      required: false
+      description: Ativa truncamento de nós/arestas para visualização rápida.
+      schema: { type: boolean, default: true }
+
+    max_nodes:
+      name: max_nodes
+      in: query
+      required: false
+      description: Máximo de nós retornados quando `preview=true`.
+      schema: { type: integer, minimum: 10, maximum: 5000, default: 500 }
+
+    max_edges:
+      name: max_edges
+      in: query
+      required: false
+      description: Máximo de arestas retornadas quando `preview=true`.
+      schema: { type: integer, minimum: 10, maximum: 20000, default: 1000 }
+
+    physics:
+      name: physics
+      in: query
+      required: false
+      description: Ativa física/layout dinâmico no pyVis (apenas no HTML).
+      schema: { type: boolean, default: true }
+
+    nocache:
+      name: nocache
+      in: query
+      required: false
+      description: Ignora cache servidor para esta chamada (recalcula RPC).
+      schema: { type: boolean, default: false }
+
+    cache_ttl:
+      name: cache_ttl
+      in: query
+      required: false
+      description: TTL (segundos) personalizado para o cache do servidor.
+      schema: { type: integer, minimum: 1 }
+
   schemas:
-    Node:
+    HealthResponse:
       type: object
-      required: [ id, label, type ]
       properties:
-        id: { type: string }
+        status: { type: string, example: ok }
+        version: { type: string, example: "1.1.0" }
+        supabase_url: { type: string, format: uri }
+        rpc_function: { type: string, example: get_graph_membros }
+        supabase:
+          type: object
+          nullable: true
+          properties:
+            ok: { type: boolean }
+            detail: { type: string }
+
+    GraphNode:
+      type: object
+      required: [ id ]
+      properties:
+        id:
+          description: ID do nó (string ou numérico). Representado como string no JSON por segurança.
+          oneOf:
+          - { type: string }
+          - { type: integer }
         label: { type: string }
-        type: { type: string, enum: [ membro, faccao, funcao ] }
-        group: { type: integer, nullable: true }
-        size: { type: number, format: float, nullable: true }
-    Edge:
+        group: { type: string, description: Categoria/cluster de visualização }
+        title: { type: string, description: Tooltip HTML/texto }
+        color: { type: string, description: Cor CSS/hex opcional }
+
+    GraphEdge:
       type: object
       required: [ source, target ]
       properties:
-        source: { type: string }
-        target: { type: string }
-        relation: { type: string, nullable: true }
-        weight: { type: number, format: float, nullable: true }
+        source: { oneOf: [ { type: string }, { type: integer } ] }
+        target: { oneOf: [ { type: string }, { type: integer } ] }
+        label: { type: string, description: Rótulo exibido na aresta }
+        weight: { type: number, description: Peso/valor para thickness }
+        arrows: { type: string, description: Direção no pyVis, ex. 'to' }
+
+    GraphMeta:
+      type: object
+      properties:
+        rpc: { type: string }
+        params: { type: object, additionalProperties: true }
+        truncated: { type: boolean }
+        received_nodes: { type: integer }
+        received_edges: { type: integer }
+        returned_nodes: { type: integer }
+        returned_edges: { type: integer }
+        cache:
+          type: string
+          enum: [ HIT, MISS ]
+
     GraphResponse:
       type: object
-      required: [ nodes, edges ]
       properties:
-        nodes: { type: array, items: { $ref: "#/components/schemas/Node" } }
-        edges: { type: array, items: { $ref: "#/components/schemas/Edge" } }
+        nodes:
+          type: array
+          items: { $ref: '#/components/schemas/GraphNode' }
+        edges:
+          type: array
+          items: { $ref: '#/components/schemas/GraphEdge' }
+        meta:
+          $ref: '#/components/schemas/GraphMeta'
+
+    GetGraphMembrosRPCRequest:
+      type: object
+      properties:
+        p_faccao_id: { type: string }
+        p_include_co: { type: boolean }
+        p_max_pairs: { type: integer, minimum: 1 }
+        depth: { type: integer, minimum: 0 }
