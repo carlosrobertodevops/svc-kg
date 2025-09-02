@@ -3,29 +3,60 @@ import json
 import time
 import hashlib
 from typing import Any, Dict, List, Optional, Tuple
+from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse, Response
 from pydantic import BaseModel
-from contextlib import asynccontextmanager
 
-# ============ Config ============
+# Static files
+from starlette.staticfiles import StaticFiles
+
+# Redis (opcional)
+try:
+    from redis.asyncio import Redis
+except Exception:
+    Redis = None  # type: ignore
+
+# ===================== ENV & Config =====================
 APP_NAME = os.getenv("APP_NAME", "svc-kg")
-SERVICE_PORT = int(os.getenv("SERVICE_PORT", "8080"))
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+# Porta é controlada pelo Gunicorn no container; aqui só para execução local.
+SERVICE_PORT = int(os.getenv("PORT", os.getenv("SERVICE_PORT", "8080")))
+
+# CORS
+def _split_csv(val: Optional[str]) -> List[str]:
+    if not val:
+        return []
+    return [x.strip() for x in val.split(",") if x.strip()]
+
+def _env_bool(name: str, default: bool) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    return str(v).strip().lower() in ("1", "true", "t", "yes", "y", "on")
+
+CORS_ALLOW_ORIGINS = _split_csv(os.getenv("CORS_ALLOW_ORIGINS", "*"))
+CORS_ALLOW_HEADERS = _split_csv(os.getenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type"))
+CORS_ALLOW_METHODS = _split_csv(os.getenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS"))
+CORS_ALLOW_CREDENTIALS = _env_bool("CORS_ALLOW_CREDENTIALS", False)
+
+# Supabase
+SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").rstrip("/")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+SUPABASE_RPC_FN = os.getenv("SUPABASE_RPC_FN", "get_graph_membros")
+SUPABASE_TIMEOUT = float(os.getenv("SUPABASE_TIMEOUT", "15"))
 
-ALLOW_ORIGINS = [
-    o.strip() for o in os.getenv("ALLOW_ORIGINS", "*").split(",")
-] if os.getenv("ALLOW_ORIGINS") else ["*"]
+# Cache
+CACHE_API_TTL = int(os.getenv("CACHE_API_TTL", "60"))  # TTL do cache de API (segundos)
+CACHE_STATIC_MAX_AGE = int(os.getenv("CACHE_STATIC_MAX_AGE", "86400"))  # para HTML/YAML estáticos
+ENABLE_REDIS_CACHE = _env_bool("ENABLE_REDIS_CACHE", True)
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
-CACHE_TTL_SECONDS = int(os.getenv("SVC_CACHE_TTL_SECONDS", "60"))
-
-# ============ Cache (TTL in-memory) ============
+# ===================== Cache de Memória TTL =====================
 class _TTLCache:
     def __init__(self, ttl: int):
         self.ttl = ttl
@@ -50,44 +81,91 @@ class _TTLCache:
     def set(self, key: str, value: Any):
         self._store[key] = (self._now() + self.ttl, value)
 
-CACHE = _TTLCache(CACHE_TTL_SECONDS)
-
 def _cache_key(prefix: str, payload: Dict[str, Any]) -> str:
     s = json.dumps(payload, sort_keys=True, ensure_ascii=False)
     return f"{prefix}:{hashlib.sha256(s.encode('utf-8')).hexdigest()}"
 
-# ============ HTTP Client (global) ============
+MEM_CACHE = _TTLCache(CACHE_API_TTL)
+
+# ===================== HTTP & Redis clients =====================
 http_client: Optional[httpx.AsyncClient] = None
+redis_client: Optional["Redis"] = None  # type: ignore
+
+async def cache_get(key: str) -> Optional[Any]:
+    # 1) memória
+    v = MEM_CACHE.get(key)
+    if v is not None:
+        return v
+    # 2) redis (opcional)
+    if redis_client is not None:
+        try:
+            raw = await redis_client.get(key)  # type: ignore
+            if raw:
+                v = json.loads(raw)
+                MEM_CACHE.set(key, v)  # aquece memória
+                return v
+        except Exception:
+            pass
+    return None
+
+async def cache_set(key: str, value: Any):
+    MEM_CACHE.set(key, value)
+    if redis_client is not None:
+        try:
+            await redis_client.setex(key, CACHE_API_TTL, json.dumps(value, ensure_ascii=False))  # type: ignore
+        except Exception:
+            pass
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    global http_client
-    http_client = httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=5.0))
+    global http_client, redis_client
+    # httpx com timeout vindo do env
+    http_client = httpx.AsyncClient(timeout=httpx.Timeout(SUPABASE_TIMEOUT, connect=5.0))
+    # Redis (opcional)
+    if ENABLE_REDIS_CACHE and Redis is not None:
+        try:
+            redis_client = Redis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)  # type: ignore
+            await redis_client.ping()  # valida conexão
+        except Exception:
+            redis_client = None
     try:
         yield
     finally:
         try:
-            await http_client.aclose()
+            if http_client:
+                await http_client.aclose()
+        except Exception:
+            pass
+        try:
+            if redis_client:
+                await redis_client.close()
         except Exception:
             pass
 
 app = FastAPI(
     title="svc-kg",
-    description="Microserviço de grafos (pyVis) com dados do Supabase RPC.",
-    version="1.0.0",
+    description="Microserviço de grafos (pyVis) consumindo Supabase RPC.",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
+# Middlewares
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOW_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ALLOW_ORIGINS if CORS_ALLOW_ORIGINS else ["*"],
+    allow_credentials=CORS_ALLOW_CREDENTIALS,
+    allow_methods=CORS_ALLOW_METHODS if CORS_ALLOW_METHODS else ["*"],
+    allow_headers=CORS_ALLOW_HEADERS if CORS_ALLOW_HEADERS else ["*"],
 )
 
-# ============ Modelos ============
+# Static mounts (se existirem as pastas)
+if os.path.isdir("static"):
+    app.mount("/static", StaticFiles(directory="static", html=False), name="static")
+if os.path.isdir("assets"):
+    app.mount("/assets", StaticFiles(directory="assets", html=False), name="assets")
+
+# ===================== Modelos =====================
 class GraphNode(BaseModel):
     id: str
     label: Optional[str] = None
@@ -104,32 +182,22 @@ class GraphPayload(BaseModel):
     edges: List[GraphEdge]
     meta: Optional[Dict[str, Any]] = None
 
-# ============ Utils de normalização ============
-def _to_bool(v: Any, default: bool = False) -> bool:
-    if v is None:
-        return default
-    if isinstance(v, bool):
-        return v
-    s = str(v).strip().lower()
-    return s in ("1", "true", "t", "yes", "y", "on")
-
+# ===================== Utils =====================
 def _ensure_nodes_edges(data: Any) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
-    Normaliza quaisquer formatos plausíveis vindos da função RPC para:
+    Normaliza o payload do RPC para:
       nodes: [{id, label?, group?, title?}]
       edges: [{source, target, label?}]
     """
     if isinstance(data, dict) and "nodes" in data and "edges" in data:
-        raw_nodes = data["nodes"] or []
-        raw_edges = data["edges"] or []
+        raw_nodes = data.get("nodes") or []
+        raw_edges = data.get("edges") or []
     else:
-        # fallback: se vier como lista de relacionamentos, infere nós
         raw = data or []
         raw_nodes = []
         raw_edges = []
         seen = set()
         for item in raw:
-            # tenta várias chaves comuns
             s = item.get("from") or item.get("source") or item.get("src") or item.get("a")
             t = item.get("to") or item.get("target") or item.get("dst") or item.get("b")
             lab = item.get("label") or item.get("rel") or item.get("type")
@@ -143,21 +211,18 @@ def _ensure_nodes_edges(data: Any) -> Tuple[List[Dict[str, Any]], List[Dict[str,
                 raw_nodes.append({"id": str(t)})
                 seen.add(t)
 
-    # normaliza nodes
     nodes: List[Dict[str, Any]] = []
     for n in raw_nodes:
-        nid = str(n.get("id") or n.get("node_id") or n.get("key") or n.get("name"))
+        nid = str(n.get("id") or n.get("node_id") or n.get("key") or n.get("name") or "")
         if not nid:
-            # ignora nodes sem id
             continue
         nodes.append({
             "id": nid,
             "label": n.get("label") or n.get("name") or nid,
             "group": n.get("group") or n.get("type"),
-            "title": n.get("title") or n.get("hint") or None,
+            "title": n.get("title") or n.get("hint"),
         })
 
-    # normaliza edges
     edges: List[Dict[str, Any]] = []
     for e in raw_edges:
         s = e.get("source") or e.get("from") or e.get("src") or e.get("a")
@@ -180,12 +245,15 @@ def _truncate(nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]], max_node
         ee = ee[:max_edges]
     return nn, ee
 
-# ============ Supabase RPC ============
+def _cache_hdr(max_age: int) -> Dict[str, str]:
+    return {"Cache-Control": f"public, max-age={max_age}, stale-while-revalidate=60"}
+
+# ===================== Supabase RPC =====================
 async def _fetch_graph_from_supabase(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise HTTPException(status_code=500, detail="Supabase não configurado (SUPABASE_URL/KEY).")
 
-    url = f"{SUPABASE_URL}/rest/v1/rpc/get_graph_membros"
+    url = f"{SUPABASE_URL}/rest/v1/rpc/{SUPABASE_RPC_FN}"
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -197,7 +265,6 @@ async def _fetch_graph_from_supabase(payload: Dict[str, Any]) -> Dict[str, Any]:
     if resp.status_code >= 500:
         raise HTTPException(status_code=503, detail=f"Falha no RPC Supabase ({resp.status_code}).")
     if resp.status_code >= 400:
-        # devolve erro do RPC (ex.: parâmetro inválido)
         try:
             detail = resp.json()
         except Exception:
@@ -209,15 +276,13 @@ async def _fetch_graph_from_supabase(payload: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         raise HTTPException(status_code=502, detail="Resposta do RPC não é JSON.")
 
-# ============ PyVis HTML ============
+# ===================== PyVis HTML =====================
 def _pyvis_html(nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]], title: str = "Grafo") -> str:
-    # Import local (evita custo em /health)
     from pyvis.network import Network
 
     net = Network(height="100%", width="100%", bgcolor="#111111", font_color="#ffffff", directed=True)
-    net.barnes_hut()  # física padrão
+    net.barnes_hut()
 
-    # adiciona nós
     for n in nodes:
         net.add_node(
             n["id"],
@@ -225,8 +290,6 @@ def _pyvis_html(nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]], title:
             title=n.get("title"),
             group=n.get("group"),
         )
-
-    # adiciona arestas
     for e in edges:
         net.add_edge(e["source"], e["target"], title=e.get("label"))
 
@@ -240,38 +303,51 @@ def _pyvis_html(nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]], title:
     """)
 
     html = net.generate_html(notebook=False)
-    # Título simples no body (o pyvis sobrescreve head/body, então fazemos append)
     html = html.replace("</body>", f"<div style='position:fixed;left:12px;top:8px;color:#fff;font-family:sans-serif;font-size:14px;opacity:.7'>{title}</div></body>")
     return html
 
-# ============ Endpoints ============
+# ===================== Endpoints =====================
 @app.get("/health")
 async def health():
-    # Mantenha simples para ficar sempre 'healthy'
-    status = {"status": "ok"}
-    try:
-        status["http_client_ok"] = (http_client is not None) and (not http_client.is_closed)  # type: ignore[attr-defined]
-    except Exception:
-        status["http_client_ok"] = False
-    return JSONResponse(status_code=200, content=status)
+    status = {
+        "status": "ok",
+        "http_client_ok": bool(http_client and not getattr(http_client, "is_closed", False)),
+        "redis_enabled": bool(ENABLE_REDIS_CACHE and Redis is not None),
+        "redis_ok": False,
+        "supabase_url": bool(SUPABASE_URL),
+        "rpc_fn": SUPABASE_RPC_FN,
+    }
+    if redis_client is not None:
+        try:
+            pong = await redis_client.ping()  # type: ignore
+            status["redis_ok"] = bool(pong)
+        except Exception:
+            status["redis_ok"] = False
+    return JSONResponse(status_code=200, content=status, headers=_cache_hdr(0))
 
-@app.get("/graph/members", response_model=GraphPayload, responses={502: {"description": "Erro no RPC"}})
+@app.get("/openapi.yaml", response_class=PlainTextResponse, include_in_schema=False)
+async def openapi_yaml():
+    path = os.path.join("docs", "openapi.yaml")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="openapi.yaml não encontrado em /docs")
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return PlainTextResponse(content, media_type="text/yaml; charset=utf-8", headers=_cache_hdr(CACHE_STATIC_MAX_AGE))
+
+@app.get("/graph/members", response_model=GraphPayload)
 async def graph_members(
     p_faccao_id: str = Query(..., description="ID da facção"),
-    p_include_co: bool = Query(True, description="Incluir conexões co-ocorrentes"),
-    p_max_pairs: int = Query(500, ge=1, le=20000, description="Máximo de pares/arestas retornados pelo RPC"),
-    max_nodes: int = Query(0, ge=0, description="Corte local de nós (0 = sem corte)"),
-    max_edges: int = Query(0, ge=0, description="Corte local de arestas (0 = sem corte)"),
+    p_include_co: bool = Query(True, description="Incluir co-ocorrências"),
+    p_max_pairs: int = Query(500, ge=1, le=20000, description="Limite de pares no RPC"),
+    max_nodes: int = Query(0, ge=0, description="Corte local de nós (0=sem corte)"),
+    max_edges: int = Query(0, ge=0, description="Corte local de arestas (0=sem corte)"),
 ):
-    payload = {
-        "p_faccao_id": p_faccao_id,
-        "p_include_co": p_include_co,
-        "p_max_pairs": p_max_pairs,
-    }
+    payload = {"p_faccao_id": p_faccao_id, "p_include_co": p_include_co, "p_max_pairs": p_max_pairs}
     key = _cache_key("members", {**payload, "max_nodes": max_nodes, "max_edges": max_edges})
-    cached = CACHE.get(key)
+
+    cached = await cache_get(key)
     if cached is not None:
-        return cached
+        return JSONResponse(cached, headers=_cache_hdr(CACHE_API_TTL))
 
     data = await _fetch_graph_from_supabase(payload)
     nodes, edges = _ensure_nodes_edges(data)
@@ -290,27 +366,24 @@ async def graph_members(
             "cached": False,
         }
     }
-    CACHE.set(key, result)
-    return result
+    await cache_set(key, result)
+    return JSONResponse(result, headers=_cache_hdr(CACHE_API_TTL))
 
 @app.get("/graph/members/html", response_class=HTMLResponse)
 async def graph_members_html(
     p_faccao_id: str = Query(..., description="ID da facção"),
-    p_include_co: bool = Query(True, description="Incluir conexões co-ocorrentes"),
-    p_max_pairs: int = Query(500, ge=1, le=20000, description="Máximo de pares/arestas"),
-    max_nodes: int = Query(0, ge=0, description="Corte de nós (0 = sem corte)"),
-    max_edges: int = Query(0, ge=0, description="Corte de arestas (0 = sem corte)"),
-    title: str = Query("Relações: Membros x Facções x Funções", description="Título do gráfico"),
+    p_include_co: bool = Query(True, description="Incluir co-ocorrências"),
+    p_max_pairs: int = Query(500, ge=1, le=20000, description="Limite de pares no RPC"),
+    max_nodes: int = Query(0, ge=0, description="Corte local de nós (0=sem corte)"),
+    max_edges: int = Query(0, ge=0, description="Corte local de arestas (0=sem corte)"),
+    title: str = Query("Relações: Membros x Facções x Funções", description="Título"),
 ):
-    payload = {
-        "p_faccao_id": p_faccao_id,
-        "p_include_co": p_include_co,
-        "p_max_pairs": p_max_pairs,
-    }
+    payload = {"p_faccao_id": p_faccao_id, "p_include_co": p_include_co, "p_max_pairs": p_max_pairs}
     key = _cache_key("members_html", {**payload, "max_nodes": max_nodes, "max_edges": max_edges, "title": title})
-    cached = CACHE.get(key)
+
+    cached = await cache_get(key)
     if cached is not None:
-        return HTMLResponse(content=cached, status_code=200)
+        return HTMLResponse(cached, headers=_cache_hdr(CACHE_STATIC_MAX_AGE))
 
     data = await _fetch_graph_from_supabase(payload)
     nodes, edges = _ensure_nodes_edges(data)
@@ -318,14 +391,14 @@ async def graph_members_html(
         nodes, edges = _truncate(nodes, edges, max_nodes, max_edges)
 
     html = _pyvis_html(nodes, edges, title=title)
-    CACHE.set(key, html)
-    return HTMLResponse(content=html, status_code=200)
+    await cache_set(key, html)
+    return HTMLResponse(html, headers=_cache_hdr(CACHE_STATIC_MAX_AGE))
 
 @app.get("/", response_class=PlainTextResponse, include_in_schema=False)
 async def root():
-    return f"{APP_NAME} up. Veja /docs para Swagger e /graph/members ou /graph/members/html."
+    return f"{APP_NAME} up. Veja /docs (Swagger), /graph/members e /graph/members/html."
 
-# ========= Exec local =========
+# Execução local (sem gunicorn)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app:app", host="0.0.0.0", port=SERVICE_PORT, reload=True)
