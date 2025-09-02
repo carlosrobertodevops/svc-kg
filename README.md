@@ -2,18 +2,22 @@
 # svc-kg
 
 svc-kg/
-├─ app.py                      # FastAPI na raiz (como você pediu)
-├─ src/
-│  ├─ __init__.py
-│  ├─ settings.py
-│  ├─ supabase_client.py
-│  ├─ graph_utils.py
-│  └─ cache.py
+├─ app.py
+├─ config.py
+├─ cache.py
+├─ supabase_client.py
+├─ graph_builder.py
+├─ utils.py
 ├─ requirements.txt
 ├─ Dockerfile
-├─ gunicorn.conf.py
+├─ docker-compose.yaml
 ├─ .env.example
-└─ README.md
+├─ static/.gitkeep
+├─ assets/.gitkeep
+└─ docs/
+   ├─ openapi.yaml
+   └─ README.md
+
 
 Micro-serviço FastAPI para exibir grafos (pyVis) a partir de RPC no Supabase.
 
@@ -53,9 +57,17 @@ curl -X POST "https://svc-kg.SEUDOMINIO/rpc/get_graph_membros" \
   -H "Content-Type: application/json" \
   -d '{"p_faccao_id":"abc123","p_include_co":true,"p_max_pairs":200}'
 
+# Documentação
 
+- Swagger UI: `GET /docs`
+- Redoc: `GET /redoc`
+- OpenAPI JSON gerado: `GET /openapi.json`
+- OpenAPI YAML estático: `GET /openapi.yaml`
 
-
+Endpoints principais:
+- `GET /graph/members` → JSON (nodes/edges) para FlutterFlow
+- `GET /graph/members/html` → Página HTML pyVis pronta para embed
+- `GET /health` → status
 
 ```
 ---

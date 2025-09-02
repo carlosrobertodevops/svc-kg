@@ -1,78 +1,153 @@
-version: "3.9"
+openapi: 3.0.3
+info:
+  title: svc-kg
+  version: "1.0.0"
+  description: |
+    Micro-serviço para visualização de grafos (pyVis) com dados vindos do Supabase (RPC `get_graph_membros`).
 
-services:
-  svc-kg:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: svc-kg:latest
-    env_file:
-      - .env
-    environment:
-      # App
-      APP_ENV: production
-      PORT: 8080
-      WORKERS: ${WORKERS:-2}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+servers:
+  - url: http://localhost:8080
+    description: Local
+  - url: https://seu-dominio-svc-kg.com
+    description: Produção
 
-      # CORS (para FlutterFlow e web)
-      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-*}
-      CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-false}
-      CORS_ALLOW_HEADERS: ${CORS_ALLOW_HEADERS:-Authorization,Content-Type}
-      CORS_ALLOW_METHODS: ${CORS_ALLOW_METHODS:-GET,POST,OPTIONS}
+paths:
+  /health:
+    get:
+      summary: Healthcheck
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              example:
+                status: ok
+                version: "1.0.0"
+                redis_enabled: true
+                supabase_url: https://supabase.mondaha.com
 
-      # Supabase RPC
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_KEY: ${SUPABASE_KEY}
-      SUPABASE_SCHEMA: ${SUPABASE_SCHEMA:-public}
-      SUPABASE_RPC_FN: ${SUPABASE_RPC_FN:-get_graph_membros}
-      SUPABASE_TIMEOUT: ${SUPABASE_TIMEOUT:-15}
+  /graph/members:
+    get:
+      summary: Retorna grafo em JSON pronto para pyVis/FlutterFlow
+      parameters:
+        - name: p_faccao_id
+          in: query
+          required: true
+          schema: { type: string }
+          description: ID da facção (obrigatório)
+        - name: p_include_co
+          in: query
+          required: false
+          schema: { type: boolean, default: true }
+        - name: p_max_pairs
+          in: query
+          required: false
+          schema: { type: integer, default: 500, minimum: 1, maximum: 5000 }
+        - name: preview
+          in: query
+          schema: { type: boolean, default: false }
+        - name: max_nodes
+          in: query
+          schema: { type: integer, default: 250, minimum: 1, maximum: 5000 }
+        - name: max_edges
+          in: query
+          schema: { type: integer, default: 500, minimum: 1, maximum: 20000 }
+      responses:
+        "200":
+          description: JSON no schema {nodes, edges}
+          headers:
+            Cache-Control: { schema: { type: string } }
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        label: { type: string }
+                        group: { type: string }
+                        title: { type: string }
+                        value: { type: number }
+                  edges:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        from: { type: string }
+                        to: { type: string }
+                        label: { type: string }
+                        weight: { type: number }
+              examples:
+                demo:
+                  value:
+                    nodes:
+                      - { id: "u1", label: "Membro 1", group: "fac1", value: 3 }
+                      - { id: "u2", label: "Membro 2", group: "fac1", value: 1 }
+                    edges:
+                      - { from: "u1", to: "u2", label: "co", weight: 2 }
 
-      # Cache HTTP e API
-      CACHE_STATIC_MAX_AGE: ${CACHE_STATIC_MAX_AGE:-86400} # 24h p/ assets html/js/css
-      CACHE_API_TTL: ${CACHE_API_TTL:-60} # 60s p/ respostas JSON
+  /graph/members/html:
+    get:
+      summary: Retorna página HTML com grafo pyVis embutido
+      parameters:
+        - {
+            name: p_faccao_id,
+            in: query,
+            required: true,
+            schema: { type: string }
+          }
+        - {
+            name: p_include_co,
+            in: query,
+            schema: { type: boolean, default: true }
+          }
+        - {
+            name: p_max_pairs,
+            in: query,
+            schema: { type: integer, default: 500, minimum: 1, maximum: 5000 }
+          }
+        - {
+            name: preview,
+            in: query,
+            schema: { type: boolean, default: false }
+          }
+        - {
+            name: max_nodes,
+            in: query,
+            schema: { type: integer, default: 250, minimum: 1, maximum: 5000 }
+          }
+        - {
+            name: max_edges,
+            in: query,
+            schema: { type: integer, default: 500, minimum: 1, maximum: 20000 }
+          }
+        - { name: physics, in: query, schema: { type: boolean, default: true } }
+        - {
+            name: height,
+            in: query,
+            schema: { type: string, default: "650px" }
+          }
+        - { name: width, in: query, schema: { type: string, default: "100%" } }
+      responses:
+        "200":
+          description: HTML do pyVis
+          headers:
+            Cache-Control: { schema: { type: string } }
+          content:
+            text/html:
+              schema: { type: string }
 
-      # Redis (opcional)
-      ENABLE_REDIS_CACHE: ${ENABLE_REDIS_CACHE:-true}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-
-      # Segurança/observabilidade (opcional)
-      SENTRY_DSN: ${SENTRY_DSN:-}
-    ports:
-      - "8080:8080"
-    depends_on:
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./assets:/app/assets
-      - ./static:/app/static
-      - ./docs:/app/docs:ro
-      - ./tmp:/app/tmp
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    # Não exponha a porta externa em produção (somente rede interna do compose)
-    # ports:
-    #   - "6379:6379"
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-
-networks:
-  default:
-    name: svc-kg-net
-
-volumes:
-  redis-data:
+  /openapi.yaml:
+    get:
+      summary: Baixa o OpenAPI YAML estático
+      responses:
+        "200":
+          description: YAML
+          content:
+            text/yaml:
+              schema: { type: string }

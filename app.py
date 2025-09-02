@@ -1,167 +1,165 @@
-# app.py
-import uvicorn
-from fastapi import FastAPI, Query, Body, HTTPException
+import os
+import hashlib
+import json
+from typing import Optional
+
+from fastapi import FastAPI, Query, Header, Response, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse
-from typing import Any, Dict, Optional
-from src.settings import settings
-from src.supabase_client import rpc_client
-from src.graph_utils import normalize_graph, truncate_preview, build_pyvis_html
-from src.cache import cache
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import ORJSONResponse, HTMLResponse, FileResponse
 
-app = FastAPI(title="svc-kg", version="1.1.0")
+from cache import get_cache
+from config import Settings, get_settings
+from supabase_client import SupabaseRPC
+from graph_builder import build_pyvis_html, normalize_graph_schema, truncate_preview
+from utils import make_cache_headers, compute_etag
 
-# --- CORS ---
-allow_origins = settings.cors_allow_origins
-if allow_origins == ["*"]:
-    allow_credentials = False
-else:
-    allow_credentials = True
+settings: Settings = get_settings()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allow_origins,
-    allow_credentials=allow_credentials,
-    allow_methods=["*"],
-    allow_headers=["*"],
+app = FastAPI(
+    title="svc-kg",
+    version="1.0.0",
+    default_response_class=ORJSONResponse,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
-def _cache_control_value() -> str:
-    swr = settings.http_stale_while_revalidate_seconds
-    base = f"public, max-age={settings.http_cache_seconds}"
-    return f"{base}, stale-while-revalidate={swr}" if swr > 0 else base
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()],
+    allow_credentials=settings.cors_allow_credentials,
+    allow_methods=[m.strip() for m in settings.cors_allow_methods.split(",") if m.strip()],
+    allow_headers=[h.strip() for h in settings.cors_allow_headers.split(",") if h.strip()],
+)
 
-@app.get("/", response_class=PlainTextResponse)
-async def root():
-    return "svc-kg up. veja /docs"
+# Static (pyVis assets ou quaisquer arquivos)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/assets", StaticFiles(directory="assets"), name="assets")
+
+# App state (RPC e Cache)
+rpc_client = SupabaseRPC(
+    supabase_url=settings.supabase_url,
+    supabase_key=settings.supabase_key,
+    timeout=settings.supabase_timeout,
+)
+cache = get_cache(settings)
+
+@app.on_event("startup")
+async def on_startup():
+    await rpc_client.start()
+    await cache.start()
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await cache.close()
+    await rpc_client.close()
 
 @app.get("/health")
-async def health(deep: bool = Query(default=False)):
-    info = {
+async def health():
+    """
+    Health leve (sem quebrar por atributo inexistente).
+    """
+    details = {
         "status": "ok",
-        "version": app.version,
-        "supabase_url": settings.supabase_url or "",
-        "rpc_function": settings.supabase_rpc_function,
+        "version": "1.0.0",
+        "redis_enabled": settings.enable_redis_cache,
+        "supabase_url": settings.supabase_url,
     }
-    if deep:
-        ok, detail = await rpc_client.ping()
-        info["supabase"] = {"ok": ok, "detail": detail}
-        return JSONResponse(info, status_code=200 if ok else 503)
-    return JSONResponse(info)
+    return details
 
-@app.get("/graph/membros")
-async def get_graph_membros(
-    p_faccao_id: Optional[str] = Query(default=None),
-    p_include_co: Optional[bool] = Query(default=None),
-    p_max_pairs: Optional[int] = Query(default=None),
-    depth: Optional[int] = Query(default=None),
-    preview: bool = Query(default=True),
-    max_nodes: int = Query(default=500, ge=10, le=5000),
-    max_edges: int = Query(default=1000, ge=10, le=20000),
-    nocache: bool = Query(default=False),
-    cache_ttl: Optional[int] = Query(default=None),
-) -> JSONResponse:
-    payload: Dict[str, Any] = {}
-    if p_faccao_id is not None: payload["p_faccao_id"] = p_faccao_id
-    if p_include_co is not None: payload["p_include_co"] = p_include_co
-    if p_max_pairs is not None: payload["p_max_pairs"] = p_max_pairs
-    if depth is not None: payload["depth"] = depth
+# --------- Endpoints de Grafo ---------
 
-    key = cache.key_for(settings.supabase_rpc_function, payload)
-    hit = False
-    raw = None
+@app.get("/graph/members")
+async def graph_members(
+    request: Request,
+    response: Response,
+    p_faccao_id: str = Query(..., description="ID da facção (obrigatório)"),
+    p_include_co: Optional[bool] = Query(True, description="Incluir coocorrências relacionadas"),
+    p_max_pairs: Optional[int] = Query(500, ge=1, le=5000, description="Limite de pares"),
+    preview: Optional[bool] = Query(False, description="Ativar preview truncado"),
+    max_nodes: Optional[int] = Query(250, ge=1, le=5000, description="Máximo de nós no preview"),
+    max_edges: Optional[int] = Query(500, ge=1, le=20000, description="Máximo de arestas no preview"),
+    if_none_match: Optional[str] = Header(None, alias="If-None-Match"),
+):
+    """
+    Retorna JSON no formato { nodes: [...], edges: [...] } pronto para pyVis/FlutterFlow.
+    Busca via Supabase RPC (get_graph_membros) + cache (Redis opcional) + ETag.
+    """
+    if not p_faccao_id:
+        raise HTTPException(status_code=400, detail="p_faccao_id é obrigatório")
 
-    if not nocache:
-        raw = await cache.get(key)
-        if raw is not None:
-            hit = True
+    cache_key = f"graph_members:{p_faccao_id}:{p_include_co}:{p_max_pairs}"
+    cached = await cache.get(cache_key)
+    if cached:
+        data = cached
+    else:
+        payload = {
+            "p_faccao_id": p_faccao_id,
+            "p_include_co": p_include_co,
+            "p_max_pairs": p_max_pairs,
+        }
+        data = await rpc_client.call(settings.supabase_rpc_fn, payload)
+        # Normaliza para o schema esperado do pyVis (id,label,group,title,value / from,to,label,weight)
+        data = normalize_graph_schema(data)
+        await cache.set(cache_key, data, ttl=settings.cache_api_ttl)
 
-    if raw is None:
-        lock = await cache.acquire_key_lock(key)
-        async with lock:
-            raw = await cache.get(key)
-            if raw is None:
-                raw = await rpc_client.call_rpc(settings.supabase_rpc_function, payload)
-                await cache.set(key, raw, ttl=cache_ttl)
-
-    graph = normalize_graph(raw)
-    returned = graph
-    truncated = False
+    # Preview (se solicitado)
     if preview:
-        returned, truncated = truncate_preview(graph, max_nodes=max_nodes, max_edges=max_edges)
+        data = truncate_preview(data, max_nodes=max_nodes, max_edges=max_edges)
 
-    meta = {
-        "rpc": settings.supabase_rpc_function,
-        "params": payload,
-        "truncated": truncated,
-        "received_nodes": len(graph.get("nodes", [])),
-        "received_edges": len(graph.get("edges", [])),
-        "returned_nodes": len(returned.get("nodes", [])),
-        "returned_edges": len(returned.get("edges", [])),
-        "cache": "HIT" if hit else "MISS",
+    # ETag / Cache headers HTTP
+    body_bytes = json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    etag = compute_etag(body_bytes)
+    if if_none_match and if_none_match == etag:
+        return Response(status_code=304)
+
+    headers = make_cache_headers(settings.cache_api_ttl, etag)
+    for k, v in headers.items():
+        response.headers[k] = v
+    return data
+
+@app.get("/graph/members/html")
+async def graph_members_html(
+    response: Response,
+    p_faccao_id: str = Query(..., description="ID da facção (obrigatório)"),
+    p_include_co: Optional[bool] = Query(True),
+    p_max_pairs: Optional[int] = Query(500, ge=1, le=5000),
+    preview: Optional[bool] = Query(False),
+    max_nodes: Optional[int] = Query(250, ge=1, le=5000),
+    max_edges: Optional[int] = Query(500, ge=1, le=20000),
+    physics: Optional[bool] = Query(True, description="Habilita física no pyVis"),
+    height: Optional[str] = Query("650px"),
+    width: Optional[str] = Query("100%"),
+):
+    """
+    Retorna uma página HTML contendo o grafo renderizado com pyVis, pronta para embed.
+    """
+    payload = {
+        "p_faccao_id": p_faccao_id,
+        "p_include_co": p_include_co,
+        "p_max_pairs": p_max_pairs,
     }
-    returned["meta"] = meta
+    cache_key = f"graph_members:{p_faccao_id}:{p_include_co}:{p_max_pairs}"
+    data = await cache.get(cache_key)
+    if not data:
+        data = await rpc_client.call(settings.supabase_rpc_fn, payload)
+        data = normalize_graph_schema(data)
+        await cache.set(cache_key, data, ttl=settings.cache_api_ttl)
 
-    resp = JSONResponse(returned)
-    resp.headers["Cache-Control"] = _cache_control_value()
-    resp.headers["X-Cache"] = "HIT" if hit else "MISS"
-    return resp
-
-@app.get("/graph/membros/vis", response_class=HTMLResponse)
-async def get_graph_membros_vis(
-    p_faccao_id: Optional[str] = Query(default=None),
-    p_include_co: Optional[bool] = Query(default=None),
-    p_max_pairs: Optional[int] = Query(default=None),
-    depth: Optional[int] = Query(default=None),
-    preview: bool = Query(default=True),
-    max_nodes: int = Query(default=500, ge=10, le=5000),
-    max_edges: int = Query(default=1000, ge=10, le=20000),
-    physics: bool = Query(default=True),
-    nocache: bool = Query(default=False),
-    cache_ttl: Optional[int] = Query(default=None),
-) -> HTMLResponse:
-    payload: Dict[str, Any] = {}
-    if p_faccao_id is not None: payload["p_faccao_id"] = p_faccao_id
-    if p_include_co is not None: payload["p_include_co"] = p_include_co
-    if p_max_pairs is not None: payload["p_max_pairs"] = p_max_pairs
-    if depth is not None: payload["depth"] = depth
-
-    key = cache.key_for(settings.supabase_rpc_function, payload)
-    hit = False
-    raw = None
-
-    if not nocache:
-        raw = await cache.get(key)
-        if raw is not None:
-            hit = True
-
-    if raw is None:
-        lock = await cache.acquire_key_lock(key)
-        async with lock:
-            raw = await cache.get(key)
-            if raw is None:
-                raw = await rpc_client.call_rpc(settings.supabase_rpc_function, payload)
-                await cache.set(key, raw, ttl=cache_ttl)
-
-    graph = normalize_graph(raw)
     if preview:
-        graph, _ = truncate_preview(graph, max_nodes=max_nodes, max_edges=max_edges)
-    html = build_pyvis_html(graph, physics=physics, height="100%", width="100%")
+        data = truncate_preview(data, max_nodes=max_nodes, max_edges=max_edges)
 
-    resp = HTMLResponse(html)
-    resp.headers["Cache-Control"] = _cache_control_value()
-    resp.headers["X-Cache"] = "HIT" if hit else "MISS"
-    return resp
+    html = build_pyvis_html(data, physics=physics, height=height, width=width)
+    headers = make_cache_headers(settings.cache_api_ttl)
+    return HTMLResponse(content=html, headers=headers)
 
-@app.post("/rpc/get_graph_membros")
-async def rpc_get_graph_membros(body: Dict[str, Any] = Body(default=None)):
-    try:
-        result = await rpc_client.call_rpc(settings.supabase_rpc_function, body or {})
-        return JSONResponse(result)
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# --------- Documentação OpenAPI YAML estática ---------
 
-if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8080, reload=False)
+@app.get("/openapi.yaml")
+async def serve_openapi_yaml():
+    """
+    Entrega o arquivo docs/openapi.yaml (para Swagger/UIs externas).
+    """
+    return FileResponse("docs/openapi.yaml", media_type="text/yaml")
