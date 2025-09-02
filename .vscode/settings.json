@@ -7,5 +7,5 @@
     { "viewType": "default", "filenamePattern": "*.html" },
     { "viewType": "default", "filenamePattern": "*.svg" },
     { "viewType": "default", "filenamePattern": "*.pdf" }
-  ],
+  ]
 }
