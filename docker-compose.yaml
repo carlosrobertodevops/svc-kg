@@ -1,43 +1,78 @@
+version: "3.9"
+
 services:
   svc-kg:
-    # O Coolify vai clonar o repositório e construir a imagem a partir do Dockerfile na raiz
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: svc-kg
-    restart: unless-stopped
-
-    # NÃO use "ports" no Coolify; apenas expose
-    expose:
-      - "8080"
-
+    image: svc-kg:latest
+    env_file:
+      - .env
     environment:
-      # Ajuste pelo UI do Coolify (ou use .env no repo)
-      APP_NAME: ${APP_NAME:-svc-kg}
-      DATABASE_URL: ${DATABASE_URL} # Ex.: postgresql://svc_kg:***@<host>:5432/postgres?sslmode=require
-      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-4}
-      DB_POOL_MAX: ${DB_POOL_MAX:-20}
-      CACHE_TTL: ${CACHE_TTL:-30}
-      # (Opcional) Se quiser proteger com API Key, ative no app.py e defina aqui:
-      # API_KEY: ${API_KEY}
+      # App
+      APP_ENV: production
+      PORT: 8080
+      WORKERS: ${WORKERS:-2}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
 
-    # Healthcheck interno (sem curl/wget) usando o Python já presente na imagem
+      # CORS (para FlutterFlow e web)
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-*}
+      CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-false}
+      CORS_ALLOW_HEADERS: ${CORS_ALLOW_HEADERS:-Authorization,Content-Type}
+      CORS_ALLOW_METHODS: ${CORS_ALLOW_METHODS:-GET,POST,OPTIONS}
+
+      # Supabase RPC
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+      SUPABASE_SCHEMA: ${SUPABASE_SCHEMA:-public}
+      SUPABASE_RPC_FN: ${SUPABASE_RPC_FN:-get_graph_membros}
+      SUPABASE_TIMEOUT: ${SUPABASE_TIMEOUT:-15}
+
+      # Cache HTTP e API
+      CACHE_STATIC_MAX_AGE: ${CACHE_STATIC_MAX_AGE:-86400} # 24h p/ assets html/js/css
+      CACHE_API_TTL: ${CACHE_API_TTL:-60} # 60s p/ respostas JSON
+
+      # Redis (opcional)
+      ENABLE_REDIS_CACHE: ${ENABLE_REDIS_CACHE:-true}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+
+      # Segurança/observabilidade (opcional)
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./assets:/app/assets
+      - ./static:/app/static
+      - ./docs:/app/docs:ro
+      - ./tmp:/app/tmp
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "python - <<'PY'\nimport urllib.request,sys\ntry:\n  urllib.request.urlopen('http://localhost:8080/health', timeout=3)\n  sys.exit(0)\nexcept Exception:\n  sys.exit(1)\nPY",
-        ]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 6
-      start_period: 20s
+      retries: 5
+    restart: unless-stopped
 
-    # O Coolify conecta o serviço na rede do proxy automaticamente; se sua instância exigir rede explícita:
-    # networks:
-    #   - coolify
-# Se sua instância do Coolify exigir rede explícita, descomente aqui e ajuste o nome:
-# networks:
-#   coolify:
-#     external: true
-#     name: coolify-infra   # ou "coolify-overlay" / veja em: docker network ls | grep coolify
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Não exponha a porta externa em produção (somente rede interna do compose)
+    # ports:
+    #   - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+networks:
+  default:
+    name: svc-kg-net
+
+volumes:
+  redis-data:
