@@ -6,3 +6,8 @@ __pycache__/
 .env.local
 pg_data/
 .git
+.DS_Store
+.mypy_cache/
+.vscode/
+__pycache__
+.vincent/

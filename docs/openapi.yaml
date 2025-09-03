@@ -1,25 +1,24 @@
 openapi: 3.0.3
 info:
   title: svc-kg
-  version: "1.4.0"
-  description: >
-    Microserviço de Knowledge Graph (membros, facções, funções).
+  version: "1.5.0"
+  description: Microserviço de Knowledge Graph.
 servers: [ { url: / } ]
 paths:
   /live:
-    get:
-      summary: Liveness
-      responses: { "200": { description: ok } }
+    get: { summary: Liveness, responses: { "200": { description: ok } } }
   /ready:
     get:
       summary: Readiness (checa Redis e backend)
       responses:
         "200": { description: pronto }
         "503": { description: dependências indisponíveis }
-  /health:
+  /debug/config:
     get:
-      summary: Health (estático)
+      summary: Config sanitizada
       responses: { "200": { description: ok } }
+  /health:
+    get: { summary: Health (estático), responses: { "200": { description: ok } } }
   /v1/graph/membros:
     get:
       summary: Grafo (via et_graph_membros/get_graph_membros)
@@ -50,28 +49,3 @@ paths:
       - { name: include_co, in: query, required: false, schema: { type: boolean, default: true } }
       - { name: max_pairs, in: query, required: false, schema: { type: integer, default: 3000 } }
       responses: { "200": { description: ok } }
-components:
-  schemas:
-    Node:
-      type: object
-      required: [ id, label, type ]
-      properties:
-        id: { type: string }
-        label: { type: string }
-        type: { type: string, enum: [ membro, faccao, funcao ] }
-        group: { type: integer, nullable: true }
-        size: { type: number, format: float, nullable: true }
-    Edge:
-      type: object
-      required: [ source, target ]
-      properties:
-        source: { type: string }
-        target: { type: string }
-        relation: { type: string, nullable: true }
-        weight: { type: number, format: float, nullable: true }
-    GraphResponse:
-      type: object
-      required: [ nodes, edges ]
-      properties:
-        nodes: { type: array, items: { $ref: "#/components/schemas/Node" } }
-        edges: { type: array, items: { $ref: "#/components/schemas/Edge" } }

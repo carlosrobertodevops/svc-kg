@@ -80,16 +80,46 @@ Endpoints principais:
 ```
 ---
 
-# svc-kg
 
-Microserviço de **Knowledge Graph** (membros, funções, facções) com **FastAPI**.
+---
 
-- Docs: **Swagger** `/docs`, **ReDoc** `/redoc`, **OpenAPI** `/openapi.json`
-- Performance: **ORJSON**, **GZip**, **psycopg_pool** (async), **cache TTL**, **multi-workers**
-- Preview seguro no navegador: `max_nodes` e `max_edges` (evita travar o Swagger)
+## 🔎 Checklist agora (externo)
 
-## Rodar local (Postgres + serviço)
+1. Abra no browser:  
+   `https://svc-kg.mondaha.com/live`  
+   Esperado: `200 {"status":"live",...}`
 
-```bash
-docker compose -f docker-compose.local.yml up --build
+2. Se (1) estiver ok, teste:  
+   `https://svc-kg.mondaha.com/health`  
+   Deve vir `200`.
+
+3. Depois:  
+   `https://svc-kg.mondaha.com/ready`  
+   - `200`: tudo certo (Redis/backend ok).  
+   - `503`: a resposta JSON aponta o que está falhando (ver campo `error`).
+
+4. Por fim, a rota do grafo:  
+   `https://svc-kg.mondaha.com/v1/graph/membros?faccao_id=6&include_co=true&max_pairs=500`
+
+Se **(1)** ainda der **503**, o problema é 100% de **roteamento/porta no Coolify** (o Traefik não encontra container saudável na porta interna). A correção é alinhar **PORT** + **Application Port** + (opcional) **labels** acima.
+::contentReference[oaicite:0]{index=0}
+
+
+
+## Troubleshooting 503 ("no available server")
+
+Esse 503 vem do Traefik/edge. Siga:
+
+1) **App port interno**
+   - No Coolify, verifique **Application Port** do serviço. Deve ser **8080** (ou altere `PORT` nas envs do app para o valor da UI).
+   - Nosso container escuta em `0.0.0.0:${PORT:-8080}`.
+
+2) **Healthcheck no Coolify**
+   - Use `/live` (não depende de Redis/DB).
+   - Se o health estiver falhando, o Traefik não publica o serviço.
+
+3) **Teste direto do app (no host do container)**
+   ```bash
+   docker exec -it <container-svc-kg> sh -lc 'curl -sS http://localhost:${PORT:-8080}/live && echo'
+   docker exec -it <container-svc-kg> sh -lc 'curl -sS http://localhost:${PORT:-8080}/ready && echo'
 
