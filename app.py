@@ -1,7 +1,8 @@
 # app.py
-import os, json, hashlib, asyncio, logging, traceback
+import os, json, hashlib, asyncio, logging, traceback, socket
 from typing import List, Optional, Tuple
 from time import time
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, Query, Response, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,27 +16,18 @@ import httpx
 from psycopg_pool import AsyncConnectionPool
 from redis import asyncio as aioredis
 
-# -------- utils --------
 def env_bool(v: Optional[str], default=False) -> bool:
     if v is None: return default
     return v.lower() in ("1", "true", "yes", "on")
 
 def normalize_supabase_url(u: str) -> str:
-    """Garante protocolo e remove sufixo /rest/v1."""
-    if not u:
-        return ""
-    u = u.strip()
-    # remove sufixo /rest/v1 (se vier da doc do Supabase)
-    u = u.replace("/rest/v1", "")
-    # remove barras finais repetidas
-    while u.endswith("/"):
-        u = u[:-1]
-    # garante protocolo
+    if not u: return ""
+    u = u.strip().replace("/rest/v1", "")
+    while u.endswith("/"): u = u[:-1]
     if not (u.startswith("http://") or u.startswith("https://")):
         u = "https://" + u
     return u
 
-# -------- ENV --------
 APP_ENV = os.getenv("APP_ENV", "production")
 PORT = int(os.getenv("PORT", "8080"))
 WORKERS = int(os.getenv("WORKERS", "2"))
@@ -46,7 +38,6 @@ CORS_ALLOW_CREDENTIALS = env_bool(os.getenv("CORS_ALLOW_CREDENTIALS", "false"))
 CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type")
 CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS")
 
-# <<< ALTERAÇÃO: normalização automática >>>
 SUPABASE_URL_RAW = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_URL = normalize_supabase_url(SUPABASE_URL_RAW)
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
@@ -63,49 +54,34 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0").strip()
 
 BACKEND_MODE = "supabase" if (SUPABASE_URL and SUPABASE_KEY) else ("postgres" if DATABASE_URL else "none")
 
-# -------- logging --------
 logging.basicConfig(level=LOG_LEVEL)
 log = logging.getLogger("svc-kg")
 
-# -------- app --------
 app = FastAPI(
     title="svc-kg",
-    version="1.5.1",
+    version="1.5.2",
     description="Microserviço de Knowledge Graph (membros, facções, funções)",
     default_response_class=ORJSONResponse,
-    swagger_ui_parameters={
-        "displayRequestDuration": True,
-        "docExpansion": "none",
-        "defaultModelsExpandDepth": -1,
-        "defaultModelExpandDepth": 0,
-    },
+    swagger_ui_parameters={"displayRequestDuration": True, "docExpansion": "none",
+                           "defaultModelsExpandDepth": -1, "defaultModelExpandDepth": 0},
 )
 
-# CORS
 allow_origins = [o.strip() for o in (CORS_ALLOW_ORIGINS or "*").split(",")]
 allow_methods = [m.strip() for m in (CORS_ALLOW_METHODS or "*").split(",")]
 allow_headers = [h.strip() for h in (CORS_ALLOW_HEADERS or "*").split(",")]
-app.add_middleware(CORSMiddleware,
-    allow_origins=allow_origins,
-    allow_credentials=CORS_ALLOW_CREDENTIALS,
-    allow_methods=allow_methods,
-    allow_headers=allow_headers,
-)
+app.add_middleware(CORSMiddleware, allow_origins=allow_origins,
+                   allow_credentials=CORS_ALLOW_CREDENTIALS,
+                   allow_methods=allow_methods, allow_headers=allow_headers)
 app.add_middleware(GZipMiddleware, minimum_size=512)
 
-# Static
-if os.path.isdir("assets"):
-    app.mount("/assets", StaticFiles(directory="assets"), name="assets")
-if os.path.isdir("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+if os.path.isdir("assets"): app.mount("/assets", StaticFiles(directory="assets"), name="assets")
+if os.path.isdir("static"): app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Globals
 http_client: Optional[httpx.AsyncClient] = None
 pool: Optional[AsyncConnectionPool] = None
 redis_client: Optional[aioredis.Redis] = None
 _mem_cache: dict[str, Tuple[float, dict]] = {}
 
-# Models (docs)
 class Node(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
@@ -125,65 +101,44 @@ class GraphResponse(BaseModel):
     nodes: List[Node]
     edges: List[Edge]
 
-# Startup/Shutdown
 @app.on_event("startup")
 async def _startup():
     global http_client, pool, redis_client
-
-    log.info(f"Starting svc-kg v{app.version} | mode={BACKEND_MODE} | port={PORT}")
+    log.info(f"Starting svc-kg v{app.version} | mode={BACKEND_MODE} | port={PORT} | supabase={SUPABASE_URL}")
     if BACKEND_MODE == "supabase":
-        if not SUPABASE_URL.startswith("http"):
-            log.error(f"SUPABASE_URL inválida após normalização: '{SUPABASE_URL_RAW}' -> '{SUPABASE_URL}'")
         http_client = httpx.AsyncClient(
             base_url=SUPABASE_URL,
             timeout=httpx.Timeout(SUPABASE_TIMEOUT),
-            headers={
-                "apikey": SUPABASE_KEY,
-                "Authorization": f"Bearer {SUPABASE_KEY}",
-                "Content-Type": "application/json",
-            },
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Content-Type": "application/json"},
         )
-
     if BACKEND_MODE == "postgres":
-        pool = AsyncConnectionPool(
-            conninfo=DATABASE_URL, min_size=0, max_size=10, kwargs={"autocommit": True}
-        )
-
+        pool = AsyncConnectionPool(conninfo=DATABASE_URL, min_size=0, max_size=10, kwargs={"autocommit": True})
     if ENABLE_REDIS_CACHE and REDIS_URL:
         try:
             redis_client = aioredis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
             await asyncio.wait_for(redis_client.ping(), timeout=2)
             log.info("Redis OK")
         except Exception as e:
-            log.warning(f"Redis indisponível, usando cache em memória. Motivo: {e}")
+            log.warning(f"Redis indisponível, fallback memória: {e}")
             redis_client = None
 
 @app.on_event("shutdown")
 async def _shutdown():
-    if http_client:
-        await http_client.aclose()
-    if pool:
-        await pool.close()
-    if redis_client:
-        await redis_client.close()
+    if http_client: await http_client.aclose()
+    if pool: await pool.close()
+    if redis_client: await redis_client.close()
 
-# Exception handlers
 @app.exception_handler(HTTPException)
 async def http_exc_handler(request: Request, exc: HTTPException):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"error": str(exc.detail), "status_code": exc.status_code, "path": str(request.url.path)},
-    )
+    return JSONResponse(status_code=exc.status_code, content={"error": str(exc.detail),
+                         "status_code": exc.status_code, "path": str(request.url.path)})
 
 @app.exception_handler(Exception)
 async def unhandled_exc_handler(request: Request, exc: Exception):
     log.error("Unhandled exception: %s\n%s", exc, "".join(traceback.format_exc()[-1000:]))
-    return JSONResponse(
-        status_code=500,
-        content={"error": "internal_error", "message": str(exc)[:500], "path": str(request.url.path)},
-    )
+    return JSONResponse(status_code=500, content={"error": "internal_error", "message": str(exc)[:500],
+                                                  "path": str(request.url.path)})
 
-# Cache helpers
 def _now() -> float: return time()
 
 async def cache_get(key: str) -> Optional[dict]:
@@ -197,23 +152,19 @@ async def cache_get(key: str) -> Optional[dict]:
     if not hit: return None
     ts, data = hit
     if _now() - ts > CACHE_API_TTL:
-        _mem_cache.pop(key, None)
-        return None
+        _mem_cache.pop(key, None); return None
     return data
 
 async def cache_set(key: str, data: dict, ttl: int):
     if redis_client:
         try:
-            await redis_client.set(key, json.dumps(data), ex=ttl)
-            return
+            await redis_client.set(key, json.dumps(data), ex=ttl); return
         except Exception as e:
             log.debug(f"cache_set redis falhou: {e}")
     _mem_cache[key] = (_now(), data)
 
-# Core helpers
 def etag_for(data: dict) -> str:
-    import orjson
-    return hashlib.sha1(orjson.dumps(data)).hexdigest()
+    import orjson; return hashlib.sha1(orjson.dumps(data)).hexdigest()
 
 def truncate_preview(data: dict, max_nodes: int, max_edges: int) -> dict:
     nodes = data.get("nodes", []); edges = data.get("edges", [])
@@ -231,7 +182,6 @@ def truncate_preview(data: dict, max_nodes: int, max_edges: int) -> dict:
     nodes2 = [n for n in nodes if n["id"] in keep]
     return {"nodes": nodes2, "edges": edges2}
 
-# Backends
 async def fetch_graph_via_supabase(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> dict:
     if http_client is None:
         raise HTTPException(status_code=503, detail="Supabase client não inicializado")
@@ -259,7 +209,6 @@ async def fetch_graph_via_pg(faccao_id: Optional[int], include_co: bool, max_pai
                 await cur.execute("select public.et_graph_membros(%s,%s,%s);", (faccao_id, include_co, max_pairs))
                 row = await cur.fetchone()
             except Exception as e:
-                logging.debug(f"et_graph_membros falhou, tentando get_graph_membros: {e}")
                 await cur.execute("select public.get_graph_membros(%s,%s,%s);", (faccao_id, include_co, max_pairs))
                 row = await cur.fetchone()
             data = row[0] if row else {"nodes": [], "edges": []}
@@ -270,84 +219,83 @@ async def fetch_graph_via_pg(faccao_id: Optional[int], include_co: bool, max_pai
             return data
 
 async def fetch_graph(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> dict:
-    if BACKEND_MODE == "supabase":
-        return await fetch_graph_via_supabase(faccao_id, include_co, max_pairs)
-    if BACKEND_MODE == "postgres":
-        return await fetch_graph_via_pg(faccao_id, include_co, max_pairs)
+    if BACKEND_MODE == "supabase": return await fetch_graph_via_supabase(faccao_id, include_co, max_pairs)
+    if BACKEND_MODE == "postgres": return await fetch_graph_via_pg(faccao_id, include_co, max_pairs)
     raise HTTPException(status_code=500, detail="Nenhum backend configurado (defina SUPABASE_* ou DATABASE_URL)")
 
-# OpenAPI (preferir docs/openapi.yaml)
 def custom_openapi():
-    if getattr(app, "openapi_schema", None):
-        return app.openapi_schema
+    if getattr(app, "openapi_schema", None): return app.openapi_schema
     yaml_path = os.path.join("docs", "openapi.yaml")
     if os.path.exists(yaml_path):
         with open(yaml_path, "r", encoding="utf-8") as f:
-            spec = yaml.safe_load(f)
-            app.openapi_schema = spec
-            return app.openapi_schema
+            app.openapi_schema = yaml.safe_load(f); return app.openapi_schema
     app.openapi_schema = get_openapi(title=app.title, version=app.version, routes=app.routes, description=app.description)
     return app.openapi_schema
 app.openapi = custom_openapi
 
-# -------- Endpoints --------
-@app.get("/live", summary="Liveness")
-async def live():
-    return {"status": "live", "service": "svc-kg"}
+@app.get("/live")
+async def live(): return {"status": "live", "service": "svc-kg"}
 
-@app.get("/ready", summary="Readiness (checa Redis e backend)")
+@app.get("/ready")
 async def ready():
-    ok = {"redis": False, "backend": BACKEND_MODE, "backend_ok": False}
+    info = {"redis": False, "backend": BACKEND_MODE, "backend_ok": False}
+    # DNS preflight (quando supabase)
+    if BACKEND_MODE == "supabase":
+        parsed = urlparse(SUPABASE_URL)
+        host = parsed.hostname or ""
+        info["supabase_host"] = host
+        try:
+            # tenta resolver DNS com timeout curto
+            loop = asyncio.get_running_loop()
+            await asyncio.wait_for(loop.run_in_executor(None, socket.getaddrinfo, host, 443), timeout=2.0)
+            info["dns_ok"] = True
+        except Exception as e:
+            info["dns_ok"] = False
+            info["error"] = f"DNS fail for {host}: {e}"
+            return ORJSONResponse(info, status_code=503)
+
     if redis_client:
         try:
-            ok["redis"] = bool(await asyncio.wait_for(redis_client.ping(), timeout=1.5))
+            info["redis"] = bool(await asyncio.wait_for(redis_client.ping(), timeout=1.5))
         except Exception:
-            ok["redis"] = False
+            info["redis"] = False
+
     try:
         if BACKEND_MODE == "supabase":
             _ = await fetch_graph_via_supabase(None, False, 1)
-            ok["backend_ok"] = True
+            info["backend_ok"] = True
         elif BACKEND_MODE == "postgres":
             async with pool.connection() as conn:
                 async with conn.cursor() as cur:
-                    await cur.execute("select 1;")
-                    await cur.fetchone()
-            ok["backend_ok"] = True
+                    await cur.execute("select 1;"); await cur.fetchone()
+            info["backend_ok"] = True
         else:
-            ok["backend_ok"] = False
+            info["backend_ok"] = False
     except Exception as e:
-        ok["backend_ok"] = False
-        ok["error"] = str(e)[:400]
-    return ORJSONResponse(ok, status_code=(200 if ok["backend_ok"] else 503))
+        info["backend_ok"] = False
+        info["error"] = str(e)[:400]
+    return ORJSONResponse(info, status_code=(200 if info["backend_ok"] else 503))
 
-@app.get("/debug/config", summary="Config (sanitizada)")
+@app.get("/debug/config")
 async def debug_config():
     return {
-        "env": APP_ENV,
-        "port": PORT,
+        "env": APP_ENV, "port": PORT,
         "backend_mode": BACKEND_MODE,
-        "has_supabase": bool(SUPABASE_URL and SUPABASE_KEY),
         "supabase_url_raw": SUPABASE_URL_RAW,
         "supabase_url": SUPABASE_URL,
         "rpc_function": SUPABASE_RPC_FN,
         "has_database_url": bool(DATABASE_URL),
-        "redis_enabled": ENABLE_REDIS_CACHE,
-        "has_redis_url": bool(REDIS_URL),
+        "redis_enabled": ENABLE_REDIS_CACHE, "has_redis_url": bool(REDIS_URL),
     }
 
-@app.get("/health", summary="Health (estático)")
+@app.get("/health")
 async def health(response: Response):
     response.headers["Cache-Control"] = f"public, max-age={CACHE_STATIC_MAX_AGE}"
-    return {
-        "status": "ok",
-        "service": "svc-kg",
-        "env": APP_ENV,
-        "cache": "redis" if (ENABLE_REDIS_CACHE and REDIS_URL and redis_client) else "memory",
-        "backend": BACKEND_MODE,
-    }
+    return {"status":"ok","service":"svc-kg","env":APP_ENV,
+            "cache":"redis" if (ENABLE_REDIS_CACHE and REDIS_URL and redis_client) else "memory",
+            "backend": BACKEND_MODE}
 
-@app.get("/v1/graph/membros", response_model=GraphResponse,
-         summary="Grafo (via et_graph_membros/get_graph_membros)")
+@app.get("/v1/graph/membros", response_model=GraphResponse)
 async def graph_membros(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -363,12 +311,10 @@ async def graph_membros(
         data = await fetch_graph(faccao_id, include_co, max_pairs)
         if cache: await cache_set(key, data, CACHE_API_TTL)
     out = truncate_preview(data, max_nodes, max_edges)
-    response.headers["ETag"] = etag_for(out)
-    response.headers["Cache-Control"] = "public, max-age=30"
+    response.headers["ETag"] = etag_for(out); response.headers["Cache-Control"] = "public, max-age=30"
     return out
 
-@app.get("/graph/members", response_model=GraphResponse,
-         summary="(Compat) Mesma resposta de /v1/graph/membros com p_*")
+@app.get("/graph/members", response_model=GraphResponse)
 async def graph_members_compat(
     response: Response,
     p_faccao_id: Optional[int] = Query(default=None),
@@ -384,14 +330,11 @@ async def graph_members_compat(
         data = await fetch_graph(p_faccao_id, p_include_co, p_max_pairs)
         if cache: await cache_set(key, data, CACHE_API_TTL)
     out = truncate_preview(data, max_nodes, max_edges)
-    response.headers["ETag"] = etag_for(out)
-    response.headers["Cache-Control"] = "public, max-age=30"
+    response.headers["ETag"] = etag_for(out); response.headers["Cache-Control"] = "public, max-age=30"
     return out
 
-@app.get("/v1/nodes/{node_id}/neighbors", response_model=GraphResponse,
-         summary="Subgrafo (raio=1)")
-async def neighbors(response: Response, node_id: str,
-                    include_co: bool = True, max_pairs: int = 3000):
+@app.get("/v1/nodes/{node_id}/neighbors", response_model=GraphResponse)
+async def neighbors(response: Response, node_id: str, include_co: bool = True, max_pairs: int = 3000):
     data = await fetch_graph(None, include_co, max_pairs)
     nodes = data.get("nodes", []); edges = data.get("edges", [])
     keep = {node_id}
@@ -401,6 +344,5 @@ async def neighbors(response: Response, node_id: str,
     nodes2 = [n for n in nodes if n.get("id") in keep]
     edges2 = [e for e in edges if e.get("source") in keep and e.get("target") in keep]
     out = {"nodes": nodes2, "edges": edges2}
-    response.headers["ETag"] = etag_for(out)
-    response.headers["Cache-Control"] = "public, max-age=30"
+    response.headers["ETag"] = etag_for(out); response.headers["Cache-Control"] = "public, max-age=30"
     return out
