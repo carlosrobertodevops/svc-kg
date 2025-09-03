@@ -582,7 +582,7 @@ async def vis_pyvis(
 
 # ------------------ VIS: vis-network (sem inline) ------------------
 @app.get("/v1/vis/visjs", response_class=HTMLResponse,
-         summary="Visualização vis-network (server-embed por padrão; fallback client)")
+         summary="Visualização vis-network (server-embed + fallback inline)")
 async def vis_visjs(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -596,32 +596,37 @@ async def vis_visjs(
     debug: bool = Query(default=False),
     source: str = Query(default="server", pattern="^(server|client)$")
 ):
-    # decide assets (local ↔ CDN)
+    # 1) Decide assets (local ↔ CDN)
     local_js = "static/vendor/vis-network/vis-network.min.js"
     local_css = "static/vendor/vis-network/vis-network.min.css"
     has_local = os.path.exists(local_js) and os.path.exists(local_css)
     if has_local:
         js_href = "/static/vendor/vis-network/vis-network.min.js"
         css_href = "/static/vendor/vis-network/vis-network.min.css"
-        csp = ("default-src 'self'; style-src 'self'; script-src 'self'; "
-               "img-src 'self' data:; font-src 'self' data:; connect-src 'self';")
+        # Permite inline (fallback) e self
+        csp = ("default-src 'self'; style-src 'self' 'unsafe-inline'; "
+               "script-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+               "font-src 'self' data:; connect-src 'self';")
     else:
         js_href = "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"
         css_href = "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
-        csp = ("default-src 'self'; style-src 'self' https://unpkg.com; script-src 'self' https://unpkg.com; "
+        # Permite inline + CDN
+        csp = ("default-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; "
+               "script-src 'self' 'unsafe-inline' https://unpkg.com; "
                "img-src 'self' data:; font-src 'self' data:; connect-src 'self';")
 
-    bg = "#0b0f19" if theme == "dark" else "#ffffff"
-
+    # 2) Se source=server, embute dados normalizados no HTML
     embedded_block = ""
     if source == "server":
         data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
         out = truncate_preview(data, max_nodes, max_edges)
-        # >>> normaliza labels antes de embedar
-        out = normalize_graph_labels(out)
+        out = normalize_graph_labels(out)  # <- limpa "{…}" -> "…"
         json_str = json.dumps(out, ensure_ascii=False)
         embedded_block = f'<script id="__KG_DATA__" type="application/json">{json_str}</script>'
 
+    bg = "#0b0f19" if theme == "dark" else "#ffffff"
+
+    # 3) HTML com fallback inline (não depende de /static/vis-embed.js)
     html = f"""<!doctype html>
 <html lang="pt-br">
   <head>
@@ -647,11 +652,114 @@ async def vis_visjs(
          data-debug="{str(debug).lower()}"
          data-source="{source}"></div>
     {embedded_block}
-    <script src="{js_href}"></script>
-    <script src="/static/vis-embed.js"></script>
+    <script src="{js_href}" crossorigin="anonymous"></script>
+
+    <!-- Fallback inline: desenha mesmo que /static/vis-embed.js ou CDN falhem -->
+    <script>
+    (function(){{
+      const container = document.getElementById('mynetwork');
+      const source = container.getAttribute('data-source') || 'server';
+      const debug = container.getAttribute('data-debug') === 'true';
+      const endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
+
+      function hashColor(s){{
+        s = String(s||''); let h=0; for (let i=0;i<s.length;i++) {{ h=(h<<5)-h+s.charCodeAt(i); h|=0; }}
+        const hue=Math.abs(h)%360; return `hsl(${hue},70%,50%)`;
+      }}
+      function isPgTextArray(s){{ s=(s||'').trim(); return s.length>=2 && s[0]=='{{' && s[s.length-1]=='}'; }}
+      function cleanLabel(raw){{
+        if(!raw) return '';
+        const s=String(raw).trim();
+        if(!isPgTextArray(s)) return s;
+        const inner=s.slice(1,-1);
+        if(!inner) return '';
+        return inner.replace(/(^|,)\\s*"?null"?\\s*(?=,|$)/gi,'')
+                    .replace(/"/g,'')
+                    .split(',').map(x=>x.trim()).filter(Boolean).join(', ');
+      }}
+      function degreeMap(nodes,edges){{
+        const d={{}}; nodes.forEach(n=>d[n.id]=0);
+        edges.forEach(e=>{{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; }});
+        return d;
+      }}
+      function attachToolbar(net,nc,ec){{
+        const p=document.getElementById('btn-print'); if(p) p.onclick=()=>window.print();
+        const r=document.getElementById('btn-reload'); if(r) r.onclick=()=>location.reload();
+        const b=document.getElementById('badge'); if(b && debug) b.textContent=`nodes: ${'{'}nc{'}'} · edges: ${'{'}ec{'}'}`;
+      }}
+      function render(data){{
+        const nodes=(data.nodes||[]).filter(n=>n&&n.id).map(n=>({{
+          id:String(n.id),
+          label: cleanLabel(n.label)||String(n.id),
+          group: String(n.group ?? n.type ?? '0'),
+          value: (typeof n.size==='number') ? n.size : undefined,
+          color: hashColor(n.group ?? n.type ?? '0'),
+          shape: 'dot'
+        }}));
+        const edges=(data.edges||[]).filter(e=>e&&e.source&&e.target).map(e=>({{
+          from:String(e.source), to:String(e.target),
+          value: (e.weight!=null? Number(e.weight):1.0),
+          title: e.relation ? `${{e.relation}} (w=${'{'}e.weight ?? 1{'}'})` : `w=${'{'}e.weight ?? 1{'}'}`
+        }}));
+
+        if(!nodes.length){{
+          container.innerHTML='<div style="display:flex;height:100%;align-items:center;justify-content:center;opacity:.85">Nenhum dado para exibir (nodes=0).</div>';
+          return;
+        }}
+        const hasSize = nodes.some(n=>typeof n.value==='number');
+        if(!hasSize) {{
+          const deg=degreeMap(nodes,edges);
+          nodes.forEach(n=>{{ const d=deg[n.id]||0; n.value=10+Math.log(d+1)*8; }});
+        }}
+        const dsNodes=new vis.DataSet(nodes);
+        const dsEdges=new vis.DataSet(edges);
+        const options={{ interaction:{{hover:true,dragNodes:true,dragView:true,zoomView:true,multiselect:true,navigationButtons:true}},
+                         manipulation:{{enabled:false}},
+                         physics:{{enabled:true,stabilization:{{enabled:true,iterations:500}},
+                                  barnesHut:{{gravitationalConstant:-8000,centralGravity:0.2,springLength:120,springConstant:0.04,avoidOverlap:0.2}}},
+                         nodes:{{borderWidth:1,shape:'dot'}}, edges:{{smooth:false,arrows:{{to:{{enabled:true}}}}}} }};
+        const net=new vis.Network(container,{{nodes:dsNodes,edges:dsEdges}},options);
+        net.once('stabilizationIterationsDone',()=>net.fit({{animation:{{duration:300}}}}));
+        net.on('doubleClick',()=>net.fit({{animation:{{duration:300}}}}));
+        attachToolbar(net,nodes.length,edges.length);
+      }}
+
+      function run(){{
+        if(typeof vis==='undefined') {{
+          container.innerHTML='<div style="padding:12px">vis-network não carregou. Verifique CSP/CDN.</div>';
+          return;
+        }}
+        if(source==='server'){{
+          const tag=document.getElementById('__KG_DATA__');
+          if(!tag) {{ container.innerHTML='<div style="padding:12px">Bloco de dados ausente.</div>'; return; }}
+          try {{ render(JSON.parse(tag.textContent||'{{}}')); }}
+          catch(e){{ console.error(e); container.innerHTML='<pre>'+String(e)+'</pre>'; }}
+        }} else {{
+          const params=new URLSearchParams(window.location.search);
+          const qs=new URLSearchParams();
+          const fac=params.get('faccao_id'); if(fac && fac.trim()!=='') qs.set('faccao_id',fac.trim());
+          qs.set('include_co', params.get('include_co') ?? 'true');
+          qs.set('max_pairs',  params.get('max_pairs')  ?? '8000');
+          qs.set('max_nodes',  params.get('max_nodes')  ?? '2000');
+          qs.set('max_edges',  params.get('max_edges')  ?? '4000');
+          qs.set('cache',      params.get('cache')      ?? 'false');
+          const url=endpoint+'?'+qs.toString();
+          fetch(url,{{headers:{{'Accept':'application/json'}}}})
+            .then(async r=>{{ if(!r.ok) throw new Error(r.status+': '+await r.text()); return r.json(); }})
+            .then(render)
+            .catch(err=>{{ console.error(err); container.innerHTML='<pre>'+String(err).replace(/</g,'&lt;')+'</pre>'; }});
+        }}
+      }}
+      if(document.readyState!=='loading') run(); else document.addEventListener('DOMContentLoaded', run);
+    }})();
+    </script>
+
+    <!-- Carrega também o arquivo externo (se existir); mas não é obrigatório -->
+    <script src="/static/vis-embed.js" defer></script>
   </body>
 </html>"""
 
     response.headers["Content-Security-Policy"] = csp
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
+
