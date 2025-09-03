@@ -1,6 +1,16 @@
 version: "3.9"
 
 services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   svc-kg:
     build:
       context: .
@@ -10,7 +20,7 @@ services:
       - .env
     environment:
       APP_ENV: production
-      PORT: 8080
+      PORT: ${PORT:-8080}
       WORKERS: ${WORKERS:-2}
       LOG_LEVEL: ${LOG_LEVEL:-info}
 
@@ -30,7 +40,7 @@ services:
       ENABLE_REDIS_CACHE: ${ENABLE_REDIS_CACHE:-true}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     ports:
-      - "8080:8080"
+      - "${PORT:-8080}:${PORT:-8080}"
     depends_on:
       redis:
         condition: service_healthy
@@ -40,27 +50,16 @@ services:
       - ./docs:/app/docs:ro
       - ./tmp:/app/tmp
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://localhost:${PORT:-8080}/health || exit 1"
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - redis-data:/data
     restart: unless-stopped
 
 networks:
   default:
     name: svc-kg-net
-
-volumes:
-  redis-data:

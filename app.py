@@ -1,27 +1,30 @@
 # app.py
-import os, json, hashlib
+import os, json, hashlib, asyncio
 from typing import List, Optional, Tuple
 from time import time
 
 from fastapi import FastAPI, Query, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import ORJSONResponse, FileResponse
+from fastapi.responses import ORJSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
-
 from fastapi.openapi.utils import get_openapi
+from pydantic import BaseModel, ConfigDict
 import yaml
 
-from psycopg_pool import AsyncConnectionPool
+# Backends
 import httpx
+from psycopg_pool import AsyncConnectionPool
 from redis import asyncio as aioredis
 
-# ---------------- ENV ----------------
+
 def env_bool(v: Optional[str], default=False) -> bool:
-    if v is None: return default
+    if v is None:
+        return default
     return v.lower() in ("1", "true", "yes", "on")
 
+
+# ---------------- ENV ----------------
 APP_ENV = os.getenv("APP_ENV", "production")
 PORT = int(os.getenv("PORT", "8080"))
 WORKERS = int(os.getenv("WORKERS", "2"))
@@ -32,23 +35,27 @@ CORS_ALLOW_CREDENTIALS = env_bool(os.getenv("CORS_ALLOW_CREDENTIALS", "false"))
 CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type")
 CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")           # ex: https://<proj>.supabase.co
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")           # service_role ou anon com RPC liberado
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
 SUPABASE_RPC_FN = os.getenv("SUPABASE_RPC_FN", "get_graph_membros")
 SUPABASE_TIMEOUT = float(os.getenv("SUPABASE_TIMEOUT", "15"))
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
 CACHE_STATIC_MAX_AGE = int(os.getenv("CACHE_STATIC_MAX_AGE", "86400"))
 CACHE_API_TTL = int(os.getenv("CACHE_API_TTL", "60"))
 
 ENABLE_REDIS_CACHE = env_bool(os.getenv("ENABLE_REDIS_CACHE", "true"), True)
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0").strip()
 
-# ---------------- APP ----------------
+# Decide backend mode
+BACKEND_MODE = "supabase" if (SUPABASE_URL and SUPABASE_KEY) else ("postgres" if DATABASE_URL else "none")
+
+
+# ---------------- App ----------------
 app = FastAPI(
     title="svc-kg",
-    version="1.3.0",
+    version="1.4.0",
     description="Microserviço de Knowledge Graph (membros, facções, funções)",
     default_response_class=ORJSONResponse,
     swagger_ui_parameters={
@@ -59,11 +66,10 @@ app = FastAPI(
     },
 )
 
-# CORS por .env
+# CORS
 allow_origins = [o.strip() for o in (CORS_ALLOW_ORIGINS or "*").split(",")]
 allow_methods = [m.strip() for m in (CORS_ALLOW_METHODS or "*").split(",")]
 allow_headers = [h.strip() for h in (CORS_ALLOW_HEADERS or "*").split(",")]
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
@@ -75,19 +81,20 @@ app.add_middleware(
 # GZip
 app.add_middleware(GZipMiddleware, minimum_size=512)
 
-# Static mounts (usados pelos volumes do compose)
+# Static mounts
 if os.path.isdir("assets"):
     app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ---------------- Recursos globais ----------------
-pool: Optional[AsyncConnectionPool] = None
+# ---------------- Globals ----------------
 http_client: Optional[httpx.AsyncClient] = None
+pool: Optional[AsyncConnectionPool] = None
 redis_client: Optional[aioredis.Redis] = None
 _mem_cache: dict[str, Tuple[float, dict]] = {}
 
-# ---------------- Modelos p/ docs ----------------
+
+# ---------------- Models (docs) ----------------
 class Node(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
@@ -107,12 +114,14 @@ class GraphResponse(BaseModel):
     nodes: List[Node]
     edges: List[Edge]
 
+
 # ---------------- Startup/Shutdown ----------------
 @app.on_event("startup")
 async def _startup():
     global http_client, pool, redis_client
-    # Supabase HTTP client
-    if SUPABASE_URL and SUPABASE_KEY:
+
+    # Supabase client (somente se em modo supabase)
+    if BACKEND_MODE == "supabase":
         http_client = httpx.AsyncClient(
             base_url=SUPABASE_URL.rstrip("/"),
             timeout=httpx.Timeout(SUPABASE_TIMEOUT),
@@ -122,12 +131,25 @@ async def _startup():
                 "Content-Type": "application/json",
             },
         )
-    # Fallback Postgres
-    pool = AsyncConnectionPool(conninfo=DATABASE_URL, min_size=1, max_size=10, kwargs={"autocommit": True})
 
-    # Redis
+    # Postgres pool (somente se modo postgres) - min_size=0 evita conectar no start
+    if BACKEND_MODE == "postgres":
+        pool = AsyncConnectionPool(
+            conninfo=DATABASE_URL,
+            min_size=0,          # evita tentativa de conexão prematura
+            max_size=10,
+            kwargs={"autocommit": True},
+        )
+
+    # Redis (opcional) — falha não é fatal
     if ENABLE_REDIS_CACHE and REDIS_URL:
-        redis_client = aioredis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
+        try:
+            redis_client = aioredis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
+            # ping assíncrono com timeout curto
+            await asyncio.wait_for(redis_client.ping(), timeout=2)
+        except Exception:
+            # fallback silencioso para memória
+            redis_client = None
 
 @app.on_event("shutdown")
 async def _shutdown():
@@ -139,32 +161,39 @@ async def _shutdown():
     if redis_client:
         await redis_client.close()
 
-# ---------------- Cache helpers ----------------
+
+# ---------------- Cache helpers (resilientes) ----------------
+def _now() -> float:
+    return time()
+
 async def cache_get(key: str) -> Optional[dict]:
     if redis_client:
-        raw = await redis_client.get(key)
-        if raw:
-            try:
+        try:
+            raw = await redis_client.get(key)
+            if raw:
                 return json.loads(raw)
-            except Exception:
-                return None
-        return None
+        except Exception:
+            pass
     hit = _mem_cache.get(key)
     if not hit:
         return None
     ts, data = hit
-    if time() - ts > CACHE_API_TTL:
+    if _now() - ts > CACHE_API_TTL:
         _mem_cache.pop(key, None)
         return None
     return data
 
 async def cache_set(key: str, data: dict, ttl: int):
     if redis_client:
-        await redis_client.set(key, json.dumps(data), ex=ttl)
-    else:
-        _mem_cache[key] = (time(), data)
+        try:
+            await redis_client.set(key, json.dumps(data), ex=ttl)
+            return
+        except Exception:
+            pass
+    _mem_cache[key] = (_now(), data)
 
-# ---------------- Helpers core ----------------
+
+# ---------------- Core helpers ----------------
 def etag_for(data: dict) -> str:
     import orjson
     return hashlib.sha1(orjson.dumps(data)).hexdigest()
@@ -203,9 +232,9 @@ async def fetch_graph_via_supabase(faccao_id: Optional[int], include_co: bool, m
 
 async def fetch_graph_via_pg(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> dict:
     assert pool is not None
+    # tenta et_graph_membros primeiro; se falhar, cai para get_graph_membros
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
-            # tenta et_graph_membros (compat) e cai para get_graph_membros
             try:
                 await cur.execute("select public.et_graph_membros(%s,%s,%s);", (faccao_id, include_co, max_pairs))
                 row = await cur.fetchone()
@@ -220,11 +249,15 @@ async def fetch_graph_via_pg(faccao_id: Optional[int], include_co: bool, max_pai
             return data
 
 async def fetch_graph(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> dict:
-    if SUPABASE_URL and SUPABASE_KEY:
+    if BACKEND_MODE == "supabase":
         return await fetch_graph_via_supabase(faccao_id, include_co, max_pairs)
-    return await fetch_graph_via_pg(faccao_id, include_co, max_pairs)
+    elif BACKEND_MODE == "postgres":
+        return await fetch_graph_via_pg(faccao_id, include_co, max_pairs)
+    else:
+        raise HTTPException(status_code=500, detail="Nenhum backend configurado (defina SUPABASE_* ou DATABASE_URL).")
 
-# ---------------- OpenAPI (usar /docs/openapi.yaml se existir) ----------------
+
+# ---------------- OpenAPI (preferir /docs/openapi.yaml) ----------------
 def custom_openapi():
     if getattr(app, "openapi_schema", None):
         return app.openapi_schema
@@ -234,26 +267,66 @@ def custom_openapi():
             spec = yaml.safe_load(f)
             app.openapi_schema = spec
             return app.openapi_schema
-    # fallback: gerar automático
     app.openapi_schema = get_openapi(
         title=app.title, version=app.version, routes=app.routes, description=app.description
     )
     return app.openapi_schema
 
-app.openapi = custom_openapi  # sobrescreve o gerador
+app.openapi = custom_openapi
+
 
 # ---------------- Endpoints ----------------
-@app.get("/health", summary="Health check")
+@app.get("/live", summary="Liveness probe (não bloqueante)")
+async def live():
+    # sempre 200 se o processo está no ar
+    return {"status": "live", "service": "svc-kg"}
+
+@app.get("/ready", summary="Readiness probe (verifica dependências)")
+async def ready():
+    ok = {"redis": False, "backend": BACKEND_MODE, "backend_ok": False}
+
+    # Redis ping (opcional)
+    if redis_client:
+        try:
+            pong = await asyncio.wait_for(redis_client.ping(), timeout=1.5)
+            ok["redis"] = bool(pong)
+        except Exception:
+            ok["redis"] = False
+
+    # Backend
+    try:
+        if BACKEND_MODE == "supabase":
+            # chama uma RPC baratinha (max_pairs pequeno)
+            _ = await fetch_graph_via_supabase(None, False, 1)
+            ok["backend_ok"] = True
+        elif BACKEND_MODE == "postgres":
+            # select 1
+            async with pool.connection() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute("select 1;")
+                    await cur.fetchone()
+            ok["backend_ok"] = True
+        else:
+            ok["backend_ok"] = False
+    except Exception as e:
+        ok["backend_ok"] = False
+        ok["error"] = str(e)[:200]
+
+    status = 200 if ok["backend_ok"] else 503
+    return ORJSONResponse(ok, status_code=status)
+
+@app.get("/health", summary="Health check (estático)")
 async def health(response: Response):
     response.headers["Cache-Control"] = f"public, max-age={CACHE_STATIC_MAX_AGE}"
     return {
         "status": "ok",
         "service": "svc-kg",
         "env": APP_ENV,
-        "cache": "redis" if (ENABLE_REDIS_CACHE and REDIS_URL) else "memory",
-        "backend": "supabase" if (SUPABASE_URL and SUPABASE_KEY) else "postgres",
+        "cache": "redis" if (ENABLE_REDIS_CACHE and REDIS_URL and redis_client) else "memory",
+        "backend": BACKEND_MODE,
     }
 
+# rota oficial
 @app.get(
     "/v1/graph/membros",
     response_model=GraphResponse,
@@ -272,6 +345,32 @@ async def graph_membros(
     data = await cache_get(key) if cache else None
     if data is None:
         data = await fetch_graph(faccao_id, include_co, max_pairs)
+        if cache:
+            await cache_set(key, data, CACHE_API_TTL)
+    out = truncate_preview(data, max_nodes, max_edges)
+    response.headers["ETag"] = etag_for(out)
+    response.headers["Cache-Control"] = "public, max-age=30"
+    return out
+
+# alias compatível com /graph/members?p_faccao_id=...&p_include_co=...&p_max_pairs=...
+@app.get(
+    "/graph/members",
+    response_model=GraphResponse,
+    summary="(Compat) Mesma resposta de /v1/graph/membros com parâmetros p_*"
+)
+async def graph_members_compat(
+    response: Response,
+    p_faccao_id: Optional[int] = Query(default=None),
+    p_include_co: bool = Query(default=True),
+    p_max_pairs: int = Query(default=8000, ge=1, le=200000),
+    max_nodes: int = Query(default=2000, ge=100, le=20000),
+    max_edges: int = Query(default=4000, ge=100, le=200000),
+    cache: bool = Query(default=True),
+):
+    key = f"graph:{p_faccao_id}:{p_include_co}:{p_max_pairs}"
+    data = await cache_get(key) if cache else None
+    if data is None:
+        data = await fetch_graph(p_faccao_id, p_include_co, p_max_pairs)
         if cache:
             await cache_set(key, data, CACHE_API_TTL)
     out = truncate_preview(data, max_nodes, max_edges)

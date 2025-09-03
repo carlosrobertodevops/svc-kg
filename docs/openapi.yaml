@@ -1,116 +1,69 @@
-
----
-
-## 🧾 `docs/openapi.yaml` (Swagger estático)
-
-```yaml
 openapi: 3.0.3
 info:
   title: svc-kg
-  version: "1.3.0"
+  version: "1.4.0"
   description: >
     Microserviço de Knowledge Graph (membros, facções, funções).
-    A UI /docs deste serviço carrega este arquivo, se presente.
-servers:
-  - url: /
+servers: [ { url: / } ]
 paths:
+  /live:
+    get:
+      summary: Liveness
+      responses: { "200": { description: ok } }
+  /ready:
+    get:
+      summary: Readiness (checa Redis e backend)
+      responses:
+        "200": { description: pronto }
+        "503": { description: dependências indisponíveis }
   /health:
     get:
-      summary: Health check
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status: { type: string }
-                  service: { type: string }
-                  env: { type: string }
-                  cache: { type: string }
-                  backend: { type: string }
+      summary: Health (estático)
+      responses: { "200": { description: ok } }
   /v1/graph/membros:
     get:
-      summary: Retorna grafo (via et_graph_membros/get_graph_membros)
+      summary: Grafo (via et_graph_membros/get_graph_membros)
       parameters:
-        - name: faccao_id
-          in: query
-          required: false
-          schema: { type: integer, format: int64, nullable: true }
-        - name: include_co
-          in: query
-          required: false
-          schema: { type: boolean, default: true }
-        - name: max_pairs
-          in: query
-          required: false
-          schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
-        - name: max_nodes
-          in: query
-          required: false
-          schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 }
-        - name: max_edges
-          in: query
-          required: false
-          schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 }
-        - name: cache
-          in: query
-          required: false
-          schema: { type: boolean, default: true }
-      responses:
-        "200":
-          description: Grafo
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  nodes:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Node'
-                  edges:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Edge'
+      - { name: faccao_id, in: query, required: false, schema: { type: integer, format: int64, nullable: true } }
+      - { name: include_co, in: query, required: false, schema: { type: boolean, default: true } }
+      - { name: max_pairs, in: query, required: false, schema: { type: integer, default: 8000 } }
+      - { name: max_nodes, in: query, required: false, schema: { type: integer, default: 2000 } }
+      - { name: max_edges, in: query, required: false, schema: { type: integer, default: 4000 } }
+      - { name: cache, in: query, required: false, schema: { type: boolean, default: true } }
+      responses: { "200": { description: ok } }
+  /graph/members:
+    get:
+      summary: (Compat) Mesmo de /v1/graph/membros porém com p_* params
+      parameters:
+      - { name: p_faccao_id, in: query, required: false, schema: { type: integer, format: int64, nullable: true } }
+      - { name: p_include_co, in: query, required: false, schema: { type: boolean, default: true } }
+      - { name: p_max_pairs, in: query, required: false, schema: { type: integer, default: 8000 } }
+      - { name: max_nodes, in: query, required: false, schema: { type: integer, default: 2000 } }
+      - { name: max_edges, in: query, required: false, schema: { type: integer, default: 4000 } }
+      - { name: cache, in: query, required: false, schema: { type: boolean, default: true } }
+      responses: { "200": { description: ok } }
   /v1/nodes/{node_id}/neighbors:
     get:
-      summary: Subgrafo de vizinhança (raio=1)
+      summary: Subgrafo (raio=1)
       parameters:
-        - name: node_id
-          in: path
-          required: true
-          schema: { type: string }
-        - name: include_co
-          in: query
-          required: false
-          schema: { type: boolean, default: true }
-        - name: max_pairs
-          in: query
-          required: false
-          schema: { type: integer, default: 3000 }
-      responses:
-        "200":
-          description: Subgrafo
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GraphResponse'
+      - { name: node_id, in: path, required: true, schema: { type: string } }
+      - { name: include_co, in: query, required: false, schema: { type: boolean, default: true } }
+      - { name: max_pairs, in: query, required: false, schema: { type: integer, default: 3000 } }
+      responses: { "200": { description: ok } }
 components:
   schemas:
     Node:
       type: object
-      required: [id, label, type]
+      required: [ id, label, type ]
       properties:
         id: { type: string }
         label: { type: string }
-        type: { type: string, enum: [membro, faccao, funcao] }
+        type: { type: string, enum: [ membro, faccao, funcao ] }
         group: { type: integer, nullable: true }
         size: { type: number, format: float, nullable: true }
     Edge:
       type: object
-      required: [source, target]
+      required: [ source, target ]
       properties:
         source: { type: string }
         target: { type: string }
@@ -118,7 +71,7 @@ components:
         weight: { type: number, format: float, nullable: true }
     GraphResponse:
       type: object
-      required: [nodes, edges]
+      required: [ nodes, edges ]
       properties:
-        nodes: { type: array, items: { $ref: '#/components/schemas/Node' } }
-        edges: { type: array, items: { $ref: '#/components/schemas/Edge' } }
+        nodes: { type: array, items: { $ref: "#/components/schemas/Node" } }
+        edges: { type: array, items: { $ref: "#/components/schemas/Edge" } }
