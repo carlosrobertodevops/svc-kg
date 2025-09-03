@@ -74,7 +74,7 @@ log = logging.getLogger("svc-kg")
 # ---------- app ----------
 app = FastAPI(
     title="svc-kg",
-    version="1.7.5",
+    version="1.7.6",
     description="Microserviço de Knowledge Graph (membros, facções, funções)",
     default_response_class=ORJSONResponse,
     swagger_ui_parameters={
@@ -549,7 +549,6 @@ async def vis_pyvis(
     show_buttons: bool = True,
     title: str = "Knowledge Graph",
     toolbar: bool = True,
-    # CSP:
     allow_inline: bool = Query(default=True, description="Envia header CSP permitindo inline"),
     meta_csp: bool = Query(default=True, description="Insere <meta http-equiv=CSP> no HTML"),
     min_height: str = Query(default="90vh", description="Altura mínima do canvas (#mynetwork)"),
@@ -573,18 +572,12 @@ async def vis_pyvis(
         return HTMLResponse(content=empty, status_code=200)
 
     html = await build_pyvis_html(out, theme=theme, arrows=arrows, hierarchical=hierarchical, physics=physics, barnes_hut=barnes_hut, show_buttons=show_buttons, title=title)
-
-    # Inject optional <meta http-equiv="Content-Security-Policy"> as fallback
     if meta_csp:
         meta = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self' data: blob:; style-src 'self' 'unsafe-inline' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src * data: blob:; font-src 'self' data:; connect-src *;\">"
         html = html.replace("<head>", "<head>" + meta, 1)
-
-    # UX tweaks
     html = _ensure_network_min_height(html, min_height=min_height)
     if toolbar: html = _wrap_toolbar(html, title=title, show_print_btn=True)
     if debug: html = _append_debug_overlay(html, len(out["nodes"]), len(out["edges"]))
-
-    # Headers
     if allow_inline:
         response.headers["Content-Security-Policy"] = "default-src 'self' data: blob:; style-src 'self' 'unsafe-inline' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src * data: blob:; font-src 'self' data:; connect-src *;"
     response.headers["ETag"] = etag_for(out)
@@ -592,9 +585,9 @@ async def vis_pyvis(
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
 
-# --------- VISUALIZAÇÃO: vis-network (sem inline JS) ---------
+# --------- VISUALIZAÇÃO: vis-network (sem inline; assets LOCAIS) ---------
 @app.get("/v1/vis/visjs", response_class=HTMLResponse,
-         summary="Visualização (vis-network, sem inline JS)")
+         summary="Visualização (vis-network, sem inline JS, assets locais)")
 async def vis_visjs(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -615,7 +608,8 @@ async def vis_visjs(
     <meta http-equiv="x-ua-compatible" content="ie=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
-    <link rel="stylesheet" href="https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css">
+    <!-- CSS/JS locais (self) -->
+    <link rel="stylesheet" href="/static/vendor/vis-network.min.css">
     <link rel="stylesheet" href="/static/vis-style.css">
     <meta name="theme-color" content="{bg}">
   </head>
@@ -629,16 +623,16 @@ async def vis_visjs(
     <div id="mynetwork"
          data-endpoint="/v1/graph/membros"
          data-debug="{str(debug).lower()}"></div>
-    <script src="https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"></script>
+    <script src="/static/vendor/vis-network.min.js"></script>
     <script src="/static/vis-page.js"></script>
   </body>
 </html>"""
-    # CSP estrita sem inline
+    # CSP rígida, só 'self'
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "style-src 'self' https://unpkg.com; "
-        "script-src 'self' https://unpkg.com; "
-        "img-src 'self' data:; font-src 'self' data:; connect-src 'self';"
+        "style-src 'self'; "
+        "script-src 'self'; "
+        "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'self';"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)

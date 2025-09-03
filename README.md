@@ -43,6 +43,8 @@ Microserviço de **Knowledge Graph** (membros, facções, funções) com:
 Parâmetros comuns:  
 `faccao_id` (opcional), `include_co` (bool), `max_pairs`, `max_nodes`, `max_edges`, `cache`.
 
+
+
 ## Como rodar (local)
 
 1. Crie `.env` a partir de `.env.example`. Para **local** use Postgres:

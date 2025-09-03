@@ -3,7 +3,7 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir \
@@ -20,9 +20,16 @@ RUN pip install --no-cache-dir \
     pyvis==0.3.2
 
 WORKDIR /app
+
+# Copia código e estáticos
 COPY app.py /app/app.py
 COPY static /app/static
 COPY docs /app/docs
+
+# Baixa assets locais do vis-network (sem CDN)
+RUN mkdir -p /app/static/vendor \
+ && curl -fsSL https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js -o /app/static/vendor/vis-network.min.js \
+ && curl -fsSL https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css -o /app/static/vendor/vis-network.min.css
 
 EXPOSE 8080
 

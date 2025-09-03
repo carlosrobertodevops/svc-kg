@@ -1,14 +1,14 @@
 openapi: 3.0.3
 info:
   title: svc-kg
-  version: "1.7.5"
+  version: "1.7.6"
   description: |
     Microserviço de Knowledge Graph (membros, facções, funções).
     - Backend: Supabase RPC (`get_graph_membros`) ou Postgres direto.
     - Cache: Redis (fallback em memória).
     - Visualização:
       - `/v1/vis/pyvis` (inline JS; pode exigir CSP relaxada)
-      - `/v1/vis/visjs` (sem inline JS; compatível com CSP rígida)
+      - `/v1/vis/visjs` (sem inline JS; assets locais)
 servers:
   - url: /
 tags:
@@ -20,20 +20,17 @@ tags:
 paths:
   /live:
     get: { tags: [Health], summary: Liveness, responses: { "200": { description: ok } } }
-
   /ready:
-    get: { tags: [Health], summary: Readiness (checa DNS/Redis/backend), responses: { "200": { description: pronto }, "503": { description: dependências indisponíveis } } }
-
+    get: { tags: [Health], summary: Readiness, responses: { "200": { description: pronto }, "503": { description: dependências indisponíveis } } }
   /health:
     get: { tags: [Health], summary: Health (estático), responses: { "200": { description: ok } } }
-
   /debug/config:
     get: { tags: [Debug], summary: Config (sanitizada), responses: { "200": { description: ok } } }
 
   /v1/graph/membros:
     get:
       tags: [Graph]
-      summary: Grafo (via et_graph_membros/get_graph_membros)
+      summary: Grafo (via função et_graph_membros/get_graph_membros)
       parameters:
         - $ref: '#/components/parameters/faccao_id'
         - $ref: '#/components/parameters/include_co'
@@ -46,7 +43,7 @@ paths:
   /graph/members:
     get:
       tags: [Graph]
-      summary: (Compat) /v1/graph/membros com parâmetros p_*
+      summary: (Compat) /v1/graph/membros com p_*
       parameters:
         - name: p_faccao_id; in: query; schema: { type: integer, format: int64, nullable: true }
         - name: p_include_co; in: query; schema: { type: boolean, default: true }
@@ -69,11 +66,7 @@ paths:
   /v1/vis/pyvis:
     get:
       tags: [Visualization]
-      summary: Visualização PyVis (HTML, inline JS)
-      description: |
-        Gera um HTML interativo **usando o dataset** de `/v1/graph/membros`,
-        com sanitização e truncamento (`max_nodes`/`max_edges`).
-        Observação: usa inline scripts; pode exigir relaxamento de CSP no proxy.
+      summary: Visualização PyVis (inline JS)
       parameters:
         - $ref: '#/components/parameters/faccao_id'
         - $ref: '#/components/parameters/include_co'
@@ -89,24 +82,16 @@ paths:
         - name: show_buttons; in: query; schema: { type: boolean, default: true }
         - name: title; in: query; schema: { type: string, default: "Knowledge Graph" }
         - name: toolbar; in: query; schema: { type: boolean, default: true }
-        - name: allow_inline; in: query; schema: { type: boolean, default: true }; description: envia header CSP permitindo inline.
-        - name: meta_csp; in: query; schema: { type: boolean, default: true }; description: injeta `<meta http-equiv=CSP>` no HTML como fallback.
-        - name: min_height; in: query; schema: { type: string, default: "90vh" }; description: altura mínima do canvas.
+        - name: allow_inline; in: query; schema: { type: boolean, default: true }
+        - name: meta_csp; in: query; schema: { type: boolean, default: true }
+        - name: min_height; in: query; schema: { type: string, default: "90vh" }
         - name: debug; in: query; schema: { type: boolean, default: false }
-      responses:
-        "200":
-          description: HTML PyVis
-          content:
-            text/html:
-              schema: { type: string }
+      responses: { "200": { description: HTML PyVis } }
 
   /v1/vis/visjs:
     get:
       tags: [Visualization]
-      summary: Visualização (vis-network, sem inline JS)
-      description: |
-        Página HTML que carrega o grafo via `/v1/graph/membros` e renderiza com vis-network.
-        **Sem** scripts inline (compatível com CSP rígida).
+      summary: Visualização vis-network (sem inline; assets locais)
       parameters:
         - $ref: '#/components/parameters/faccao_id'
         - $ref: '#/components/parameters/include_co'
@@ -117,12 +102,7 @@ paths:
         - name: theme; in: query; schema: { type: string, enum: [light, dark], default: light }
         - name: title; in: query; schema: { type: string, default: "Knowledge Graph (vis.js)" }
         - name: debug; in: query; schema: { type: boolean, default: false }
-      responses:
-        "200":
-          description: HTML interativo
-          content:
-            text/html:
-              schema: { type: string }
+      responses: { "200": { description: HTML vis-network } }
 
 components:
   parameters:

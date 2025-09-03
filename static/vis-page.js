@@ -1,3 +1,4 @@
+// static/vis-page.js
 (function () {
   const container = document.getElementById('mynetwork');
   const endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
@@ -14,6 +15,8 @@
   qs.set('cache', params.get('cache') ?? 'true');
 
   const url = endpoint + '?' + qs.toString();
+
+  const log = (...a) => { if (debug && window.console) console.log('[visjs]', ...a); };
 
   const hashColor = (str) => {
     let h = 0; const s = String(str);
@@ -48,14 +51,26 @@
     if (badge && debug) badge.textContent = `nodes: ${nodesCount} · edges: ${edgesCount}`;
   };
 
+  log('fetching', url);
+
   fetch(url, { headers: { 'Accept': 'application/json' } })
     .then(async (r) => {
-      if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`);
+      const ct = r.headers.get('content-type') || '';
+      if (!r.ok) {
+        const txt = await r.text();
+        throw new Error(`${r.status} ${r.statusText} | CT=${ct} | ${txt.slice(0, 200)}`);
+      }
+      if (!ct.includes('application/json')) {
+        const txt = await r.text();
+        throw new Error(`content-type!=json | ${txt.slice(0, 200)}`);
+      }
       return r.json();
     })
     .then((data) => {
       const nodes = (data.nodes || []).filter(n => n && n.id);
       const edgesRaw = (data.edges || []).filter(e => e && e.source && e.target);
+      log('data', { nodes: nodes.length, edges: edgesRaw.length });
+
       if (!nodes.length) { showEmpty('Nenhum dado para exibir (nodes=0).'); return; }
 
       const nodesVis = nodes.map(n => ({
@@ -94,9 +109,15 @@
       };
 
       const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, options);
-      network.once('stabilizationIterationsDone', () => network.fit({ animation: { duration: 300 } }));
+      network.once('stabilizationIterationsDone', () => {
+        log('stabilized');
+        network.fit({ animation: { duration: 300 } });
+      });
       network.on('doubleClick', () => network.fit({ animation: { duration: 300 } }));
       attachToolbar(network, nodesVis.length, edgesVis.length);
     })
-    .catch((err) => showEmpty(`Falha ao carregar dados: ${String(err).replace(/</g, '&lt;')}`));
+    .catch((err) => {
+      log('error', err);
+      showEmpty(`Falha ao carregar/desenhar: ${String(err).replace(/</g, '&lt;')}`);
+    });
 })();
