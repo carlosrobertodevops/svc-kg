@@ -1,106 +1,32 @@
-openapi: 3.0.3
-info:
-  title: svc-kg
-  version: "1.7.3"
-  description: |
-    Microserviço de Knowledge Graph (membros, facções, funções).
-    - Backend: Supabase RPC (`get_graph_membros`) ou Postgres direto.
-    - Cache: Redis (fallback memória).
-    - Visualização PyVis (HTML interativo): `/v1/vis/pyvis`.
-servers:
-  - url: /
-tags:
-  - name: Health
-  - name: Debug
-  - name: Graph
-  - name: Visualization
+APP_ENV=production
+PORT=8080
+WORKERS=2
+LOG_LEVEL=info
 
-paths:
-  /live:
-    get: { tags: [Health], summary: Liveness, responses: { "200": { description: ok } } }
+CORS_ALLOW_ORIGINS=*
+CORS_ALLOW_CREDENTIALS=false
+CORS_ALLOW_HEADERS=Authorization,Content-Type
+CORS_ALLOW_METHODS=GET,POST,OPTIONS
 
-  /ready:
-    get: { tags: [Health], summary: Readiness (checa DNS/Redis/backend), responses: { "200": { description: pronto }, "503": { description: dependências indisponíveis } } }
+# SUPABASE (produção / Coolify)
+SUPABASE_URL=https://supabase.mondaha.com
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_KEY=
+SUPABASE_RPC_FN=get_graph_membros
+SUPABASE_TIMEOUT=15
 
-  /health:
-    get: { tags: [Health], summary: Health (estático), responses: { "200": { description: ok } } }
+# POSTGRES (local). Se usar, deixe SUPABASE_* em branco.
+DATABASE_URL=
 
-  /debug/config:
-    get: { tags: [Debug], summary: Config (sanitizada), responses: { "200": { description: ok } } }
+CACHE_STATIC_MAX_AGE=86400
+CACHE_API_TTL=60
 
-  /v1/graph/membros:
-    get:
-      tags: [Graph]
-      summary: Grafo (via et_graph_membros/get_graph_membros)
-      parameters:
-        - $ref: '#/components/parameters/faccao_id'
-        - $ref: '#/components/parameters/include_co'
-        - $ref: '#/components/parameters/max_pairs'
-        - $ref: '#/components/parameters/max_nodes'
-        - $ref: '#/components/parameters/max_edges'
-        - $ref: '#/components/parameters/cache'
-      responses: { "200": { description: ok } }
+ENABLE_REDIS_CACHE=true
+REDIS_URL=redis://redis:6379/0
 
-  /graph/members:
-    get:
-      tags: [Graph]
-      summary: (Compat) /v1/graph/membros com parâmetros p_*
-      parameters:
-        - name: p_faccao_id; in: query; schema: { type: integer, format: int64, nullable: true }
-        - name: p_include_co; in: query; schema: { type: boolean, default: true }
-        - name: p_max_pairs;  in: query; schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
-        - $ref: '#/components/parameters/max_nodes'
-        - $ref: '#/components/parameters/max_edges'
-        - $ref: '#/components/parameters/cache'
-      responses: { "200": { description: ok } }
+# <<< Somente se usar docker-compose.coolify-proxy.yml >>>
+APP_HOST=svc-kg.mondaha.com
+COOLIFY_PROXY_NETWORK=coolify-proxy
 
-  /v1/nodes/{node_id}/neighbors:
-    get:
-      tags: [Graph]
-      summary: Subgrafo (raio=1)
-      parameters:
-        - name: node_id; in: path; required: true; schema: { type: string }
-        - $ref: '#/components/parameters/include_co'
-        - name: max_pairs; in: query; schema: { type: integer, default: 3000, minimum: 1, maximum: 200000 }
-      responses: { "200": { description: ok } }
-
-  /v1/vis/pyvis:
-    get:
-      tags: [Visualization]
-      summary: Visualização PyVis (HTML) do grafo
-      description: |
-        Gera um HTML interativo **usando o mesmo dataset** de `/v1/graph/membros`,
-        incluindo sanitização e truncamento por `max_nodes`/`max_edges` e cache.
-      parameters:
-        - $ref: '#/components/parameters/faccao_id'
-        - $ref: '#/components/parameters/include_co'
-        - $ref: '#/components/parameters/max_pairs'
-        - $ref: '#/components/parameters/max_nodes'
-        - $ref: '#/components/parameters/max_edges'
-        - $ref: '#/components/parameters/cache'
-        - name: theme; in: query; schema: { type: string, enum: [light, dark], default: light }
-        - name: arrows; in: query; schema: { type: boolean, default: true }
-        - name: hierarchical; in: query; schema: { type: boolean, default: false }
-        - name: physics; in: query; schema: { type: boolean, default: true }
-        - name: barnes_hut; in: query; schema: { type: boolean, default: true }
-        - name: show_buttons; in: query; schema: { type: boolean, default: true }
-        - name: title; in: query; schema: { type: string, default: "Knowledge Graph" }
-        - name: toolbar; in: query; schema: { type: boolean, default: true }
-        - name: allow_inline; in: query; schema: { type: boolean, default: true }; description: Libera CSP para scripts/styles inline (necessário p/ PyVis).
-        - name: debug; in: query; schema: { type: boolean, default: false }; description: Mostra contadores de nós/arestas na tela.
-        - name: min_height; in: query; schema: { type: string, default: "90vh" }; description: Altura mínima do canvas (#mynetwork).
-      responses:
-        "200":
-          description: HTML interativo
-          content:
-            text/html:
-              schema: { type: string }
-
-components:
-  parameters:
-    faccao_id:   { name: faccao_id, in: query, schema: { type: integer, format: int64, nullable: true } }
-    include_co:  { name: include_co, in: query, schema: { type: boolean, default: true } }
-    max_pairs:   { name: max_pairs,  in: query, schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 } }
-    max_nodes:   { name: max_nodes,  in: query, schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 } }
-    max_edges:   { name: max_edges,  in: query, schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 } }
-    cache:       { name: cache,      in: query, schema: { type: boolean, default: true } }
+# opcional: para teste
+SERVER_CMD=gunicorn
