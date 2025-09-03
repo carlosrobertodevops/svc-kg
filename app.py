@@ -15,15 +15,25 @@ import httpx
 from psycopg_pool import AsyncConnectionPool
 from redis import asyncio as aioredis
 
-# -------- util --------
+# -------- utils --------
 def env_bool(v: Optional[str], default=False) -> bool:
     if v is None: return default
     return v.lower() in ("1", "true", "yes", "on")
 
-def sanitize_url(u: str) -> str:
-    if not u: return ""
-    # evita duplicar /rest/v1 se usuário colou inteiro
-    return u.replace("/rest/v1", "").rstrip("/")
+def normalize_supabase_url(u: str) -> str:
+    """Garante protocolo e remove sufixo /rest/v1."""
+    if not u:
+        return ""
+    u = u.strip()
+    # remove sufixo /rest/v1 (se vier da doc do Supabase)
+    u = u.replace("/rest/v1", "")
+    # remove barras finais repetidas
+    while u.endswith("/"):
+        u = u[:-1]
+    # garante protocolo
+    if not (u.startswith("http://") or u.startswith("https://")):
+        u = "https://" + u
+    return u
 
 # -------- ENV --------
 APP_ENV = os.getenv("APP_ENV", "production")
@@ -36,7 +46,9 @@ CORS_ALLOW_CREDENTIALS = env_bool(os.getenv("CORS_ALLOW_CREDENTIALS", "false"))
 CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type")
 CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS")
 
-SUPABASE_URL = sanitize_url(os.getenv("SUPABASE_URL", "").strip())
+# <<< ALTERAÇÃO: normalização automática >>>
+SUPABASE_URL_RAW = os.getenv("SUPABASE_URL", "").strip()
+SUPABASE_URL = normalize_supabase_url(SUPABASE_URL_RAW)
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
 SUPABASE_RPC_FN = os.getenv("SUPABASE_RPC_FN", "get_graph_membros")
 SUPABASE_TIMEOUT = float(os.getenv("SUPABASE_TIMEOUT", "15"))
@@ -58,7 +70,7 @@ log = logging.getLogger("svc-kg")
 # -------- app --------
 app = FastAPI(
     title="svc-kg",
-    version="1.5.0",
+    version="1.5.1",
     description="Microserviço de Knowledge Graph (membros, facções, funções)",
     default_response_class=ORJSONResponse,
     swagger_ui_parameters={
@@ -119,10 +131,9 @@ async def _startup():
     global http_client, pool, redis_client
 
     log.info(f"Starting svc-kg v{app.version} | mode={BACKEND_MODE} | port={PORT}")
-
     if BACKEND_MODE == "supabase":
         if not SUPABASE_URL.startswith("http"):
-            log.error("SUPABASE_URL inválida. Ex: https://xxxxx.supabase.co")
+            log.error(f"SUPABASE_URL inválida após normalização: '{SUPABASE_URL_RAW}' -> '{SUPABASE_URL}'")
         http_client = httpx.AsyncClient(
             base_url=SUPABASE_URL,
             timeout=httpx.Timeout(SUPABASE_TIMEOUT),
@@ -156,7 +167,7 @@ async def _shutdown():
     if redis_client:
         await redis_client.close()
 
-# Exception handlers (evitar 500 “mudo”)
+# Exception handlers
 @app.exception_handler(HTTPException)
 async def http_exc_handler(request: Request, exc: HTTPException):
     return JSONResponse(
@@ -228,17 +239,14 @@ async def fetch_graph_via_supabase(faccao_id: Optional[int], include_co: bool, m
     body = {"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs}
     r = await http_client.post(url, json=body)
     if r.status_code >= 400:
-        # expõe erro como 502 (upstream)
         raise HTTPException(status_code=502, detail=f"Supabase RPC {SUPABASE_RPC_FN} falhou ({r.status_code}): {r.text[:400]}")
     try:
         data = r.json() if r.content else {"nodes": [], "edges": []}
     except Exception:
         data = {"nodes": [], "edges": []}
     if isinstance(data, str):
-        try:
-            data = json.loads(data)
-        except Exception:
-            data = {"nodes": [], "edges": []}
+        try: data = json.loads(data)
+        except Exception: data = {"nodes": [], "edges": []}
     data.setdefault("nodes", []); data.setdefault("edges", [])
     return data
 
@@ -251,7 +259,7 @@ async def fetch_graph_via_pg(faccao_id: Optional[int], include_co: bool, max_pai
                 await cur.execute("select public.et_graph_membros(%s,%s,%s);", (faccao_id, include_co, max_pairs))
                 row = await cur.fetchone()
             except Exception as e:
-                log.debug(f"et_graph_membros falhou, tentando get_graph_membros: {e}")
+                logging.debug(f"et_graph_membros falhou, tentando get_graph_membros: {e}")
                 await cur.execute("select public.get_graph_membros(%s,%s,%s);", (faccao_id, include_co, max_pairs))
                 row = await cur.fetchone()
             data = row[0] if row else {"nodes": [], "edges": []}
@@ -296,7 +304,6 @@ async def ready():
         except Exception:
             ok["redis"] = False
     try:
-        # valida backend rapidamente
         if BACKEND_MODE == "supabase":
             _ = await fetch_graph_via_supabase(None, False, 1)
             ok["backend_ok"] = True
@@ -320,7 +327,8 @@ async def debug_config():
         "port": PORT,
         "backend_mode": BACKEND_MODE,
         "has_supabase": bool(SUPABASE_URL and SUPABASE_KEY),
-        "supabase_url": SUPABASE_URL or "",
+        "supabase_url_raw": SUPABASE_URL_RAW,
+        "supabase_url": SUPABASE_URL,
         "rpc_function": SUPABASE_RPC_FN,
         "has_database_url": bool(DATABASE_URL),
         "redis_enabled": ENABLE_REDIS_CACHE,
