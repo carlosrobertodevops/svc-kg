@@ -75,7 +75,7 @@ log = logging.getLogger("svc-kg")
 # ---------------- app ----------------
 app = FastAPI(
     title="svc-kg",
-    version="1.7.1",
+    version="1.7.2",
     description="Microserviço de Knowledge Graph (membros, facções, funções)",
     default_response_class=ORJSONResponse,
     swagger_ui_parameters={
@@ -201,6 +201,49 @@ async def cache_set(key: str, data: dict, ttl: int):
 # ---------------- core helpers ----------------
 def etag_for(data: dict) -> str:
     import orjson; return hashlib.sha1(orjson.dumps(data)).hexdigest()
+
+def sanitize_graph(data: dict) -> dict:
+    """Normaliza IDs para str, remove nós sem ID e remove arestas cujos endpoints não existem."""
+    raw_nodes = data.get("nodes", []) or []
+    raw_edges = data.get("edges", []) or []
+
+    # dedup e normalização de nós
+    id_seen = set()
+    nodes: list[dict] = []
+    for n in raw_nodes:
+        nid = str(n.get("id", "")).strip()
+        if not nid:  # sem ID, ignora
+            continue
+        if nid in id_seen:
+            # sobrescreve com a última ocorrência
+            for i in range(len(nodes)):
+                if nodes[i]["id"] == nid:
+                    nodes[i] = {**nodes[i], **n, "id": nid}
+                    break
+        else:
+            nodes.append({**n, "id": nid})
+            id_seen.add(nid)
+
+    # normalização de arestas e filtro por endpoints existentes
+    edges: list[dict] = []
+    for e in raw_edges:
+        s = str(e.get("source", "")).strip()
+        t = str(e.get("target", "")).strip()
+        if not s or not t:  # endpoints vazios
+            continue
+        if s not in id_seen or t not in id_seen:
+            continue
+        # garante tipos básicos
+        w = e.get("weight", 1.0)
+        try:
+            w = float(w) if w is not None else 1.0
+        except Exception:
+            w = 1.0
+        rel = e.get("relation")
+        rel = str(rel) if (rel is not None) else None
+        edges.append({"source": s, "target": t, "weight": w, "relation": rel})
+
+    return {"nodes": nodes, "edges": edges}
 
 def truncate_preview(data: dict, max_nodes: int, max_edges: int) -> dict:
     nodes = data.get("nodes", []); edges = data.get("edges", [])
@@ -369,10 +412,22 @@ async def fetch_graph_via_pg(faccao_id: Optional[int], include_co: bool, max_pai
             data.setdefault("nodes", []); data.setdefault("edges", [])
             return data
 
-async def fetch_graph(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> dict:
-    if BACKEND_MODE == "supabase": return await fetch_graph_via_supabase(faccao_id, include_co, max_pairs)
-    if BACKEND_MODE == "postgres": return await fetch_graph_via_pg(faccao_id, include_co, max_pairs)
+async def fetch_graph_raw(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> dict:
+    if BACKEND_MODE == "supabase":
+        return await fetch_graph_via_supabase(faccao_id, include_co, max_pairs)
+    if BACKEND_MODE == "postgres":
+        return await fetch_graph_via_pg(faccao_id, include_co, max_pairs)
     raise HTTPException(status_code=500, detail="Nenhum backend configurado (defina SUPABASE_* ou DATABASE_URL)")
+
+async def fetch_graph_sanitized(faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool = True) -> dict:
+    key = f"graph_raw:{faccao_id}:{include_co}:{max_pairs}"
+    data = await cache_get(key) if use_cache else None
+    if data is None:
+        raw = await fetch_graph_raw(faccao_id, include_co, max_pairs)
+        data = sanitize_graph(raw)
+        if use_cache:
+            await cache_set(key, data, CACHE_API_TTL)
+    return data
 
 # ---------------- openapi ----------------
 def custom_openapi():
@@ -410,16 +465,8 @@ async def ready():
         except Exception:
             info["redis"] = False
     try:
-        if BACKEND_MODE == "supabase":
-            _ = await fetch_graph_via_supabase(None, False, 1)
-            info["backend_ok"] = True
-        elif BACKEND_MODE == "postgres":
-            async with pool.connection() as conn:
-                async with conn.cursor() as cur:
-                    await cur.execute("select 1;"); await cur.fetchone()
-            info["backend_ok"] = True
-        else:
-            info["backend_ok"] = False
+        _ = await fetch_graph_sanitized(None, False, 1, use_cache=False)
+        info["backend_ok"] = True
     except Exception as e:
         info["backend_ok"] = False
         info["error"] = str(e)[:400]
@@ -453,11 +500,12 @@ async def graph_membros(
     max_edges: int = Query(default=4000, ge=100, le=200000),
     cache: bool = Query(default=True)
 ):
-    key = f"graph:{faccao_id}:{include_co}:{max_pairs}"
+    key = f"graph_sane:{faccao_id}:{include_co}:{max_pairs}"
     data = await cache_get(key) if cache else None
     if data is None:
-        data = await fetch_graph(faccao_id, include_co, max_pairs)
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=True)
         if cache: await cache_set(key, data, CACHE_API_TTL)
+
     out = truncate_preview(data, max_nodes, max_edges)
     response.headers["ETag"] = etag_for(out); response.headers["Cache-Control"] = "public, max-age=30"
     return out
@@ -473,11 +521,12 @@ async def graph_members_compat(
     max_edges: int = Query(default=4000, ge=100, le=200000),
     cache: bool = Query(default=True),
 ):
-    key = f"graph:{p_faccao_id}:{p_include_co}:{p_max_pairs}"
+    key = f"graph_sane:{p_faccao_id}:{p_include_co}:{p_max_pairs}"
     data = await cache_get(key) if cache else None
     if data is None:
-        data = await fetch_graph(p_faccao_id, p_include_co, p_max_pairs)
+        data = await fetch_graph_sanitized(p_faccao_id, p_include_co, p_max_pairs, use_cache=True)
         if cache: await cache_set(key, data, CACHE_API_TTL)
+
     out = truncate_preview(data, max_nodes, max_edges)
     response.headers["ETag"] = etag_for(out); response.headers["Cache-Control"] = "public, max-age=30"
     return out
@@ -485,7 +534,7 @@ async def graph_members_compat(
 @app.get("/v1/nodes/{node_id}/neighbors", response_model=GraphResponse,
          summary="Subgrafo (raio=1)")
 async def neighbors(response: Response, node_id: str, include_co: bool = True, max_pairs: int = 3000):
-    data = await fetch_graph(None, include_co, max_pairs)
+    data = await fetch_graph_sanitized(None, include_co, max_pairs, use_cache=True)
     nodes = data.get("nodes", []); edges = data.get("edges", [])
     keep = {node_id}
     for e in edges:
@@ -504,7 +553,6 @@ async def vis_pyvis(
     faccao_id: Optional[int] = Query(default=None, description="Filtra por facção (opcional)"),
     include_co: bool = Query(default=True, description="Inclui CO_*"),
     max_pairs: int = Query(default=8000, ge=1, le=200000),
-    # >>> iguais ao JSON para equivalência 1:1
     max_nodes: int = Query(default=2000, ge=100, le=20000),
     max_edges: int = Query(default=4000, ge=100, le=200000),
     cache: bool = Query(default=True),
@@ -520,14 +568,14 @@ async def vis_pyvis(
 ):
     """
     Gera o HTML PyVis **usando o mesmo dataset** do /v1/graph/membros,
-    incluindo truncamento por max_nodes/max_edges e cache.
+    incluindo sanitização e truncamento por max_nodes/max_edges e cache.
     """
-    key = f"graph:{faccao_id}:{include_co}:{max_pairs}"
+    key = f"graph_sane:{faccao_id}:{include_co}:{max_pairs}"
     data = await cache_get(key) if cache else None
     if data is None:
-        data = await fetch_graph(faccao_id, include_co, max_pairs)
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=True)
         if cache: await cache_set(key, data, CACHE_API_TTL)
-    # aplica o mesmo truncamento do endpoint JSON
+
     out = truncate_preview(data, max_nodes, max_edges)
 
     html = await build_pyvis_html(
