@@ -1,301 +1,134 @@
 openapi: 3.0.3
 info:
   title: svc-kg
-  version: "1.7.1"
+  version: "1.7.5"
   description: |
     Microserviço de Knowledge Graph (membros, facções, funções).
     - Backend: Supabase RPC (`get_graph_membros`) ou Postgres direto.
-    - Cache: Redis (fallback memória).
-    - Visualização PyVis (HTML interativo): `/v1/vis/pyvis`.
+    - Cache: Redis (fallback em memória).
+    - Visualização:
+      - `/v1/vis/pyvis` (inline JS; pode exigir CSP relaxada)
+      - `/v1/vis/visjs` (sem inline JS; compatível com CSP rígida)
 servers:
-- url: /
+  - url: /
 tags:
-- name: Health
-- name: Debug
-- name: Graph
-- name: Visualization
+  - name: Health
+  - name: Debug
+  - name: Graph
+  - name: Visualization
 
 paths:
   /live:
-    get:
-      tags: [ Health ]
-      summary: Liveness
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LiveResponse'
+    get: { tags: [Health], summary: Liveness, responses: { "200": { description: ok } } }
 
   /ready:
-    get:
-      tags: [ Health ]
-      summary: Readiness (checa DNS/Redis/backend)
-      responses:
-        "200":
-          description: pronto
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReadyResponse'
-        "503":
-          description: dependências indisponíveis
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReadyResponse'
+    get: { tags: [Health], summary: Readiness (checa DNS/Redis/backend), responses: { "200": { description: pronto }, "503": { description: dependências indisponíveis } } }
 
   /health:
-    get:
-      tags: [ Health ]
-      summary: Health (estático)
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthResponse'
+    get: { tags: [Health], summary: Health (estático), responses: { "200": { description: ok } } }
 
   /debug/config:
-    get:
-      tags: [ Debug ]
-      summary: Config (sanitizada)
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DebugConfig'
+    get: { tags: [Debug], summary: Config (sanitizada), responses: { "200": { description: ok } } }
 
   /v1/graph/membros:
     get:
-      tags: [ Graph ]
+      tags: [Graph]
       summary: Grafo (via et_graph_membros/get_graph_membros)
       parameters:
-      - $ref: '#/components/parameters/faccao_id'
-      - $ref: '#/components/parameters/include_co'
-      - $ref: '#/components/parameters/max_pairs'
-      - $ref: '#/components/parameters/max_nodes'
-      - $ref: '#/components/parameters/max_edges'
-      - $ref: '#/components/parameters/cache'
-      responses:
-        "200":
-          description: ok
-          headers:
-            ETag: { schema: { type: string } }
-            Cache-Control: { schema: { type: string } }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GraphResponse'
+        - $ref: '#/components/parameters/faccao_id'
+        - $ref: '#/components/parameters/include_co'
+        - $ref: '#/components/parameters/max_pairs'
+        - $ref: '#/components/parameters/max_nodes'
+        - $ref: '#/components/parameters/max_edges'
+        - $ref: '#/components/parameters/cache'
+      responses: { "200": { description: ok } }
 
   /graph/members:
     get:
-      tags: [ Graph ]
+      tags: [Graph]
       summary: (Compat) /v1/graph/membros com parâmetros p_*
       parameters:
-      - name: p_faccao_id
-        in: query
-        required: false
-        schema: { type: integer, format: int64, nullable: true }
-      - name: p_include_co
-        in: query
-        required: false
-        schema: { type: boolean, default: true }
-      - name: p_max_pairs
-        in: query
-        required: false
-        schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
-      - $ref: '#/components/parameters/max_nodes'
-      - $ref: '#/components/parameters/max_edges'
-      - $ref: '#/components/parameters/cache'
-      responses:
-        "200":
-          description: ok
-          headers:
-            ETag: { schema: { type: string } }
-            Cache-Control: { schema: { type: string } }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GraphResponse'
+        - name: p_faccao_id; in: query; schema: { type: integer, format: int64, nullable: true }
+        - name: p_include_co; in: query; schema: { type: boolean, default: true }
+        - name: p_max_pairs;  in: query; schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
+        - $ref: '#/components/parameters/max_nodes'
+        - $ref: '#/components/parameters/max_edges'
+        - $ref: '#/components/parameters/cache'
+      responses: { "200": { description: ok } }
 
   /v1/nodes/{node_id}/neighbors:
     get:
-      tags: [ Graph ]
+      tags: [Graph]
       summary: Subgrafo (raio=1)
       parameters:
-      - name: node_id
-        in: path
-        required: true
-        schema: { type: string }
-      - $ref: '#/components/parameters/include_co'
-      - name: max_pairs
-        in: query
-        required: false
-        schema: { type: integer, default: 3000, minimum: 1, maximum: 200000 }
-      responses:
-        "200":
-          description: ok
-          headers:
-            ETag: { schema: { type: string } }
-            Cache-Control: { schema: { type: string } }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GraphResponse'
+        - name: node_id; in: path; required: true; schema: { type: string }
+        - $ref: '#/components/parameters/include_co'
+        - name: max_pairs; in: query; schema: { type: integer, default: 3000, minimum: 1, maximum: 200000 }
+      responses: { "200": { description: ok } }
 
   /v1/vis/pyvis:
     get:
-      tags: [ Visualization ]
-      summary: Visualização PyVis (HTML) do grafo
+      tags: [Visualization]
+      summary: Visualização PyVis (HTML, inline JS)
       description: |
-        Gera um HTML interativo **usando o mesmo dataset** de `/v1/graph/membros`,
-        incluindo truncamento por `max_nodes`/`max_edges` e cache.
+        Gera um HTML interativo **usando o dataset** de `/v1/graph/membros`,
+        com sanitização e truncamento (`max_nodes`/`max_edges`).
+        Observação: usa inline scripts; pode exigir relaxamento de CSP no proxy.
       parameters:
-      - $ref: '#/components/parameters/faccao_id'
-      - $ref: '#/components/parameters/include_co'
-      - $ref: '#/components/parameters/max_pairs'
-      - $ref: '#/components/parameters/max_nodes'
-      - $ref: '#/components/parameters/max_edges'
-      - $ref: '#/components/parameters/cache'
-      - name: theme
-        in: query
-        required: false
-        schema: { type: string, enum: [ light, dark ], default: light }
-      - name: arrows
-        in: query
-        required: false
-        schema: { type: boolean, default: true }
-      - name: hierarchical
-        in: query
-        required: false
-        schema: { type: boolean, default: false }
-      - name: physics
-        in: query
-        required: false
-        schema: { type: boolean, default: true }
-      - name: barnes_hut
-        in: query
-        required: false
-        schema: { type: boolean, default: true }
-      - name: show_buttons
-        in: query
-        required: false
-        schema: { type: boolean, default: true }
-      - name: title
-        in: query
-        required: false
-        schema: { type: string, default: "Knowledge Graph" }
-      - name: toolbar
-        in: query
-        required: false
-        schema: { type: boolean, default: true }
+        - $ref: '#/components/parameters/faccao_id'
+        - $ref: '#/components/parameters/include_co'
+        - $ref: '#/components/parameters/max_pairs'
+        - $ref: '#/components/parameters/max_nodes'
+        - $ref: '#/components/parameters/max_edges'
+        - $ref: '#/components/parameters/cache'
+        - name: theme; in: query; schema: { type: string, enum: [light, dark], default: light }
+        - name: arrows; in: query; schema: { type: boolean, default: true }
+        - name: hierarchical; in: query; schema: { type: boolean, default: false }
+        - name: physics; in: query; schema: { type: boolean, default: true }
+        - name: barnes_hut; in: query; schema: { type: boolean, default: true }
+        - name: show_buttons; in: query; schema: { type: boolean, default: true }
+        - name: title; in: query; schema: { type: string, default: "Knowledge Graph" }
+        - name: toolbar; in: query; schema: { type: boolean, default: true }
+        - name: allow_inline; in: query; schema: { type: boolean, default: true }; description: envia header CSP permitindo inline.
+        - name: meta_csp; in: query; schema: { type: boolean, default: true }; description: injeta `<meta http-equiv=CSP>` no HTML como fallback.
+        - name: min_height; in: query; schema: { type: string, default: "90vh" }; description: altura mínima do canvas.
+        - name: debug; in: query; schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: HTML PyVis
+          content:
+            text/html:
+              schema: { type: string }
+
+  /v1/vis/visjs:
+    get:
+      tags: [Visualization]
+      summary: Visualização (vis-network, sem inline JS)
+      description: |
+        Página HTML que carrega o grafo via `/v1/graph/membros` e renderiza com vis-network.
+        **Sem** scripts inline (compatível com CSP rígida).
+      parameters:
+        - $ref: '#/components/parameters/faccao_id'
+        - $ref: '#/components/parameters/include_co'
+        - $ref: '#/components/parameters/max_pairs'
+        - $ref: '#/components/parameters/max_nodes'
+        - $ref: '#/components/parameters/max_edges'
+        - $ref: '#/components/parameters/cache'
+        - name: theme; in: query; schema: { type: string, enum: [light, dark], default: light }
+        - name: title; in: query; schema: { type: string, default: "Knowledge Graph (vis.js)" }
+        - name: debug; in: query; schema: { type: boolean, default: false }
       responses:
         "200":
           description: HTML interativo
-          headers:
-            ETag: { schema: { type: string } }
-            Cache-Control: { schema: { type: string } }
-            X-Content-Type-Options: { schema: { type: string } }
           content:
             text/html:
               schema: { type: string }
 
 components:
   parameters:
-    faccao_id:
-      name: faccao_id
-      in: query
-      required: false
-      schema: { type: integer, format: int64, nullable: true }
-      description: Filtra por facção (opcional).
-    include_co:
-      name: include_co
-      in: query
-      required: false
-      schema: { type: boolean, default: true }
-      description: Inclui pares inferidos (CO_*).
-    max_pairs:
-      name: max_pairs
-      in: query
-      required: false
-      schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
-      description: Limite de pares inferidos nas arestas.
-    max_nodes:
-      name: max_nodes
-      in: query
-      required: false
-      schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 }
-      description: Teto de nós aplicando truncamento preservando hubs.
-    max_edges:
-      name: max_edges
-      in: query
-      required: false
-      schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 }
-      description: Teto de arestas aplicando truncamento por peso.
-    cache:
-      name: cache
-      in: query
-      required: false
-      schema: { type: boolean, default: true }
-      description: Usa cache (Redis / memória) para respostas idênticas por TTL.
-
-  schemas:
-    LiveResponse:
-      type: object
-      properties:
-        status: { type: string, example: live }
-        service: { type: string, example: svc-kg }
-
-    ReadyResponse:
-      type: object
-      properties:
-        redis: { type: boolean }
-        backend: { type: string, example: supabase }
-        backend_ok: { type: boolean }
-        supabase_host: { type: string, nullable: true }
-        dns_ok: { type: boolean, nullable: true }
-        error: { type: string, nullable: true }
-
-    HealthResponse:
-      type: object
-      properties:
-        status: { type: string, example: ok }
-        service: { type: string, example: svc-kg }
-        env: { type: string, example: production }
-        cache: { type: string, example: redis }
-        backend: { type: string, example: supabase }
-
-    Node:
-      type: object
-      required: [ id, label, type ]
-      properties:
-        id: { type: string, example: "123" }
-        label: { type: string, example: "Alice" }
-        type: { type: string, example: "membro" }
-        group: { type: integer, nullable: true, example: 10 }
-        size: { type: number, format: float, nullable: true, example: 18.5 }
-
-    Edge:
-      type: object
-      required: [ source, target ]
-      properties:
-        source: { type: string, example: "123" }
-        target: { type: string, example: "456" }
-        weight: { type: number, format: float, nullable: true, example: 3.0 }
-        relation: { type: string, nullable: true, example: "PERTENCE_A" }
-
-    GraphResponse:
-      type: object
-      required: [ nodes, edges ]
-      properties:
-        nodes:
-          type: array
-          items: { $ref: '#/components/schemas/Node' }
-        edges:
-          type: array
-          items: { $ref: '#/components/schemas/Edge' }
+    faccao_id:   { name: faccao_id, in: query, schema: { type: integer, format: int64, nullable: true } }
+    include_co:  { name: include_co, in: query, schema: { type: boolean, default: true } }
+    max_pairs:   { name: max_pairs,  in: query, schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 } }
+    max_nodes:   { name: max_nodes,  in: query, schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 } }
+    max_edges:   { name: max_edges,  in: query, schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 } }
+    cache:       { name: cache,      in: query, schema: { type: boolean, default: true } }

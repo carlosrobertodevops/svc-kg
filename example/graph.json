@@ -1,0 +1,37 @@
+{
+	"nodes": [
+		{
+			"id": "A",
+			"label": "Alice",
+			"data": {
+				"type": "person"
+			}
+		},
+		{
+			"id": "B",
+			"label": "Bob",
+			"data": {
+				"type": "person"
+			}
+		},
+		{
+			"id": "C",
+			"label": "City",
+			"data": {
+				"type": "place"
+			}
+		}
+	],
+	"edges": [
+		{
+			"source": "A",
+			"target": "B",
+			"label": "knows"
+		},
+		{
+			"source": "A",
+			"target": "C",
+			"label": "lives_in"
+		}
+	]
+}

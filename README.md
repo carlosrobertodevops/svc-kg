@@ -1,5 +1,5 @@
 
-# svc-kg
+# svc-kg (v1.7.5)
 
 svc-kg/
 ├─ app.py
@@ -23,118 +23,35 @@ svc-kg/
    ├─ 01_indexes.sql # índices
    └─ 02_alias.sql   # et_graph_membros -> get_graph_membros
 
+Microserviço de **Knowledge Graph** (membros, facções, funções) com:
+- Backend: **Supabase RPC** (`get_graph_membros`) **ou** Postgres.
+- Cache: Redis (fallback em memória).
+- Visualização:
+  - `/v1/vis/pyvis` → **PyVis** (usa **inline JS**; pode requerer CSP relaxada)
+  - `/v1/vis/visjs` → **vis-network** (sem inline; compatível com CSP rígida)
 
+## Endpoints principais
 
+- `GET /live` — liveness
+- `GET /ready` — readiness (DNS/Redis/backend)
+- `GET /v1/graph/membros` — JSON `{ nodes, edges }`
+- `GET /v1/vis/pyvis` — HTML PyVis (inline JS)
+- `GET /v1/vis/visjs` — HTML vis-network (zero inline JS)
+- `GET /v1/nodes/{node_id}/neighbors` — subgrafo (raio 1)
+- Swagger: `docs/openapi.yaml`
 
+Parâmetros comuns:  
+`faccao_id` (opcional), `include_co` (bool), `max_pairs`, `max_nodes`, `max_edges`, `cache`.
 
-# svc-kg
+## Como rodar (local)
 
-Microserviço de Knowledge Graph com:
-- Backend: Supabase RPC (`get_graph_membros`) ou Postgres direto.
-- Cache: Redis (fallback memória).
-- Visual: endpoint **/v1/vis/pyvis** (HTML interativo PyVis).
-
-## Subir LOCAL
-```bash
-cp .env.example .env
-# Deixe SUPABASE_* em branco e use o Postgres local do compose
-docker compose -f docker-compose.local.yml up --build
-curl -s http://localhost:8080/ready | jq
-
-
-Micro-serviço FastAPI para exibir grafos (pyVis) a partir de RPC no Supabase.
-
-
-
-## Endpoints
-
-- `GET /health` → `?deep=1` para verificar conexão com Supabase
-- `GET /graph/membros` → JSON (nodes/edges) com meta
-- `GET /graph/membros/vis` → HTML pyVis
-- `POST /rpc/get_graph_membros` → debug pass-through
-
-### Parâmetros comuns
-- `p_faccao_id`: string
-- `p_include_co`: bool
-- `p_max_pairs`: int
-- `depth`: int
-- `preview`: bool (default: true) – aplica truncamento
-- `max_nodes`: int (default: 500)
-- `max_edges`: int (default: 1000)
-- `nocache`: bool – ignora cache do servidor
-- `cache_ttl`: int – TTL customizado (segundos)
-
-
-
-
-
-
-
-## Exemplo cURL
-
+1. Crie `.env` a partir de `.env.example`. Para **local** use Postgres:
 ---
-```bash
-curl "https://svc-kg.SEUDOMINIO/graph/membros?p_faccao_id=abc123&preview=true"
-curl "https://svc-kg.SEUDOMINIO/graph/membros/vis?p_faccao_id=abc123&physics=true"
-curl -X POST "https://svc-kg.SEUDOMINIO/rpc/get_graph_membros" \
-  -H "Content-Type: application/json" \
-  -d '{"p_faccao_id":"abc123","p_include_co":true,"p_max_pairs":200}'
-
-# Documentação
-
-- Swagger UI: `GET /docs`
-- Redoc: `GET /redoc`
-- OpenAPI JSON gerado: `GET /openapi.json`
-- OpenAPI YAML estático: `GET /openapi.yaml`
-
-Endpoints principais:
-- `GET /graph/members` → JSON (nodes/edges) para FlutterFlow
-- `GET /graph/members/html` → Página HTML pyVis pronta para embed
-- `GET /health` → status
+```env
+   DATABASE_URL=postgresql://kg:kg@db:5432/kg
+   SUPABASE_URL=
+   SUPABASE_SERVICE_KEY=
+# svc-kg
 
 ```
 ---
-
-
----
-
-## 🔎 Checklist agora (externo)
-
-1. Abra no browser:  
-   `https://svc-kg.mondaha.com/live`  
-   Esperado: `200 {"status":"live",...}`
-
-2. Se (1) estiver ok, teste:  
-   `https://svc-kg.mondaha.com/health`  
-   Deve vir `200`.
-
-3. Depois:  
-   `https://svc-kg.mondaha.com/ready`  
-   - `200`: tudo certo (Redis/backend ok).  
-   - `503`: a resposta JSON aponta o que está falhando (ver campo `error`).
-
-4. Por fim, a rota do grafo:  
-   `https://svc-kg.mondaha.com/v1/graph/membros?faccao_id=6&include_co=true&max_pairs=500`
-
-Se **(1)** ainda der **503**, o problema é 100% de **roteamento/porta no Coolify** (o Traefik não encontra container saudável na porta interna). A correção é alinhar **PORT** + **Application Port** + (opcional) **labels** acima.
-::contentReference[oaicite:0]{index=0}
-
-
-
-## Troubleshooting 503 ("no available server")
-
-Esse 503 vem do Traefik/edge. Siga:
-
-1) **App port interno**
-   - No Coolify, verifique **Application Port** do serviço. Deve ser **8080** (ou altere `PORT` nas envs do app para o valor da UI).
-   - Nosso container escuta em `0.0.0.0:${PORT:-8080}`.
-
-2) **Healthcheck no Coolify**
-   - Use `/live` (não depende de Redis/DB).
-   - Se o health estiver falhando, o Traefik não publica o serviço.
-
-3) **Teste direto do app (no host do container)**
-   ```bash
-   docker exec -it <container-svc-kg> sh -lc 'curl -sS http://localhost:${PORT:-8080}/live && echo'
-   docker exec -it <container-svc-kg> sh -lc 'curl -sS http://localhost:${PORT:-8080}/ready && echo'
-

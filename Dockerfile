@@ -4,7 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir \
     fastapi==0.115.0 \
@@ -21,8 +21,10 @@ RUN pip install --no-cache-dir \
 
 WORKDIR /app
 COPY app.py /app/app.py
+COPY static /app/static
+COPY docs /app/docs
 
-ENV PORT=8080 WORKERS=2 LOG_LEVEL=info
 EXPOSE 8080
 
-CMD ["bash","-lc","gunicorn -w ${WORKERS:-2} -k uvicorn.workers.UvicornWorker app:app -b 0.0.0.0:${PORT:-8080} --timeout 60 --log-level ${LOG_LEVEL:-info}"]
+ENV PORT=8080 WORKERS=2 LOG_LEVEL=info SERVER_CMD=gunicorn
+CMD ["bash","-lc","if [ \"$SERVER_CMD\" = uvicorn ]; then uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080} --log-level ${LOG_LEVEL:-info}; else gunicorn -w ${WORKERS:-2} -k uvicorn.workers.UvicornWorker app:app -b 0.0.0.0:${PORT:-8080} --timeout 60 --log-level ${LOG_LEVEL:-info}; fi"]
