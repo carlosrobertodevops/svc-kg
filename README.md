@@ -27,6 +27,21 @@ svc-kg/
 
 
 
+# svc-kg
+
+Microserviço de Knowledge Graph com:
+- Backend: Supabase RPC (`get_graph_membros`) ou Postgres direto.
+- Cache: Redis (fallback memória).
+- Visual: endpoint **/v1/vis/pyvis** (HTML interativo PyVis).
+
+## Subir LOCAL
+```bash
+cp .env.example .env
+# Deixe SUPABASE_* em branco e use o Postgres local do compose
+docker compose -f docker-compose.local.yml up --build
+curl -s http://localhost:8080/ready | jq
+
+
 Micro-serviço FastAPI para exibir grafos (pyVis) a partir de RPC no Supabase.
 
 

@@ -9,10 +9,10 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432" # opcional: acessar via psql/GUI no host
+      - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
-      - ./db:/docker-entrypoint-initdb.d:ro # aplica 00_init.sql, 01_indexes.sql, 02_alias.sql
+      - ./db:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
@@ -52,13 +52,13 @@ services:
       CORS_ALLOW_HEADERS: ${CORS_ALLOW_HEADERS:-Authorization,Content-Type}
       CORS_ALLOW_METHODS: ${CORS_ALLOW_METHODS:-GET,POST,OPTIONS}
 
-      # Para uso LOCAL com Postgres do compose, deixe SUPABASE_* vazios no .env
+      # Local: use o Postgres do compose (deixe SUPABASE_* vazios)
       SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_KEY: ${SUPABASE_KEY}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       SUPABASE_RPC_FN: ${SUPABASE_RPC_FN:-get_graph_membros}
       SUPABASE_TIMEOUT: ${SUPABASE_TIMEOUT:-15}
 
-      # Aponta para o serviço 'db' deste compose
       DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres
 
       CACHE_STATIC_MAX_AGE: ${CACHE_STATIC_MAX_AGE:-86400}
@@ -79,7 +79,7 @@ services:
       - ./docs:/app/docs:ro
       - ./tmp:/app/tmp
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/live || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

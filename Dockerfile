@@ -15,7 +15,9 @@ RUN pip install --no-cache-dir \
     orjson==3.10.7 \
     httpx==0.27.2 \
     redis==5.0.7 \
-    PyYAML==6.0.2
+    PyYAML==6.0.2 \
+    networkx==3.3 \
+    pyvis==0.3.2
 
 WORKDIR /app
 COPY app.py /app/app.py
