@@ -1,5 +1,5 @@
-# app.py
-import os, json, hashlib, asyncio, logging, traceback, socket, math
+# app.py (v1.7.8)
+import os, json, hashlib, asyncio, logging, traceback, socket, math, csv, io
 from typing import List, Optional, Tuple
 from time import time
 from urllib.parse import urlparse
@@ -15,9 +15,9 @@ import yaml
 import httpx
 from psycopg_pool import AsyncConnectionPool
 from redis import asyncio as aioredis
-from pyvis.network import Network  # PyVis
+from pyvis.network import Network
 
-# ---------- utils ----------
+# ------------------ utils/env ------------------
 def env_bool(v: Optional[str], default=False) -> bool:
     if v is None: return default
     return v.lower() in ("1", "true", "yes", "on")
@@ -32,7 +32,6 @@ def normalize_supabase_url(u: str) -> str:
 
 def _now() -> float: return time()
 
-# ---------- ENV ----------
 APP_ENV = os.getenv("APP_ENV", "production")
 PORT = int(os.getenv("PORT", "8080"))
 WORKERS = int(os.getenv("WORKERS", "2"))
@@ -67,14 +66,13 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0").strip()
 
 BACKEND_MODE = "supabase" if (SUPABASE_URL and SUPABASE_SERVICE_KEY) else ("postgres" if DATABASE_URL else "none")
 
-# ---------- logging ----------
 logging.basicConfig(level=LOG_LEVEL)
 log = logging.getLogger("svc-kg")
 
-# ---------- app ----------
+# ------------------ app ------------------
 app = FastAPI(
     title="svc-kg",
-    version="1.7.6",
+    version="1.7.8",
     description="Microserviço de Knowledge Graph (membros, facções, funções)",
     default_response_class=ORJSONResponse,
     swagger_ui_parameters={
@@ -85,7 +83,6 @@ app = FastAPI(
     },
 )
 
-# CORS & GZip
 allow_origins = [o.strip() for o in (CORS_ALLOW_ORIGINS or "*").split(",")]
 allow_methods = [m.strip() for m in (CORS_ALLOW_METHODS or "*").split(",")]
 allow_headers = [h.strip() for h in (CORS_ALLOW_HEADERS or "*").split(",")]
@@ -97,17 +94,15 @@ app.add_middleware(CORSMiddleware,
 )
 app.add_middleware(GZipMiddleware, minimum_size=512)
 
-# Static
 if os.path.isdir("assets"): app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 if os.path.isdir("static"): app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Globals
 http_client: Optional[httpx.AsyncClient] = None
 pool: Optional[AsyncConnectionPool] = None
 redis_client: Optional[aioredis.Redis] = None
 _mem_cache: dict[str, Tuple[float, dict]] = {}
 
-# ---------- models ----------
+# ------------------ models ------------------
 class Node(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
@@ -127,7 +122,7 @@ class GraphResponse(BaseModel):
     nodes: List[Node]
     edges: List[Edge]
 
-# ---------- startup/shutdown ----------
+# ------------------ lifecycle ------------------
 @app.on_event("startup")
 async def _startup():
     global http_client, pool, redis_client
@@ -138,22 +133,16 @@ async def _startup():
         http_client = httpx.AsyncClient(
             base_url=SUPABASE_URL,
             timeout=httpx.Timeout(SUPABASE_TIMEOUT),
-            headers={
-                "apikey": api_key,
-                "Authorization": f"Bearer {auth_key}",
-                "Content-Type": "application/json",
-            },
+            headers={"apikey": api_key, "Authorization": f"Bearer {auth_key}", "Content-Type": "application/json"},
         )
     if BACKEND_MODE == "postgres":
         pool = AsyncConnectionPool(conninfo=DATABASE_URL, min_size=0, max_size=10, kwargs={"autocommit": True})
     if ENABLE_REDIS_CACHE and REDIS_URL:
         try:
             redis_client = aioredis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
-            await asyncio.wait_for(redis_client.ping(), timeout=2)
-            log.info("Redis OK")
+            await asyncio.wait_for(redis_client.ping(), timeout=2); log.info("Redis OK")
         except Exception as e:
-            log.warning(f"Redis indisponível, fallback memória: {e}")
-            redis_client = None
+            log.warning(f"Redis indisponível, fallback memória: {e}"); redis_client = None
 
 @app.on_event("shutdown")
 async def _shutdown():
@@ -161,7 +150,7 @@ async def _shutdown():
     if pool: await pool.close()
     if redis_client: await redis_client.close()
 
-# ---------- exception handlers ----------
+# ------------------ errors ------------------
 @app.exception_handler(HTTPException)
 async def http_exc_handler(request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code,
@@ -173,7 +162,7 @@ async def unhandled_exc_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500,
                         content={"error": "internal_error", "message": str(exc)[:500], "path": str(request.url.path)})
 
-# ---------- cache helpers ----------
+# ------------------ cache helpers ------------------
 async def cache_get(key: str) -> Optional[dict]:
     if redis_client:
         try:
@@ -194,10 +183,55 @@ async def cache_set(key: str, data: dict, ttl: int):
         except Exception: pass
     _mem_cache[key] = (_now(), data)
 
-# ---------- core helpers ----------
 def etag_for(data: dict) -> str:
     import orjson; return hashlib.sha1(orjson.dumps(data)).hexdigest()
 
+# ------------------ label normalization ------------------
+def _is_pg_text_array(s: str) -> bool:
+    s = s.strip()
+    return len(s) >= 2 and s[0] == "{" and s[-1] == "}"
+
+def normalize_label(raw: Optional[str]) -> str:
+    """
+    Converte strings como:
+      "{BIGULINHA}"            -> "BIGULINHA"
+      "{\"NEM CATENGA\"}"      -> "NEM CATENGA"
+      "{M2,MENOR,\"CÃO MIÚDO\"}" -> "M2, MENOR, CÃO MIÚDO"
+      "{}"                      -> ""
+    Caso não seja um array textual do Postgres, devolve o próprio texto.
+    """
+    if not raw: return ""
+    s = str(raw).strip()
+    if not _is_pg_text_array(s):
+        return s
+    inner = s[1:-1]
+    if inner == "":
+        return ""
+    try:
+        reader = csv.reader(io.StringIO(inner))
+        arr = next(reader)
+        out = []
+        for item in arr:
+            if item is None: continue
+            t = item.strip().strip('"')
+            if t.lower() == "null": continue
+            out.append(t)
+        return ", ".join(out)
+    except Exception:
+        # fallback bruto: remove { }, aspas
+        return inner.replace('"', '').strip()
+
+def normalize_graph_labels(data: dict) -> dict:
+    """Aplica normalize_label em todos os nós; garante label de fallback."""
+    nodes = []
+    for n in data.get("nodes", []) or []:
+        lab = normalize_label(n.get("label"))
+        if not lab:
+            lab = str(n.get("id", ""))
+        nodes.append({**n, "label": lab})
+    return {"nodes": nodes, "edges": data.get("edges", []) or []}
+
+# ------------------ graph helpers ------------------
 def sanitize_graph(data: dict) -> dict:
     raw_nodes = data.get("nodes", []) or []
     raw_edges = data.get("edges", []) or []
@@ -218,10 +252,8 @@ def sanitize_graph(data: dict) -> dict:
         t = str(e.get("target", "")).strip()
         if not s or not t: continue
         if s not in id_seen or t not in id_seen: continue
-        try:
-            w = float(e.get("weight", 1.0) if e.get("weight", 1.0) is not None else 1.0)
-        except Exception:
-            w = 1.0
+        try: w = float(e.get("weight", 1.0) if e.get("weight", 1.0) is not None else 1.0)
+        except Exception: w = 1.0
         rel = e.get("relation"); rel = str(rel) if (rel is not None) else None
         edges.append({"source": s, "target": t, "weight": w, "relation": rel})
     return {"nodes": nodes, "edges": edges}
@@ -262,8 +294,7 @@ def _wrap_toolbar(html: str, title: str = "PyVis Graph", show_print_btn: bool = 
       .kg-toolbar button{{margin-left:6px;padding:6px 10px;border:0;border-radius:8px;cursor:pointer;background:#fff;color:#111}}
       .kg-toolbar h4{{margin:0 8px 0 0;display:inline;font-weight:600}}
       @media print{{.kg-toolbar{{display:none}}}}
-      html,body,#notebook,#mynetwork{{height:100%}}
-      body{{margin:0}}
+      html,body,#notebook,#mynetwork{{height:100%}} body{{margin:0}}
     </style>
     <div class="kg-toolbar">
       <h4>{title.replace("<","&lt;").replace(">","&gt;")}</h4>
@@ -287,87 +318,60 @@ def _append_debug_overlay(html: str, n_nodes: int, n_edges: int) -> str:
     """
     return html.replace("</body>", badge + "\n</body>", 1)
 
-# ---------- PyVis builder ----------
-async def build_pyvis_html(
-    data: dict,
-    theme: str = "light",
-    arrows: bool = True,
-    hierarchical: bool = False,
-    physics: bool = True,
-    barnes_hut: bool = True,
-    show_buttons: bool = True,
-    title: str = "Knowledge Graph",
-) -> str:
-    nodes = data.get("nodes", [])
-    edges = data.get("edges", [])
-    deg = _degree_map(nodes, edges)
+# ------------------ build pyvis ------------------
+async def build_pyvis_html(data: dict, theme: str="light", arrows: bool=True,
+                           hierarchical: bool=False, physics: bool=True,
+                           barnes_hut: bool=True, show_buttons: bool=True,
+                           title: str="Knowledge Graph") -> str:
+    # normaliza labels para o padrão PyVis
+    norm = normalize_graph_labels(data)
+    nodes = norm.get("nodes", []); edges = norm.get("edges", [])
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
     fg = "#e6e9ef" if theme == "dark" else "#111111"
-
-    net = Network(
-        height="100%",
-        width="100%",
-        bgcolor=bg,
-        font_color=fg,
-        cdn_resources="in_line",
-        notebook=False,
-        directed=arrows,
-    )
-
+    net = Network(height="100%", width="100%", bgcolor=bg, font_color=fg,
+                  cdn_resources="in_line", notebook=False, directed=arrows)
+    deg = _degree_map(nodes, edges)
     for n in nodes:
-        nid = n.get("id")
-        label = n.get("label", nid)
-        group = str(n.get("group", n.get("type", "0")))
-        ntype = n.get("type", "node")
+        nid = n.get("id"); label = n.get("label", nid)
+        group = str(n.get("group", n.get("type", "0"))); ntype = n.get("type", "node")
         size = n.get("size")
-        if size is None:
-            d = deg.get(nid, 0)
-            size = 10 + math.log(d + 1) * 8
+        if size is None: size = 10 + math.log(deg.get(nid,0)+1)*8
         color = _hash_color(group)
         title_node = f"<b>{label}</b><br>id: {nid}<br>grupo: {group}<br>tipo: {ntype}"
         net.add_node(nid, label=label, title=title_node, color=color, size=size, shape="dot")
-
     for e in edges:
-        s = e.get("source")
-        t = e.get("target")
-        w = float(e.get("weight", 1.0) or 1.0)
+        s = e.get("source"); t = e.get("target"); w = float(e.get("weight", 1.0) or 1.0)
         rel = e.get("relation", "")
         title_edge = f"{rel} (w={w})" if rel else f"w={w}"
         net.add_edge(s, t, title=title_edge, value=w, arrows="to" if arrows else "", physics=physics)
-
     if show_buttons:
-        net.show_buttons(filter_=["physics", "interaction", "layout"])
-
+        net.show_buttons(filter_=["physics","interaction","layout"])
     import json as _json
     options = {
-        "interaction": {"hover": True, "dragNodes": True, "dragView": True, "zoomView": True, "multiselect": True, "navigationButtons": True},
-        "manipulation": {"enabled": False},
-        "physics": {"enabled": physics, "stabilization": {"enabled": True, "iterations": 500}},
-        "nodes": {"borderWidth": 1, "shape": "dot"},
-        "edges": {"smooth": False}
+        "interaction":{"hover":True,"dragNodes":True,"dragView":True,"zoomView":True,"multiselect":True,"navigationButtons":True},
+        "manipulation":{"enabled":False},
+        "physics":{"enabled":physics,"stabilization":{"enabled":True,"iterations":500}},
+        "nodes":{"borderWidth":1,"shape":"dot"},
+        "edges":{"smooth":False}
     }
     if barnes_hut:
-        options["physics"]["barnesHut"] = {"gravitationalConstant": -8000, "centralGravity": 0.2, "springLength": 120, "springConstant": 0.04, "avoidOverlap": 0.2}
+        options["physics"]["barnesHut"] = {"gravitationalConstant":-8000,"centralGravity":0.2,"springLength":120,"springConstant":0.04,"avoidOverlap":0.2}
     if hierarchical:
-        options["layout"] = {"hierarchical": {"enabled": True, "direction": "UD", "sortMethod": "hubsize", "nodeSpacing": 200, "levelSeparation": 200}}
+        options["layout"] = {"hierarchical":{"enabled":True,"direction":"UD","sortMethod":"hubsize","nodeSpacing":200,"levelSeparation":200}}
         options["physics"]["enabled"] = False
     net.set_options(_json.dumps(options))
-    net.generate_html()  # net.html string
+    net.generate_html()
     return net.html
 
-# ---------- backends ----------
+# ------------------ backends ------------------
 async def fetch_graph_via_supabase(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> dict:
-    if http_client is None:
-        raise HTTPException(status_code=503, detail="Supabase client não inicializado")
+    if http_client is None: raise HTTPException(status_code=503, detail="Supabase client não inicializado")
     url = f"/rest/v1/rpc/{SUPABASE_RPC_FN}"
     body = {"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs}
     r = await http_client.post(url, json=body)
-    if r.status_code >= 400:
-        raise HTTPException(status_code=502, detail=f"Supabase RPC {SUPABASE_RPC_FN} falhou ({r.status_code}): {r.text[:400]}")
-    try:
-        data = r.json() if r.content else {"nodes": [], "edges": []}
-    except Exception:
-        data = {"nodes": [], "edges": []}
+    if r.status_code >= 400: raise HTTPException(status_code=502, detail=f"Supabase RPC {SUPABASE_RPC_FN} falhou ({r.status_code}): {r.text[:400]}")
+    try: data = r.json() if r.content else {"nodes": [], "edges": []}
+    except Exception: data = {"nodes": [], "edges": []}
     if isinstance(data, str):
         try: data = json.loads(data)
         except Exception: data = {"nodes": [], "edges": []}
@@ -375,8 +379,7 @@ async def fetch_graph_via_supabase(faccao_id: Optional[int], include_co: bool, m
     return data
 
 async def fetch_graph_via_pg(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> dict:
-    if pool is None:
-        raise HTTPException(status_code=503, detail="Pool Postgres não inicializado")
+    if pool is None: raise HTTPException(status_code=503, detail="Pool Postgres não inicializado")
     async with pool.connection() as conn:
         async with conn.cursor() as cur:
             try:
@@ -393,23 +396,20 @@ async def fetch_graph_via_pg(faccao_id: Optional[int], include_co: bool, max_pai
             return data
 
 async def fetch_graph_raw(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> dict:
-    if BACKEND_MODE == "supabase":
-        return await fetch_graph_via_supabase(faccao_id, include_co, max_pairs)
-    if BACKEND_MODE == "postgres":
-        return await fetch_graph_via_pg(faccao_id, include_co, max_pairs)
+    if BACKEND_MODE == "supabase": return await fetch_graph_via_supabase(faccao_id, include_co, max_pairs)
+    if BACKEND_MODE == "postgres": return await fetch_graph_via_pg(faccao_id, include_co, max_pairs)
     raise HTTPException(status_code=500, detail="Nenhum backend configurado (defina SUPABASE_* ou DATABASE_URL)")
 
-async def fetch_graph_sanitized(faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool = True) -> dict:
+async def fetch_graph_sanitized(faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool=True) -> dict:
     key = f"graph_raw:{faccao_id}:{include_co}:{max_pairs}"
     data = await cache_get(key) if use_cache else None
     if data is None:
         raw = await fetch_graph_raw(faccao_id, include_co, max_pairs)
         data = sanitize_graph(raw)
-        if use_cache:
-            await cache_set(key, data, CACHE_API_TTL)
+        if use_cache: await cache_set(key, data, CACHE_API_TTL)
     return data
 
-# ---------- openapi ----------
+# ------------------ openapi ------------------
 def custom_openapi():
     if getattr(app, "openapi_schema", None): return app.openapi_schema
     yaml_path = os.path.join("docs", "openapi.yaml")
@@ -420,7 +420,7 @@ def custom_openapi():
     return app.openapi_schema
 app.openapi = custom_openapi
 
-# ---------- endpoints ----------
+# ------------------ basic endpoints ------------------
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def root():
     return HTMLResponse(
@@ -438,12 +438,11 @@ async def live(): return {"status": "live", "service": "svc-kg"}
 async def ready():
     info = {"redis": False, "backend": BACKEND_MODE, "backend_ok": False}
     if BACKEND_MODE == "supabase":
-        parsed = urlparse(SUPABASE_URL)
-        host = parsed.hostname or ""
+        parsed = urlparse(SUPABASE_URL); host = parsed.hostname or ""
         info["supabase_host"] = host
         try:
             loop = asyncio.get_running_loop()
-            await asyncio.wait_for(loop.run_in_executor(None, socket.getaddrinfo, host, 443), timeout=2.0)
+            await asyncio.wait_for(loop.run_in_executor(None, socket.getaddrinfo, host, 443), timeout=2)
             info["dns_ok"] = True
         except Exception as e:
             info["dns_ok"] = False; info["error"] = f"DNS fail for {host}: {e}"
@@ -475,8 +474,8 @@ async def health(response: Response):
             "cache":"redis" if (ENABLE_REDIS_CACHE and REDIS_URL and redis_client) else "memory",
             "backend": BACKEND_MODE}
 
-@app.get("/v1/graph/membros", response_model=GraphResponse,
-         summary="Grafo (via et_graph_membros/get_graph_membros)")
+# ------------------ graph endpoints ------------------
+@app.get("/v1/graph/membros", response_model=GraphResponse, summary="Grafo (via et_graph_membros/get_graph_membros)")
 async def graph_membros(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -495,8 +494,7 @@ async def graph_membros(
     response.headers["ETag"] = etag_for(out); response.headers["Cache-Control"] = "public, max-age=30"
     return out
 
-@app.get("/graph/members", response_model=GraphResponse,
-         summary="(Compat) /v1/graph/membros com p_*")
+@app.get("/graph/members", response_model=GraphResponse, summary="(Compat) /v1/graph/membros com p_*")
 async def graph_members_compat(
     response: Response,
     p_faccao_id: Optional[int] = Query(default=None),
@@ -515,8 +513,7 @@ async def graph_members_compat(
     response.headers["ETag"] = etag_for(out); response.headers["Cache-Control"] = "public, max-age=30"
     return out
 
-@app.get("/v1/nodes/{node_id}/neighbors", response_model=GraphResponse,
-         summary="Subgrafo (raio=1)")
+@app.get("/v1/nodes/{node_id}/neighbors", response_model=GraphResponse, summary="Subgrafo (raio=1)")
 async def neighbors(response: Response, node_id: str, include_co: bool = True, max_pairs: int = 3000):
     data = await fetch_graph_sanitized(None, include_co, max_pairs, use_cache=True)
     nodes = data.get("nodes", []); edges = data.get("edges", [])
@@ -530,13 +527,12 @@ async def neighbors(response: Response, node_id: str, include_co: bool = True, m
     response.headers["ETag"] = etag_for(out); response.headers["Cache-Control"] = "public, max-age=30"
     return out
 
-# --------- VISUALIZAÇÃO: PyVis (inline JS) ---------
-@app.get("/v1/vis/pyvis", response_class=HTMLResponse,
-         summary="Visualização PyVis (HTML, usa inline JS)")
+# ------------------ VIS: PyVis (inline) ------------------
+@app.get("/v1/vis/pyvis", response_class=HTMLResponse, summary="Visualização PyVis (inline JS)")
 async def vis_pyvis(
     response: Response,
-    faccao_id: Optional[int] = Query(default=None, description="Filtra por facção (opcional)"),
-    include_co: bool = Query(default=True, description="Inclui CO_*"),
+    faccao_id: Optional[int] = Query(default=None),
+    include_co: bool = Query(default=True),
     max_pairs: int = Query(default=8000, ge=1, le=200000),
     max_nodes: int = Query(default=2000, ge=100, le=20000),
     max_edges: int = Query(default=4000, ge=100, le=200000),
@@ -549,9 +545,9 @@ async def vis_pyvis(
     show_buttons: bool = True,
     title: str = "Knowledge Graph",
     toolbar: bool = True,
-    allow_inline: bool = Query(default=True, description="Envia header CSP permitindo inline"),
-    meta_csp: bool = Query(default=True, description="Insere <meta http-equiv=CSP> no HTML"),
-    min_height: str = Query(default="90vh", description="Altura mínima do canvas (#mynetwork)"),
+    allow_inline: bool = Query(default=True),
+    meta_csp: bool = Query(default=True),
+    min_height: str = Query(default="90vh"),
     debug: bool = Query(default=False)
 ):
     key = f"graph_sane:{faccao_id}:{include_co}:{max_pairs}"
@@ -562,10 +558,9 @@ async def vis_pyvis(
     out = truncate_preview(data, max_nodes, max_edges)
 
     if not out.get("nodes"):
-        empty = f"""<!doctype html>
-<html><head><meta charset="utf-8"><title>{title}</title>
-<style>html,body{{height:100%;margin:0}}.empty{{display:flex;height:100%;align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif;background:{'#0b0f19' if theme=='dark' else '#fff'};color:{'#e6e9ef' if theme=='dark' else '#111' }}}</style>
-</head><body><div class="empty">Nenhum dado para exibir (nodes=0).</div></body></html>"""
+        empty = f"""<!doctype html><html><head><meta charset="utf-8"><title>{title}</title>
+<style>html,body{{height:100%;margin:0}}.empty{{display:flex;height:100%;align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif;background:{'#0b0f19' if theme=='dark' else '#fff'};color:{'#e6e9ef' if theme=='dark' else '#111'}}}</style></head>
+<body><div class="empty">Nenhum dado para exibir (nodes=0).</div></body></html>"""
         if allow_inline:
             response.headers["Content-Security-Policy"] = "default-src 'self' data: blob:; style-src 'self' 'unsafe-inline' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src * data: blob:; font-src 'self' data:; connect-src *;"
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -585,9 +580,9 @@ async def vis_pyvis(
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
 
-# --------- VISUALIZAÇÃO: vis-network (sem inline; assets LOCAIS) ---------
+# ------------------ VIS: vis-network (sem inline) ------------------
 @app.get("/v1/vis/visjs", response_class=HTMLResponse,
-         summary="Visualização (vis-network, sem inline JS, assets locais)")
+         summary="Visualização vis-network (server-embed por padrão; fallback client)")
 async def vis_visjs(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -598,9 +593,35 @@ async def vis_visjs(
     cache: bool = Query(default=True),
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (vis.js)",
-    debug: bool = Query(default=False)
+    debug: bool = Query(default=False),
+    source: str = Query(default="server", pattern="^(server|client)$")
 ):
+    # decide assets (local ↔ CDN)
+    local_js = "static/vendor/vis-network/vis-network.min.js"
+    local_css = "static/vendor/vis-network/vis-network.min.css"
+    has_local = os.path.exists(local_js) and os.path.exists(local_css)
+    if has_local:
+        js_href = "/static/vendor/vis-network/vis-network.min.js"
+        css_href = "/static/vendor/vis-network/vis-network.min.css"
+        csp = ("default-src 'self'; style-src 'self'; script-src 'self'; "
+               "img-src 'self' data:; font-src 'self' data:; connect-src 'self';")
+    else:
+        js_href = "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"
+        css_href = "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
+        csp = ("default-src 'self'; style-src 'self' https://unpkg.com; script-src 'self' https://unpkg.com; "
+               "img-src 'self' data:; font-src 'self' data:; connect-src 'self';")
+
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
+
+    embedded_block = ""
+    if source == "server":
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
+        out = truncate_preview(data, max_nodes, max_edges)
+        # >>> normaliza labels antes de embedar
+        out = normalize_graph_labels(out)
+        json_str = json.dumps(out, ensure_ascii=False)
+        embedded_block = f'<script id="__KG_DATA__" type="application/json">{json_str}</script>'
+
     html = f"""<!doctype html>
 <html lang="pt-br">
   <head>
@@ -608,10 +629,10 @@ async def vis_visjs(
     <meta http-equiv="x-ua-compatible" content="ie=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
-    <!-- CSS/JS locais (self) -->
-    <link rel="stylesheet" href="/static/vendor/vis-network.min.css">
+    <link rel="stylesheet" href="{css_href}">
     <link rel="stylesheet" href="/static/vis-style.css">
     <meta name="theme-color" content="{bg}">
+    <style>html,body,#mynetwork{{height:100%;margin:0}}</style>
   </head>
   <body data-theme="{theme}">
     <div class="kg-toolbar">
@@ -621,18 +642,16 @@ async def vis_visjs(
       <span id="badge" class="badge" style="display:{'inline-block' if debug else 'none'}">debug</span>
     </div>
     <div id="mynetwork"
+         style="height:90vh;width:100%;"
          data-endpoint="/v1/graph/membros"
-         data-debug="{str(debug).lower()}"></div>
-    <script src="/static/vendor/vis-network.min.js"></script>
-    <script src="/static/vis-page.js"></script>
+         data-debug="{str(debug).lower()}"
+         data-source="{source}"></div>
+    {embedded_block}
+    <script src="{js_href}"></script>
+    <script src="/static/vis-embed.js"></script>
   </body>
 </html>"""
-    # CSP rígida, só 'self'
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "style-src 'self'; "
-        "script-src 'self'; "
-        "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'self';"
-    )
+
+    response.headers["Content-Security-Policy"] = csp
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)

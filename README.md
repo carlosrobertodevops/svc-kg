@@ -1,27 +1,5 @@
 
-# svc-kg (v1.7.5)
 
-svc-kg/
-├─ app.py
-├─ Dockerfile
-├─ docker-compose.local.yml
-├─ docker-compose.coolify.yml
-├─ .env.example
-├─ .gitignore
-├─ .dockerignore
-├─ README.md
-├─ assets/           # (montado no container)
-│  └─ .keep
-├─ static/           # (montado no container)
-│  └─ .keep
-├─ tmp/              # (montado no container)
-│  └─ .gitkeep
-├─ docs/
-│  └─ openapi.yaml   # Swagger spec estático (usado no /docs)
-└─ db/
-   ├─ 00_init.sql    # schema + seed + get_graph_membros
-   ├─ 01_indexes.sql # índices
-   └─ 02_alias.sql   # et_graph_membros -> get_graph_membros
 
 Microserviço de **Knowledge Graph** (membros, facções, funções) com:
 - Backend: **Supabase RPC** (`get_graph_membros`) **ou** Postgres.
@@ -30,30 +8,58 @@ Microserviço de **Knowledge Graph** (membros, facções, funções) com:
   - `/v1/vis/pyvis` → **PyVis** (usa **inline JS**; pode requerer CSP relaxada)
   - `/v1/vis/visjs` → **vis-network** (sem inline; compatível com CSP rígida)
 
-## Endpoints principais
+# svc-kg (v1.7.6)
 
-- `GET /live` — liveness
-- `GET /ready` — readiness (DNS/Redis/backend)
-- `GET /v1/graph/membros` — JSON `{ nodes, edges }`
-- `GET /v1/vis/pyvis` — HTML PyVis (inline JS)
-- `GET /v1/vis/visjs` — HTML vis-network (zero inline JS)
-- `GET /v1/nodes/{node_id}/neighbors` — subgrafo (raio 1)
-- Swagger: `docs/openapi.yaml`
+svc-kg/
+├─ db/
+│  ├─ 00_init.sql    # schema + seed + get_graph_membros
+│  ├─ 01_indexes.sql # índices
+│  └─ 02_alias.sql   # et_graph_membros -> get_graph_membros
+├─ docs/
+│  └─ openapi.yaml   # Swagger spec estático (usado no /docs)
+├─ static/           # (montado no container)
+│   ├─ vis-page.js
+│   └─ vis-style.css
+├─ app.py
+├─ Dockerfile
+├─ docker-compose.local.yml
+├─ docker-compose.coolify.yml
+├─ .env.example
+├─ .gitignore
+├─ .dockerignore
+├─ README.md
 
-Parâmetros comuns:  
-`faccao_id` (opcional), `include_co` (bool), `max_pairs`, `max_nodes`, `max_edges`, `cache`.
 
 
+Microserviço de **Knowledge Graph** com:
+- Backend: **Supabase RPC** (`get_graph_membros`) ou **Postgres**.
+- Cache: **Redis** (fallback em memória).
+- Visualização:
+  - `/v1/vis/pyvis` → **PyVis** (usa inline JS; pode ser bloqueado por CSP rígida)
+  - `/v1/vis/visjs` → **vis-network** (sem inline; **assets locais**, compatível com CSP)
 
-## Como rodar (local)
+## Endpoints
 
-1. Crie `.env` a partir de `.env.example`. Para **local** use Postgres:
----
-```env
+- `GET /live` — liveness  
+- `GET /ready` — readiness (DNS/Redis/backend)  
+- `GET /v1/graph/membros` — JSON `{nodes, edges}`  
+- `GET /v1/nodes/{id}/neighbors` — subgrafo (raio 1)  
+- Visualização:
+  - `GET /v1/vis/pyvis?...`
+  - `GET /v1/vis/visjs?...`
+- OpenAPI: `docs/openapi.yaml`
+
+## Rodando LOCAL (Postgres + Redis)
+
+1. Crie `.env` a partir de `.env.example` e defina:
+   ```env
+   APP_ENV=development
+   PORT=8080
+   WORKERS=2
+   LOG_LEVEL=debug
+
+   # Local usa Postgres (não Supabase)
    DATABASE_URL=postgresql://kg:kg@db:5432/kg
    SUPABASE_URL=
    SUPABASE_SERVICE_KEY=
-# svc-kg
 
-```
----
