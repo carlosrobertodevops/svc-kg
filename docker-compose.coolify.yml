@@ -39,8 +39,10 @@ services:
 
       ENABLE_REDIS_CACHE: ${ENABLE_REDIS_CACHE:-true}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-    ports:
-      - "${PORT:-8080}:${PORT:-8080}"
+    # Em Coolify geralmente não precisa mapear portas; ele cuida do Traefik.
+    # Se quiser expor localmente, descomente:
+    # ports:
+    #   - "${PORT:-8080}:${PORT:-8080}"
     depends_on:
       redis:
         condition: service_healthy
@@ -50,14 +52,16 @@ services:
       - ./docs:/app/docs:ro
       - ./tmp:/app/tmp
     healthcheck:
+      # usa /live (não depende de DB/Redis)
       test:
-        [
-          "CMD-SHELL",
-          "curl -sf http://localhost:${PORT:-8080}/health || exit 1"
-        ]
+        ["CMD-SHELL", "curl -sf http://localhost:${PORT:-8080}/live || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+    # (Opcional, mas ajuda o Traefik a achar a porta interna correta)
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.svc-kg.loadbalancer.server.port=${PORT:-8080}"
     restart: unless-stopped
 
 networks:
