@@ -1,4 +1,4 @@
-# app.py (v1.7.8)
+# app.py (v1.7.9)
 import os, json, hashlib, asyncio, logging, traceback, socket, math, csv, io
 from typing import List, Optional, Tuple
 from time import time
@@ -16,6 +16,7 @@ import httpx
 from psycopg_pool import AsyncConnectionPool
 from redis import asyncio as aioredis
 from pyvis.network import Network
+import networkx as nx  # NEW
 
 # ------------------ utils/env ------------------
 def env_bool(v: Optional[str], default=False) -> bool:
@@ -72,7 +73,7 @@ log = logging.getLogger("svc-kg")
 # ------------------ app ------------------
 app = FastAPI(
     title="svc-kg",
-    version="1.7.8",
+    version="1.7.9",
     description="Microserviço de Knowledge Graph (membros, facções, funções)",
     default_response_class=ORJSONResponse,
     swagger_ui_parameters={
@@ -163,6 +164,8 @@ async def unhandled_exc_handler(request: Request, exc: Exception):
                         content={"error": "internal_error", "message": str(exc)[:500], "path": str(request.url.path)})
 
 # ------------------ cache helpers ------------------
+def _now_ts(): return _now()
+
 async def cache_get(key: str) -> Optional[dict]:
     if redis_client:
         try:
@@ -172,7 +175,7 @@ async def cache_get(key: str) -> Optional[dict]:
     hit = _mem_cache.get(key)
     if not hit: return None
     ts, data = hit
-    if _now() - ts > CACHE_API_TTL:
+    if _now_ts() - ts > CACHE_API_TTL:
         _mem_cache.pop(key, None); return None
     return data
 
@@ -181,7 +184,7 @@ async def cache_set(key: str, data: dict, ttl: int):
         try:
             await redis_client.set(key, json.dumps(data), ex=ttl); return
         except Exception: pass
-    _mem_cache[key] = (_now(), data)
+    _mem_cache[key] = (_now_ts(), data)
 
 def etag_for(data: dict) -> str:
     import orjson; return hashlib.sha1(orjson.dumps(data)).hexdigest()
@@ -192,21 +195,11 @@ def _is_pg_text_array(s: str) -> bool:
     return len(s) >= 2 and s[0] == "{" and s[-1] == "}"
 
 def normalize_label(raw: Optional[str]) -> str:
-    """
-    Converte strings como:
-      "{BIGULINHA}"            -> "BIGULINHA"
-      "{\"NEM CATENGA\"}"      -> "NEM CATENGA"
-      "{M2,MENOR,\"CÃO MIÚDO\"}" -> "M2, MENOR, CÃO MIÚDO"
-      "{}"                      -> ""
-    Caso não seja um array textual do Postgres, devolve o próprio texto.
-    """
     if not raw: return ""
     s = str(raw).strip()
-    if not _is_pg_text_array(s):
-        return s
+    if not _is_pg_text_array(s): return s
     inner = s[1:-1]
-    if inner == "":
-        return ""
+    if inner == "": return ""
     try:
         reader = csv.reader(io.StringIO(inner))
         arr = next(reader)
@@ -218,16 +211,13 @@ def normalize_label(raw: Optional[str]) -> str:
             out.append(t)
         return ", ".join(out)
     except Exception:
-        # fallback bruto: remove { }, aspas
         return inner.replace('"', '').strip()
 
 def normalize_graph_labels(data: dict) -> dict:
-    """Aplica normalize_label em todos os nós; garante label de fallback."""
     nodes = []
     for n in data.get("nodes", []) or []:
         lab = normalize_label(n.get("label"))
-        if not lab:
-            lab = str(n.get("id", ""))
+        if not lab: lab = str(n.get("id", ""))
         nodes.append({**n, "label": lab})
     return {"nodes": nodes, "edges": data.get("edges", []) or []}
 
@@ -318,12 +308,11 @@ def _append_debug_overlay(html: str, n_nodes: int, n_edges: int) -> str:
     """
     return html.replace("</body>", badge + "\n</body>", 1)
 
-# ------------------ build pyvis ------------------
+# ------------------ build pyvis (clássico) ------------------
 async def build_pyvis_html(data: dict, theme: str="light", arrows: bool=True,
                            hierarchical: bool=False, physics: bool=True,
                            barnes_hut: bool=True, show_buttons: bool=True,
                            title: str="Knowledge Graph") -> str:
-    # normaliza labels para o padrão PyVis
     norm = normalize_graph_labels(data)
     nodes = norm.get("nodes", []); edges = norm.get("edges", [])
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
@@ -362,6 +351,111 @@ async def build_pyvis_html(data: dict, theme: str="light", arrows: bool=True,
     net.set_options(_json.dumps(options))
     net.generate_html()
     return net.html
+
+# ------------------ build pyvis PRO (NetworkX) ------------------
+async def build_pyvis_html_repo_style(
+    data: dict,
+    theme: str = "light",
+    arrows: bool = True,
+    physics: bool = True,
+    show_buttons: bool = True,
+    metric: str = "degree",     # "degree" | "betweenness"
+    communities: bool = True,   # colorir por comunidades
+    title: str = "Knowledge Graph (PyVis+NX)"
+) -> str:
+    norm = normalize_graph_labels(data)
+    nodes = norm.get("nodes", []) or []
+    edges = norm.get("edges", []) or []
+
+    bg = "#0b0f19" if theme == "dark" else "#ffffff"
+    fg = "#e6e9ef" if theme == "dark" else "#111111"
+
+    G = nx.Graph()
+    for n in nodes:
+        nid = str(n.get("id", "")).strip()
+        if not nid: continue
+        G.add_node(
+            nid,
+            label=n.get("label") or nid,
+            group=str(n.get("group", n.get("type", "0"))),
+            ntype=n.get("type", "node"),
+            size=n.get("size")
+        )
+    for e in edges:
+        s = str(e.get("source", "")).strip()
+        t = str(e.get("target", "")).strip()
+        if not s or not t or (s not in G) or (t not in G): continue
+        w = float(e.get("weight", 1.0) or 1.0)
+        rel = e.get("relation", "")
+        G.add_edge(s, t, weight=w, title=(f"{rel} (w={w})" if rel else f"w={w}"))
+
+    sizes = {}
+    try:
+        if metric == "betweenness":
+            c = nx.betweenness_centrality(G, normalized=True)
+            sizes = {n: 10 + (v * 80.0) for n, v in c.items()}
+        else:
+            c = nx.degree_centrality(G)
+            sizes = {n: 10 + (v * 80.0) for n, v in c.items()}
+    except Exception:
+        deg = dict(G.degree())
+        sizes = {n: 10 + (math.log(deg.get(n, 0) + 1) * 8.0) for n in G.nodes()}
+
+    comm_map = {}
+    try:
+        from networkx.algorithms.community import greedy_modularity_communities
+        comms = list(greedy_modularity_communities(G)) if communities else []
+        for idx, com in enumerate(comms):
+            for n in com: comm_map[n] = idx
+    except Exception:
+        comm_map = {}
+
+    def hash_color(key: str) -> str:
+        h = hashlib.sha1(key.encode("utf-8")).hexdigest()
+        return f"#{h[:6]}"
+
+    net = Network(height="100%", width="100%", bgcolor=bg, font_color=fg,
+                  cdn_resources="in_line", notebook=False, directed=arrows)
+
+    for n in G.nodes():
+        attrs = G.nodes[n]
+        label = attrs.get("label", n)
+        group = attrs.get("group", "0")
+        ntype = attrs.get("ntype", "node")
+        size = attrs.get("size")
+        if size is None: size = sizes.get(n, 12.0)
+
+        color = hash_color(f"c{comm_map[n]}") if n in comm_map else hash_color(str(group))
+        title_node = f"<b>{label}</b><br>id: {n}<br>grupo: {group}<br>tipo: {ntype}"
+        net.add_node(n, label=label, title=title_node, color=color, size=size, shape="dot")
+
+    for s, t, ed in G.edges(data=True):
+        net.add_edge(s, t, title=ed.get("title"), value=float(ed.get("weight", 1.0) or 1.0),
+                     arrows="to" if arrows else "", physics=physics)
+
+    if show_buttons:
+        net.show_buttons(filter_=["physics", "interaction", "layout"])
+
+    import json as _json
+    options = {
+        "interaction": {"hover": True, "dragNodes": True, "dragView": True, "zoomView": True,
+                        "multiselect": True, "navigationButtons": True},
+        "manipulation": {"enabled": False},
+        "physics": {"enabled": physics, "stabilization": {"enabled": True, "iterations": 500}},
+        "nodes": {"borderWidth": 1, "shape": "dot"},
+        "edges": {"smooth": False}
+    }
+    if physics:
+        options["physics"]["barnesHut"] = {
+            "gravitationalConstant": -8000, "centralGravity": 0.2,
+            "springLength": 120, "springConstant": 0.04, "avoidOverlap": 0.2
+        }
+    net.set_options(_json.dumps(options))
+    net.generate_html()
+    html = net.html
+    html = _wrap_toolbar(html, title=title, show_print_btn=True)
+    html = _ensure_network_min_height(html, min_height="92vh")
+    return html
 
 # ------------------ backends ------------------
 async def fetch_graph_via_supabase(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> dict:
@@ -428,7 +522,7 @@ async def root():
         "<style>body{font-family:Inter,system-ui,Arial;padding:24px}</style>"
         "</head><body><h1>svc-kg online</h1>"
         "<p>Use <code>/live</code>, <code>/ready</code>, <code>/v1/graph/membros</code>, "
-        "<code>/v1/vis/pyvis</code> ou <code>/v1/vis/visjs</code>.</p></body></html>"
+        "<code>/v1/vis/pyvis</code>, <code>/v1/vis/pyvis2</code> ou <code>/v1/vis/visjs</code>.</p></body></html>"
     )
 
 @app.get("/live", summary="Liveness")
@@ -527,7 +621,7 @@ async def neighbors(response: Response, node_id: str, include_co: bool = True, m
     response.headers["ETag"] = etag_for(out); response.headers["Cache-Control"] = "public, max-age=30"
     return out
 
-# ------------------ VIS: PyVis (inline) ------------------
+# ------------------ VIS: PyVis (inline clássico) ------------------
 @app.get("/v1/vis/pyvis", response_class=HTMLResponse, summary="Visualização PyVis (inline JS)")
 async def vis_pyvis(
     response: Response,
@@ -580,7 +674,58 @@ async def vis_pyvis(
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
 
-# ------------------ VIS: vis-network (sem inline) ------------------
+# ------------------ VIS: PyVis PRO (NetworkX) ------------------
+@app.get("/v1/vis/pyvis2", response_class=HTMLResponse,
+         summary="Visualização PyVis com NetworkX (centralidade + comunidades)")
+async def vis_pyvis2(
+    response: Response,
+    faccao_id: Optional[int] = Query(default=None),
+    include_co: bool = Query(default=True),
+    max_pairs: int = Query(default=8000, ge=1, le=200000),
+    max_nodes: int = Query(default=2000, ge=100, le=20000),
+    max_edges: int = Query(default=4000, ge=100, le=200000),
+    cache: bool = Query(default=True),
+    theme: str = Query(default="light", pattern="^(light|dark)$"),
+    arrows: bool = True,
+    physics: bool = True,
+    metric: str = Query(default="degree", pattern="^(degree|betweenness)$"),
+    communities: bool = True,
+    title: str = "Knowledge Graph (PyVis+NX)",
+    debug: bool = False
+):
+    key = f"graph_sane:{faccao_id}:{include_co}:{max_pairs}"
+    data = await cache_get(key) if cache else None
+    if data is None:
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=True)
+        if cache:
+            await cache_set(key, data, CACHE_API_TTL)
+    out = truncate_preview(data, max_nodes, max_edges)
+
+    if not out.get("nodes"):
+        html = """<!doctype html><html><head><meta charset="utf-8"><title>PyVis</title>
+<style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font-family:Inter,Arial}</style></head>
+<body>Sem dados (nodes=0).</body></html>"""
+        return HTMLResponse(content=html, status_code=200)
+
+    try:
+        html = await build_pyvis_html_repo_style(
+            out, theme=theme, arrows=arrows, physics=physics,
+            metric=metric, communities=communities, title=title
+        )
+    except Exception:
+        html = await build_pyvis_html(out, theme=theme, arrows=arrows, physics=physics,
+                                      barnes_hut=True, show_buttons=True, title=title)
+
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self' data: blob:; "
+        "style-src 'self' 'unsafe-inline' data: blob:; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; "
+        "img-src * data: blob:; font-src 'self' data:; connect-src *;"
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return HTMLResponse(content=html, status_code=200)
+
+# ------------------ VIS: vis-network (server-embed + fallback inline seguro) ------------------
 @app.get("/v1/vis/visjs", response_class=HTMLResponse,
          summary="Visualização vis-network (server-embed + fallback inline)")
 async def vis_visjs(
@@ -596,78 +741,73 @@ async def vis_visjs(
     debug: bool = Query(default=False),
     source: str = Query(default="server", pattern="^(server|client)$")
 ):
-    # 1) Decide assets (local ↔ CDN)
     local_js = "static/vendor/vis-network/vis-network.min.js"
     local_css = "static/vendor/vis-network/vis-network.min.css"
     has_local = os.path.exists(local_js) and os.path.exists(local_css)
     if has_local:
         js_href = "/static/vendor/vis-network/vis-network.min.js"
         css_href = "/static/vendor/vis-network/vis-network.min.css"
-        # Permite inline (fallback) e self
         csp = ("default-src 'self'; style-src 'self' 'unsafe-inline'; "
                "script-src 'self' 'unsafe-inline'; img-src 'self' data:; "
                "font-src 'self' data:; connect-src 'self';")
     else:
         js_href = "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"
         css_href = "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
-        # Permite inline + CDN
         csp = ("default-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; "
                "script-src 'self' 'unsafe-inline' https://unpkg.com; "
                "img-src 'self' data:; font-src 'self' data:; connect-src 'self';")
 
-    # 2) Se source=server, embute dados normalizados no HTML
     embedded_block = ""
     if source == "server":
         data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
         out = truncate_preview(data, max_nodes, max_edges)
-        out = normalize_graph_labels(out)  # <- limpa "{…}" -> "…"
-        json_str = json.dumps(out, ensure_ascii=False)
-        embedded_block = f'<script id="__KG_DATA__" type="application/json">{json_str}</script>'
+        out = normalize_graph_labels(out)
+        json_str = json.dumps(out, ensure_ascii=False).replace("</script>", "<\\/script>")
+        embedded_block = '<script id="__KG_DATA__" type="application/json">' + json_str + '</script>'
 
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
+    debug_style = "inline-block" if debug else "none"
 
-    # 3) HTML com fallback inline (não depende de /static/vis-embed.js)
-    html = f"""<!doctype html>
+    tpl = """<!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="x-ua-compatible" content="ie=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title}</title>
-    <link rel="stylesheet" href="{css_href}">
+    <title>%TITLE%</title>
+    <link rel="stylesheet" href="%CSS%">
     <link rel="stylesheet" href="/static/vis-style.css">
-    <meta name="theme-color" content="{bg}">
-    <style>html,body,#mynetwork{{height:100%;margin:0}}</style>
+    <meta name="theme-color" content="%BG%">
+    <style>html,body,#mynetwork{height:100%;margin:0}</style>
   </head>
-  <body data-theme="{theme}">
+  <body data-theme="%THEME%">
     <div class="kg-toolbar">
-      <h4>{title}</h4>
+      <h4>%TITLE%</h4>
       <button id="btn-print" type="button" title="Imprimir">Print</button>
       <button id="btn-reload" type="button" title="Recarregar">Reload</button>
-      <span id="badge" class="badge" style="display:{'inline-block' if debug else 'none'}">debug</span>
+      <span id="badge" class="badge" style="display:%DBG_STYLE%">debug</span>
     </div>
     <div id="mynetwork"
          style="height:90vh;width:100%;"
          data-endpoint="/v1/graph/membros"
-         data-debug="{str(debug).lower()}"
-         data-source="{source}"></div>
-    {embedded_block}
-    <script src="{js_href}" crossorigin="anonymous"></script>
+         data-debug="%DEBUG%"
+         data-source="%SOURCE%"></div>
+    %EMBED%
+    <script src="%JS%" crossorigin="anonymous"></script>
 
-    <!-- Fallback inline: desenha mesmo que /static/vis-embed.js ou CDN falhem -->
     <script>
-    (function(){{
+    (function(){
       const container = document.getElementById('mynetwork');
       const source = container.getAttribute('data-source') || 'server';
       const debug = container.getAttribute('data-debug') === 'true';
       const endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
 
-      function hashColor(s){{
-        s = String(s||''); let h=0; for (let i=0;i<s.length;i++) {{ h=(h<<5)-h+s.charCodeAt(i); h|=0; }}
+      function hashColor(s){
+        s = String(s||''); let h=0; for (let i=0;i<s.length;i++) { h=(h<<5)-h+s.charCodeAt(i); h|=0; }
         const hue=Math.abs(h)%360; return `hsl(${hue},70%,50%)`;
-      }}
-      function isPgTextArray(s){{ s=(s||'').trim(); return s.length>=2 && s[0]=='{{' && s[s.length-1]=='}'; }}
-      function cleanLabel(raw){{
+      }
+      function isPgTextArray(s){ s=(s||'').trim(); return s.length>=2 && s[0]==='{' && s[s.length-1]==='}'; }
+      function cleanLabel(raw){
         if(!raw) return '';
         const s=String(raw).trim();
         if(!isPgTextArray(s)) return s;
@@ -676,65 +816,65 @@ async def vis_visjs(
         return inner.replace(/(^|,)\\s*"?null"?\\s*(?=,|$)/gi,'')
                     .replace(/"/g,'')
                     .split(',').map(x=>x.trim()).filter(Boolean).join(', ');
-      }}
-      function degreeMap(nodes,edges){{
-        const d={{}}; nodes.forEach(n=>d[n.id]=0);
-        edges.forEach(e=>{{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; }});
+      }
+      function degreeMap(nodes,edges){
+        const d={}; nodes.forEach(n=>d[n.id]=0);
+        edges.forEach(e=>{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; });
         return d;
-      }}
-      function attachToolbar(net,nc,ec){{
+      }
+      function attachToolbar(net,nc,ec){
         const p=document.getElementById('btn-print'); if(p) p.onclick=()=>window.print();
         const r=document.getElementById('btn-reload'); if(r) r.onclick=()=>location.reload();
-        const b=document.getElementById('badge'); if(b && debug) b.textContent=`nodes: ${'{'}nc{'}'} · edges: ${'{'}ec{'}'}`;
-      }}
-      function render(data){{
-        const nodes=(data.nodes||[]).filter(n=>n&&n.id).map(n=>({{
+        const b=document.getElementById('badge'); if(b && debug) b.textContent=`nodes: ${nc} · edges: ${ec}`;
+      }
+      function render(data){
+        const nodes=(data.nodes||[]).filter(n=>n&&n.id).map(n=>({
           id:String(n.id),
           label: cleanLabel(n.label)||String(n.id),
           group: String(n.group ?? n.type ?? '0'),
           value: (typeof n.size==='number') ? n.size : undefined,
           color: hashColor(n.group ?? n.type ?? '0'),
           shape: 'dot'
-        }}));
-        const edges=(data.edges||[]).filter(e=>e&&e.source&&e.target).map(e=>({{
+        }));
+        const edges=(data.edges||[]).filter(e=>e&&e.source&&e.target).map(e=>({
           from:String(e.source), to:String(e.target),
           value: (e.weight!=null? Number(e.weight):1.0),
-          title: e.relation ? `${{e.relation}} (w=${'{'}e.weight ?? 1{'}'})` : `w=${'{'}e.weight ?? 1{'}'}`
-        }}));
+          title: e.relation ? `${e.relation} (w=${e.weight ?? 1})` : `w=${e.weight ?? 1}`
+        }));
 
-        if(!nodes.length){{
+        if(!nodes.length){
           container.innerHTML='<div style="display:flex;height:100%;align-items:center;justify-content:center;opacity:.85">Nenhum dado para exibir (nodes=0).</div>';
           return;
-        }}
+        }
         const hasSize = nodes.some(n=>typeof n.value==='number');
-        if(!hasSize) {{
+        if(!hasSize) {
           const deg=degreeMap(nodes,edges);
-          nodes.forEach(n=>{{ const d=deg[n.id]||0; n.value=10+Math.log(d+1)*8; }});
-        }}
+          nodes.forEach(n=>{ const d=deg[n.id]||0; n.value=10+Math.log(d+1)*8; });
+        }
         const dsNodes=new vis.DataSet(nodes);
         const dsEdges=new vis.DataSet(edges);
-        const options={{ interaction:{{hover:true,dragNodes:true,dragView:true,zoomView:true,multiselect:true,navigationButtons:true}},
-                         manipulation:{{enabled:false}},
-                         physics:{{enabled:true,stabilization:{{enabled:true,iterations:500}},
-                                  barnesHut:{{gravitationalConstant:-8000,centralGravity:0.2,springLength:120,springConstant:0.04,avoidOverlap:0.2}}},
-                         nodes:{{borderWidth:1,shape:'dot'}}, edges:{{smooth:false,arrows:{{to:{{enabled:true}}}}}} }};
-        const net=new vis.Network(container,{{nodes:dsNodes,edges:dsEdges}},options);
-        net.once('stabilizationIterationsDone',()=>net.fit({{animation:{{duration:300}}}}));
-        net.on('doubleClick',()=>net.fit({{animation:{{duration:300}}}}));
+        const options={ interaction:{hover:true,dragNodes:true,dragView:true,zoomView:true,multiselect:true,navigationButtons:true},
+                        manipulation:{enabled:false},
+                        physics:{enabled:true,stabilization:{enabled:true,iterations:500},
+                                 barnesHut:{gravitationalConstant:-8000,centralGravity:0.2,springLength:120,springConstant:0.04,avoidOverlap:0.2}},
+                        nodes:{borderWidth:1,shape:'dot'}, edges:{smooth:false,arrows:{to:{enabled:true}}} };
+        const net=new vis.Network(container,{nodes:dsNodes,edges:dsEdges},options);
+        net.once('stabilizationIterationsDone',()=>net.fit({animation:{duration:300}}));
+        net.on('doubleClick',()=>net.fit({animation:{duration:300}}));
         attachToolbar(net,nodes.length,edges.length);
-      }}
+      }
 
-      function run(){{
-        if(typeof vis==='undefined') {{
+      function run(){
+        if(typeof vis==='undefined') {
           container.innerHTML='<div style="padding:12px">vis-network não carregou. Verifique CSP/CDN.</div>';
           return;
-        }}
-        if(source==='server'){{
+        }
+        if(source==='server'){
           const tag=document.getElementById('__KG_DATA__');
-          if(!tag) {{ container.innerHTML='<div style="padding:12px">Bloco de dados ausente.</div>'; return; }}
-          try {{ render(JSON.parse(tag.textContent||'{{}}')); }}
-          catch(e){{ console.error(e); container.innerHTML='<pre>'+String(e)+'</pre>'; }}
-        }} else {{
+          if(!tag) { container.innerHTML='<div style="padding:12px">Bloco de dados ausente.</div>'; return; }
+          try { render(JSON.parse(tag.textContent||'{}')); }
+          catch(e){ console.error(e); container.innerHTML='<pre>'+String(e)+'</pre>'; }
+        } else {
           const params=new URLSearchParams(window.location.search);
           const qs=new URLSearchParams();
           const fac=params.get('faccao_id'); if(fac && fac.trim()!=='') qs.set('faccao_id',fac.trim());
@@ -744,22 +884,31 @@ async def vis_visjs(
           qs.set('max_edges',  params.get('max_edges')  ?? '4000');
           qs.set('cache',      params.get('cache')      ?? 'false');
           const url=endpoint+'?'+qs.toString();
-          fetch(url,{{headers:{{'Accept':'application/json'}}}})
-            .then(async r=>{{ if(!r.ok) throw new Error(r.status+': '+await r.text()); return r.json(); }})
+          fetch(url,{headers:{'Accept':'application/json'}})
+            .then(async r=>{ if(!r.ok) throw new Error(r.status+': '+await r.text()); return r.json(); })
             .then(render)
-            .catch(err=>{{ console.error(err); container.innerHTML='<pre>'+String(err).replace(/</g,'&lt;')+'</pre>'; }});
-        }}
-      }}
+            .catch(err=>{ console.error(err); container.innerHTML='<pre>'+String(err).replace(/</g,'&lt;')+'</pre>'; });
+        }
+      }
       if(document.readyState!=='loading') run(); else document.addEventListener('DOMContentLoaded', run);
-    }})();
+    })();
     </script>
 
-    <!-- Carrega também o arquivo externo (se existir); mas não é obrigatório -->
     <script src="/static/vis-embed.js" defer></script>
   </body>
-</html>"""
+</html>
+"""
+    html = (tpl
+            .replace("%TITLE%", title)
+            .replace("%CSS%", css_href)
+            .replace("%JS%", js_href)
+            .replace("%BG%", bg)
+            .replace("%THEME%", theme)
+            .replace("%DBG_STYLE%", debug_style)
+            .replace("%DEBUG%", str(debug).lower())
+            .replace("%SOURCE%", source)
+            .replace("%EMBED%", embedded_block))
 
     response.headers["Content-Security-Policy"] = csp
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
-

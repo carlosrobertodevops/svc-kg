@@ -1,37 +1,26 @@
 FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PORT=8080 \
+    WORKERS=2
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
- && rm -rf /var/lib/apt/lists/*
-
-RUN pip install --no-cache-dir \
-    fastapi==0.115.0 \
-    "uvicorn[standard]==0.30.6" \
-    "gunicorn==22.0.0" \
-    "psycopg[binary]==3.2.1" \
-    "psycopg_pool==3.2.1" \
-    orjson==3.10.7 \
-    httpx==0.27.2 \
-    redis==5.0.7 \
-    PyYAML==6.0.2 \
-    networkx==3.3 \
-    pyvis==0.3.2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copia código e estáticos
-COPY app.py /app/app.py
-COPY static /app/static
-COPY docs /app/docs
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Baixa assets locais do vis-network (sem CDN)
-RUN mkdir -p /app/static/vendor \
- && curl -fsSL https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js -o /app/static/vendor/vis-network.min.js \
- && curl -fsSL https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css -o /app/static/vendor/vis-network.min.css
+# Copia app e assets estáticos
+COPY app.py ./app.py
+COPY static ./static
+COPY assets ./assets
+COPY docs ./docs
 
 EXPOSE 8080
 
-ENV PORT=8080 WORKERS=2 LOG_LEVEL=info SERVER_CMD=gunicorn
-CMD ["bash","-lc","if [ \"$SERVER_CMD\" = uvicorn ]; then uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080} --log-level ${LOG_LEVEL:-info}; else gunicorn -w ${WORKERS:-2} -k uvicorn.workers.UvicornWorker app:app -b 0.0.0.0:${PORT:-8080} --timeout 60 --log-level ${LOG_LEVEL:-info}; fi"]
+# usa gunicorn com workers uvicorn (respeita $WORKERS e $PORT)
+CMD ["bash", "-lc", "exec gunicorn -k uvicorn.workers.UvicornWorker -w ${WORKERS:-2} -b 0.0.0.0:${PORT:-8080} app:app --access-logfile - --error-logfile -"]
