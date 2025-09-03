@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: svc-kg
-  version: "1.7.0"
+  version: "1.7.1"
   description: |
     Microserviço de Knowledge Graph (membros, facções, funções).
     - Backend: Supabase RPC (`get_graph_membros`) ou Postgres direto.
@@ -11,20 +11,15 @@ servers:
 - url: /
 tags:
 - name: Health
-  description: Endpoints de saúde do serviço.
 - name: Debug
-  description: Diagnóstico e configuração.
 - name: Graph
-  description: Endpoints que retornam grafo em JSON.
 - name: Visualization
-  description: Visualização interativa (HTML) do grafo.
 
 paths:
   /live:
     get:
       tags: [ Health ]
       summary: Liveness
-      description: Retorna 200 se o processo está de pé.
       responses:
         "200":
           description: ok
@@ -32,16 +27,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LiveResponse'
-              examples:
-                default:
-                  value: { status: "live", service: "svc-kg" }
 
   /ready:
     get:
       tags: [ Health ]
       summary: Readiness (checa DNS/Redis/backend)
-      description: |
-        Verifica DNS do Supabase (quando em modo supabase), Redis e backend (Supabase/Postgres).
       responses:
         "200":
           description: pronto
@@ -49,53 +39,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReadyResponse'
-              examples:
-                ok:
-                  value:
-                    redis: true
-                    backend: "supabase"
-                    backend_ok: true
-                    supabase_host: "supabase.seu-dominio.com"
-                    dns_ok: true
         "503":
           description: dependências indisponíveis
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReadyResponse'
-              examples:
-                dns_fail:
-                  value:
-                    redis: true
-                    backend: "supabase"
-                    backend_ok: false
-                    supabase_host: "supabase.seu-dominio.com"
-                    dns_ok: false
-                    error: "DNS fail for supabase.seu-dominio.com: [Errno -2] Name or service not known"
 
   /health:
     get:
       tags: [ Health ]
       summary: Health (estático)
-      description: Informações estáticas e de cache.
       responses:
         "200":
           description: ok
-          headers:
-            Cache-Control:
-              schema: { type: string }
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
-              examples:
-                default:
-                  value:
-                    status: ok
-                    service: svc-kg
-                    env: production
-                    cache: redis
-                    backend: supabase
 
   /debug/config:
     get:
@@ -124,44 +85,30 @@ paths:
         "200":
           description: ok
           headers:
-            ETag:
-              schema: { type: string }
-            Cache-Control:
-              schema: { type: string }
+            ETag: { schema: { type: string } }
+            Cache-Control: { schema: { type: string } }
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/GraphResponse'
-              examples:
-                pequena:
-                  value:
-                    nodes:
-                    - { id: "1", label: "Alice", type: "membro", group: 10, size: 18 }
-                    - { id: "10", label: "Facção X", type: "faccao", group: 10, size: 16 }
-                    edges:
-                    - { source: "1", target: "10", weight: 3.0, relation: "PERTENCE_A" }
 
   /graph/members:
     get:
       tags: [ Graph ]
       summary: (Compat) /v1/graph/membros com parâmetros p_*
-      description: Endpoint compatível que aceita `p_faccao_id`, `p_include_co`, `p_max_pairs`.
       parameters:
       - name: p_faccao_id
         in: query
         required: false
         schema: { type: integer, format: int64, nullable: true }
-        description: Filtra por facção (opcional).
       - name: p_include_co
         in: query
         required: false
         schema: { type: boolean, default: true }
-        description: Inclui pares inferidos (CO_*).
       - name: p_max_pairs
         in: query
         required: false
         schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
-        description: Limite de pares inferidos.
       - $ref: '#/components/parameters/max_nodes'
       - $ref: '#/components/parameters/max_edges'
       - $ref: '#/components/parameters/cache'
@@ -169,10 +116,8 @@ paths:
         "200":
           description: ok
           headers:
-            ETag:
-              schema: { type: string }
-            Cache-Control:
-              schema: { type: string }
+            ETag: { schema: { type: string } }
+            Cache-Control: { schema: { type: string } }
           content:
             application/json:
               schema:
@@ -187,21 +132,17 @@ paths:
         in: path
         required: true
         schema: { type: string }
-        description: ID do nó para obter vizinhos.
       - $ref: '#/components/parameters/include_co'
       - name: max_pairs
         in: query
         required: false
         schema: { type: integer, default: 3000, minimum: 1, maximum: 200000 }
-        description: Limite de pares inferidos ao montar subgrafo.
       responses:
         "200":
           description: ok
           headers:
-            ETag:
-              schema: { type: string }
-            Cache-Control:
-              schema: { type: string }
+            ETag: { schema: { type: string } }
+            Cache-Control: { schema: { type: string } }
           content:
             application/json:
               schema:
@@ -212,66 +153,57 @@ paths:
       tags: [ Visualization ]
       summary: Visualização PyVis (HTML) do grafo
       description: |
-        Gera um HTML interativo (PyVis/vis.js) do grafo. Ideal para embutir em WebView (FlutterFlow) ou abrir no navegador.
+        Gera um HTML interativo **usando o mesmo dataset** de `/v1/graph/membros`,
+        incluindo truncamento por `max_nodes`/`max_edges` e cache.
       parameters:
       - $ref: '#/components/parameters/faccao_id'
       - $ref: '#/components/parameters/include_co'
       - $ref: '#/components/parameters/max_pairs'
+      - $ref: '#/components/parameters/max_nodes'
+      - $ref: '#/components/parameters/max_edges'
+      - $ref: '#/components/parameters/cache'
       - name: theme
         in: query
         required: false
         schema: { type: string, enum: [ light, dark ], default: light }
-        description: Tema do canvas (fundo claro/escuro).
       - name: arrows
         in: query
         required: false
         schema: { type: boolean, default: true }
-        description: Mostra setas nas arestas (direcionado).
       - name: hierarchical
         in: query
         required: false
         schema: { type: boolean, default: false }
-        description: Ativa layout hierárquico (physics desabilitado).
       - name: physics
         in: query
         required: false
         schema: { type: boolean, default: true }
-        description: Ativa física do layout (arrasto/estabilização).
       - name: barnes_hut
         in: query
         required: false
         schema: { type: boolean, default: true }
-        description: Usa Barnes-Hut como solver de física.
       - name: show_buttons
         in: query
         required: false
         schema: { type: boolean, default: true }
-        description: Mostra painel de opções do PyVis (physics/interaction/layout).
       - name: title
         in: query
         required: false
         schema: { type: string, default: "Knowledge Graph" }
-        description: Título para a toolbar embutida.
       - name: toolbar
         in: query
         required: false
         schema: { type: boolean, default: true }
-        description: Mostra toolbar com Print/Reload.
       responses:
         "200":
           description: HTML interativo
           headers:
-            Cache-Control:
-              schema: { type: string }
-            X-Content-Type-Options:
-              schema: { type: string }
+            ETag: { schema: { type: string } }
+            Cache-Control: { schema: { type: string } }
+            X-Content-Type-Options: { schema: { type: string } }
           content:
             text/html:
-              schema:
-                type: string
-              examples:
-                minimal:
-                  value: "<!DOCTYPE html><html><head>...</head><body>...</body></html>"
+              schema: { type: string }
 
 components:
   parameters:
@@ -280,7 +212,7 @@ components:
       in: query
       required: false
       schema: { type: integer, format: int64, nullable: true }
-      description: Filtra por facção (opcional). Se omitido, retorna o grafo completo (atenção ao volume).
+      description: Filtra por facção (opcional).
     include_co:
       name: include_co
       in: query
@@ -298,13 +230,13 @@ components:
       in: query
       required: false
       schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 }
-      description: Teto de nós na resposta (aplica truncamento preservando hubs).
+      description: Teto de nós aplicando truncamento preservando hubs.
     max_edges:
       name: max_edges
       in: query
       required: false
       schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 }
-      description: Teto de arestas na resposta (aplica truncamento por peso).
+      description: Teto de arestas aplicando truncamento por peso.
     cache:
       name: cache
       in: query
@@ -318,7 +250,6 @@ components:
       properties:
         status: { type: string, example: live }
         service: { type: string, example: svc-kg }
-      additionalProperties: false
 
     ReadyResponse:
       type: object
@@ -329,7 +260,6 @@ components:
         supabase_host: { type: string, nullable: true }
         dns_ok: { type: boolean, nullable: true }
         error: { type: string, nullable: true }
-      additionalProperties: true
 
     HealthResponse:
       type: object
@@ -339,23 +269,6 @@ components:
         env: { type: string, example: production }
         cache: { type: string, example: redis }
         backend: { type: string, example: supabase }
-      additionalProperties: false
-
-    DebugConfig:
-      type: object
-      properties:
-        env: { type: string }
-        port: { type: integer }
-        backend_mode: { type: string, example: supabase }
-        supabase_url_raw: { type: string }
-        supabase_url: { type: string }
-        has_anon_key: { type: boolean }
-        has_service_key: { type: boolean }
-        rpc_function: { type: string, example: get_graph_membros }
-        has_database_url: { type: boolean }
-        redis_enabled: { type: boolean }
-        has_redis_url: { type: boolean }
-      additionalProperties: false
 
     Node:
       type: object
@@ -386,12 +299,3 @@ components:
         edges:
           type: array
           items: { $ref: '#/components/schemas/Edge' }
-
-    ErrorResponse:
-      type: object
-      properties:
-        error: { type: string, example: internal_error }
-        message: { type: string, nullable: true }
-        status_code: { type: integer, nullable: true }
-        path: { type: string, nullable: true }
-      additionalProperties: false

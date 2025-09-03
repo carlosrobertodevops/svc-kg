@@ -15,7 +15,7 @@ import yaml
 import httpx
 from psycopg_pool import AsyncConnectionPool
 from redis import asyncio as aioredis
-from pyvis.network import Network  # novo
+from pyvis.network import Network  # PyVis
 
 # ---------------- utils ----------------
 def env_bool(v: Optional[str], default=False) -> bool:
@@ -46,7 +46,7 @@ CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS")
 SUPABASE_URL_RAW = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_URL = normalize_supabase_url(SUPABASE_URL_RAW)
 
-# chaves separadas (ANON + SERVICE). Retrocompat com SUPABASE_KEY.
+# chaves (anon + service). Retrocompat SUPABASE_KEY.
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "").strip()
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "").strip()
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
@@ -75,7 +75,7 @@ log = logging.getLogger("svc-kg")
 # ---------------- app ----------------
 app = FastAPI(
     title="svc-kg",
-    version="1.7.0",
+    version="1.7.1",
     description="Microserviço de Knowledge Graph (membros, facções, funções)",
     default_response_class=ORJSONResponse,
     swagger_ui_parameters={
@@ -500,9 +500,15 @@ async def neighbors(response: Response, node_id: str, include_co: bool = True, m
 @app.get("/v1/vis/pyvis", response_class=HTMLResponse,
          summary="Visualização PyVis (HTML) do grafo")
 async def vis_pyvis(
+    response: Response,
     faccao_id: Optional[int] = Query(default=None, description="Filtra por facção (opcional)"),
     include_co: bool = Query(default=True, description="Inclui CO_*"),
     max_pairs: int = Query(default=8000, ge=1, le=200000),
+    # >>> iguais ao JSON para equivalência 1:1
+    max_nodes: int = Query(default=2000, ge=100, le=20000),
+    max_edges: int = Query(default=4000, ge=100, le=200000),
+    cache: bool = Query(default=True),
+    # opções de visual
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     arrows: bool = True,
     hierarchical: bool = False,
@@ -512,12 +518,26 @@ async def vis_pyvis(
     title: str = "Knowledge Graph",
     toolbar: bool = True
 ):
-    data = await fetch_graph(faccao_id, include_co, max_pairs)
+    """
+    Gera o HTML PyVis **usando o mesmo dataset** do /v1/graph/membros,
+    incluindo truncamento por max_nodes/max_edges e cache.
+    """
+    key = f"graph:{faccao_id}:{include_co}:{max_pairs}"
+    data = await cache_get(key) if cache else None
+    if data is None:
+        data = await fetch_graph(faccao_id, include_co, max_pairs)
+        if cache: await cache_set(key, data, CACHE_API_TTL)
+    # aplica o mesmo truncamento do endpoint JSON
+    out = truncate_preview(data, max_nodes, max_edges)
+
     html = await build_pyvis_html(
-        data, theme=theme, arrows=arrows, hierarchical=hierarchical,
+        out, theme=theme, arrows=arrows, hierarchical=hierarchical,
         physics=physics, barnes_hut=barnes_hut, show_buttons=show_buttons, title=title
     )
     if toolbar:
         html = _wrap_toolbar(html, title=title, show_print_btn=True)
-    headers = {"Cache-Control": "no-cache, no-store, must-revalidate", "X-Content-Type-Options": "nosniff"}
-    return HTMLResponse(content=html, status_code=200, headers=headers)
+
+    response.headers["ETag"] = etag_for(out)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return HTMLResponse(content=html, status_code=200)
