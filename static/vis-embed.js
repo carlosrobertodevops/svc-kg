@@ -1,11 +1,12 @@
 // static/vis-embed.js
 (function () {
-  if (!document.currentScript) return;
   const container = document.getElementById('mynetwork');
   if (!container) return;
 
   const COLOR_CV = '#d32f2f';
   const COLOR_PCC = '#0d47a1';
+  const DEFAULT_ICON = '/static/icons/person.svg';
+
   const EDGE_COLORS = {
     'PERTENCE_A': '#9e9e9e',
     'EXERCE': '#00796b',
@@ -13,7 +14,6 @@
     'CO_FACCAO': '#8e24aa',
     'CO_FUNCAO': '#546e7a'
   };
-  const ICON_PERSON = '/static/icons/person.svg';
 
   function hashColor(s) {
     s = String(s || ''); let h = 0;
@@ -56,136 +56,158 @@
     const base = EDGE_COLORS[relation] || '#90a4ae';
     return { color: base };
   }
-  const isPersonType = (t) => {
-    t = String(t || '').toLowerCase();
-    return t.includes('pessoa') || t.includes('membro');
-  };
+
+  // NOVO: resolve photo a partir de `photo_url` ou `foto_path`
+  function resolvePhoto(n) {
+    let p = n.photo_url || n.foto_path;
+    if (!p) return null;
+    p = String(p).trim();
+    if (!p) return null;
+    const low = p.toLowerCase();
+    if (low.startsWith('http://') || low.startsWith('https://')) return p;
+    if (p.startsWith('/')) return p;
+    if (p.startsWith('assets/')) return '/assets/' + p.slice(7);
+    if (p.startsWith('static/')) return '/' + p;
+    return '/assets/' + p; // padrão
+  }
 
   function attachToolbar(net, nc, ec, dsNodes) {
     const q = document.getElementById('kg-search');
     const btnPrint = document.getElementById('btn-print');
     const btnReload = document.getElementById('btn-reload');
     const badge = document.getElementById('badge');
+
     if (btnPrint) btnPrint.onclick = () => window.print();
     if (btnReload) btnReload.onclick = () => location.reload();
     if (badge) badge.textContent = `nodes: ${nc} · edges: ${ec}`;
+
+    function selectByQuery(query) {
+      const text = (query || '').trim().toLowerCase();
+      if (!text) return;
+      const all = dsNodes.get();
+      const hits = all.filter(n => (String(n.label || '').toLowerCase().includes(text)) || String(n.id) === text);
+      if (!hits.length) return;
+      dsNodes.update(all.map(n => Object.assign(n, { color: Object.assign({}, n.color, { opacity: 0.25 }) })));
+      const ids = hits.map(h => h.id);
+      ids.forEach(id => {
+        const cur = dsNodes.get(id);
+        const hi = Object.assign({}, cur.color || {}, { opacity: 1 });
+        dsNodes.update({ id, color: hi });
+      });
+      net.fit({ nodes: ids, animation: { duration: 300 } });
+    }
+
     if (q) {
-      const run = () => selectByQuery(net, dsNodes, q.value);
+      const run = () => selectByQuery(q.value);
       q.addEventListener('change', run);
       q.addEventListener('keyup', (e) => { if (e.key === 'Enter') run(); });
     }
   }
-  function selectByQuery(net, dsNodes, query) {
-    const text = (query || '').trim().toLowerCase();
-    if (!text) return;
-    const all = dsNodes.get();
-    const hits = all.filter(n => (n.label || '').toLowerCase().includes(text) || String(n.id) === text);
-    if (!hits.length) return;
-    dsNodes.update(all.map(n => Object.assign(n, { color: Object.assign({}, n.color, { opacity: 0.25 }) })));
-    const ids = hits.map(h => h.id);
-    ids.forEach(id => {
-      const cur = dsNodes.get(id);
-      const hi = Object.assign({}, cur.color || {}, { opacity: 1 });
-      dsNodes.update({ id, color: hi });
-    });
-    net.fit({ nodes: ids, animation: { duration: 300 } });
-  }
 
   const params = new URLSearchParams(window.location.search);
-  const qs = new URLSearchParams();
-  const fac = params.get('faccao_id'); if (fac && fac.trim() !== '') qs.set('faccao_id', fac.trim());
-  qs.set('include_co', params.get('include_co') ?? 'true');
-  qs.set('max_pairs', params.get('max_pairs') ?? '8000');
-  qs.set('max_nodes', params.get('max_nodes') ?? '2000');
-  qs.set('max_edges', params.get('max_edges') ?? '4000');
-  qs.set('cache', params.get('cache') ?? 'false');
-  qs.set('enrich_photos', params.get('enrich_photos') ?? 'true');
+  const source = container.getAttribute('data-source') || 'server';
+  const endpointBase = container.getAttribute('data-endpoint') || '/v1/graph/membros';
 
-  const endpoint = (container.getAttribute('data-endpoint') || '/v1/graph/membros') + '?' + qs.toString();
-  fetch(endpoint, { headers: { 'Accept': 'application/json' } })
-    .then(async r => { if (!r.ok) throw new Error(r.status + ': ' + await r.text()); return r.json(); })
-    .then(function render(data) {
-      const rawNodes = data.nodes || [];
-      const rawEdges = data.edges || [];
+  function render(data) {
+    const rawNodes = data.nodes || [];
+    const rawEdges = data.edges || [];
 
-      const faccaoColorById = inferFaccaoColors(rawNodes);
+    const faccaoColorById = inferFaccaoColors(rawNodes);
 
-      const nodes = rawNodes
-        .filter(n => n && n.id != null)
-        .map(n => {
-          const id = String(n.id);
-          const label = cleanLabel(n.label) || id;
-          const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
-          const value = (typeof n.size === 'number') ? n.size : undefined;
-          const photo = n.photo_url && (/^https?:\/\//i.test(n.photo_url) || n.photo_url.startsWith('/assets/')) ? n.photo_url : null;
-          const color = colorForNode({ group, type: n.type }, faccaoColorById);
-          const base = { id, label, group, value, color, borderWidth: 1 };
-          if (photo) { base.shape = 'circularImage'; base.image = photo; }
-          else if (isPersonType(n.type)) { base.shape = 'image'; base.image = ICON_PERSON; }
-          else { base.shape = 'dot'; }
-          return base;
-        });
+    const nodes = rawNodes
+      .filter(n => n && n.id != null)
+      .map(n => {
+        const id = String(n.id);
+        const label = cleanLabel(n.label) || id;
+        const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
+        const value = (typeof n.size === 'number') ? n.size : undefined;
+        const photo = resolvePhoto(n);
+        const color = colorForNode({ group, type: n.type }, faccaoColorById);
+        const base = { id, label, group, value, color, borderWidth: 1 };
+        if (photo) { base.shape = 'circularImage'; base.image = photo; }
+        else { base.shape = 'circularImage'; base.image = DEFAULT_ICON; }
+        return base;
+      });
 
-      const nodeIds = new Set(nodes.map(n => n.id));
-      const edges = rawEdges
-        .filter(e => e && e.source != null && e.target != null && nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)))
-        .map(e => {
-          const rel = e.relation || '';
-          const style = edgeStyleFor(rel);
-          return {
-            from: String(e.source),
-            to: String(e.target),
-            value: (e.weight != null ? Number(e.weight) : 1.0),
-            title: rel ? `${rel} (w=${e.weight ?? 1})` : `w=${e.weight ?? 1}`,
-            width: 1,
-            color: style
-          };
-        });
+    const nodeIds = new Set(nodes.map(n => n.id));
+    const edges = rawEdges
+      .filter(e => e && e.source != null && e.target != null && nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)))
+      .map(e => {
+        const rel = e.relation || '';
+        const style = edgeStyleFor(rel);
+        return {
+          from: String(e.source),
+          to: String(e.target),
+          value: (e.weight != null ? Number(e.weight) : 1.0),
+          title: rel ? `${rel} (w=${e.weight ?? 1})` : `w=${e.weight ?? 1}`,
+          width: 1,
+          color: style
+        };
+      });
 
-      if (!nodes.length) {
-        container.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;opacity:.85">Nenhum dado para exibir (nodes=0).</div>';
-        return;
-      }
+    if (!nodes.length) {
+      container.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;opacity:.85">Nenhum dado para exibir (nodes=0).</div>';
+      return;
+    }
 
-      const hasSize = nodes.some(n => typeof n.value === 'number');
-      if (!hasSize) {
-        const deg = degreeMap(nodes, edges);
-        nodes.forEach(n => { const d = deg[n.id] || 0; n.value = 10 + Math.log(d + 1) * 8; });
-      }
+    const hasSize = nodes.some(n => typeof n.value === 'number');
+    if (!hasSize) {
+      const deg = degreeMap(nodes, edges);
+      nodes.forEach(n => { const d = deg[n.id] || 0; n.value = 10 + Math.log(d + 1) * 8; });
+    }
 
-      const dsNodes = new vis.DataSet(nodes);
-      const dsEdges = new vis.DataSet(edges);
+    const dsNodes = new vis.DataSet(nodes);
+    const dsEdges = new vis.DataSet(edges);
 
-      const options = {
-        interaction: {
-          hover: true,
-          dragNodes: true,
-          dragView: false,
-          zoomView: true,
-          multiselect: true,
-          navigationButtons: true
-        },
-        manipulation: { enabled: false },
-        physics: {
-          enabled: true,
-          stabilization: { enabled: true, iterations: 300 },
-          barnesHut: {
-            gravitationalConstant: -8000,
-            centralGravity: 0.2,
-            springLength: 120,
-            springConstant: 0.04,
-            avoidOverlap: 0.2
-          }
-        },
-        nodes: { shape: 'dot', borderWidth: 1 },
-        edges: { smooth: false }
-      };
+    const options = {
+      interaction: {
+        hover: true,
+        dragNodes: true,
+        dragView: false,
+        zoomView: true,
+        multiselect: true,
+        navigationButtons: true
+      },
+      manipulation: { enabled: false },
+      physics: {
+        enabled: true,
+        stabilization: { enabled: true, iterations: 300 },
+        barnesHut: {
+          gravitationalConstant: -8000,
+          centralGravity: 0.2,
+          springLength: 120,
+          springConstant: 0.04,
+          avoidOverlap: 0.2
+        }
+      },
+      nodes: { shape: 'dot', borderWidth: 1 },
+      edges: { smooth: false }
+    };
 
-      const net = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
-      // Desliga física após estabilização -> arrastar não puxa o grafo todo
-      net.once('stabilizationIterationsDone', () => { net.setOptions({ physics: false }); net.fit({ animation: { duration: 300 } }); });
-      net.on('doubleClick', () => net.fit({ animation: { duration: 300 } }));
-      attachToolbar(net, nodes.length, edges.length, dsNodes);
-    })
-    .catch(err => { console.error(err); container.innerHTML = '<pre>' + String(err).replace(/</g, '&lt;') + '</pre>'; });
+    const net = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
+    net.once('stabilizationIterationsDone', () => net.fit({ animation: { duration: 300 } }));
+    net.on('doubleClick', () => net.fit({ animation: { duration: 300 } }));
+    attachToolbar(net, nodes.length, edges.length, dsNodes);
+  }
+
+  if (source === 'server') {
+    const tag = document.getElementById('__KG_DATA__');
+    if (!tag) return;
+    try { render(JSON.parse(tag.textContent || '{}')); }
+    catch (e) { console.error(e); container.innerHTML = '<pre>' + String(e).replace(/</g, '&lt;') + '</pre>'; }
+  } else {
+    const qs = new URLSearchParams();
+    const fac = params.get('faccao_id'); if (fac && fac.trim() !== '') qs.set('faccao_id', fac.trim());
+    qs.set('include_co', params.get('include_co') ?? 'true');
+    qs.set('max_pairs', params.get('max_pairs') ?? '8000');
+    qs.set('max_nodes', params.get('max_nodes') ?? '2000');
+    qs.set('max_edges', params.get('max_edges') ?? '4000');
+    qs.set('cache', params.get('cache') ?? 'false');
+
+    const url = endpointBase + '?' + qs.toString();
+    fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(async r => { if (!r.ok) throw new Error(r.status + ': ' + await r.text()); return r.json(); })
+      .then(render)
+      .catch(err => { console.error(err); container.innerHTML = '<pre>' + String(err).replace(/</g, '&lt;') + '</pre>'; });
+  }
 })();

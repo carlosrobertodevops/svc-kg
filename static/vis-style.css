@@ -1,23 +1,35 @@
-/* static/vis-style.css */
 :root {
-	color-scheme: light dark;
+	--kg-bg: #ffffff;
+	--kg-fg: #111827;
+	--kg-border: #e0e0e0;
 }
-
-body[data-theme="dark"] {
-	background: #0b0f19;
-	color: #e8eaed;
+[data-theme="dark"] {
+	--kg-bg: #0b0f19;
+	--kg-fg: #e8eaed;
+	--kg-border: #263238;
 }
-
+html,
+body {
+	background: var(--kg-bg);
+	color: var(--kg-fg);
+}
 .kg-toolbar {
-	background: color-mix(in srgb, #fff 92%, transparent);
+	background: var(--kg-bg);
+	color: var(--kg-fg);
+	border-bottom: 1px solid var(--kg-border);
 }
-
-@media (prefers-color-scheme: dark) {
-	body[data-theme="light"] .kg-toolbar {
-		background: #fafafa;
-	}
-	body[data-theme="dark"] .kg-toolbar {
-		background: #0f1422;
-		border-bottom: 1px solid #1f2937;
-	}
+.kg-toolbar button {
+	padding: 6px 10px;
+	border: 1px solid var(--kg-border);
+	background: transparent;
+	border-radius: 6px;
+	cursor: pointer;
+}
+.kg-toolbar button:hover {
+	background: rgba(0, 0, 0, 0.04);
+}
+.kg-toolbar input[type="search"] {
+	border: 1px solid var(--kg-border);
+	border-radius: 6px;
+	outline: none;
 }
