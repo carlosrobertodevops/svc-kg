@@ -1,7 +1,8 @@
 import os
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from string import Template
+import urllib.parse
 
 import httpx
 from fastapi import FastAPI, Response, Query, HTTPException
@@ -9,26 +10,31 @@ from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-APP_ENV = os.getenv("APP_ENV", "development")
+APP_ENV = os.getenv("APP_ENV", "production")
 PORT = int(os.getenv("PORT", "8080"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
 
+# CORS
 CORS_ALLOW_ORIGINS = os.getenv("CORS_ALLOW_ORIGINS", "*")
 CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() == "true"
 CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type")
 CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS")
 
+# Backend (Supabase / PostgREST)
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 SUPABASE_RPC_FN = os.getenv("SUPABASE_RPC_FN", "get_graph_membros")
 SUPABASE_TIMEOUT = float(os.getenv("SUPABASE_TIMEOUT", "15"))
 
-CACHE_API_TTL = int(os.getenv("CACHE_API_TTL", "60"))
+# Tabela para fotos (configurável)
+MEMBERS_TABLE = os.getenv("MEMBERS_TABLE", "membros")
+MEMBERS_ID_COL = os.getenv("MEMBERS_ID_COL", "id")
+MEMBERS_PHOTO_COL = os.getenv("MEMBERS_PHOTO_COL", "photo_url")
 
+# Cache (opcional)
+CACHE_API_TTL = int(os.getenv("CACHE_API_TTL", "60"))
 ENABLE_REDIS_CACHE = os.getenv("ENABLE_REDIS_CACHE", "false").lower() == "true"
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-
-# Redis opcional
 REDIS = None
 if ENABLE_REDIS_CACHE:
     try:
@@ -56,10 +62,9 @@ async def cache_set(key: str, value: str, ttl: int) -> None:
         pass
 
 
-# App
 app = FastAPI(
     title="svc-kg",
-    version="1.7.14",
+    version="1.7.16",
     docs_url="/docs",
     redoc_url="/docs/redoc",
     openapi_url="/docs/openapi.json",
@@ -69,7 +74,6 @@ app = FastAPI(
 cors_origins = [o.strip() for o in (CORS_ALLOW_ORIGINS or "*").split(",")]
 cors_methods = [m.strip() for m in (CORS_ALLOW_METHODS or "*").split(",")]
 cors_headers = [h.strip() for h in (CORS_ALLOW_HEADERS or "*").split(",")]
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -83,7 +87,7 @@ if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# -------- Supabase helpers --------
+# ----------------- Supabase helpers -----------------
 async def call_supabase_graph(
     faccao_id: Optional[int], include_co: bool, max_pairs: int
 ) -> Dict[str, Any]:
@@ -115,6 +119,7 @@ async def call_supabase_graph(
         except json.JSONDecodeError as je:
             raise HTTPException(status_code=502, detail=f"Supabase retornou JSON inválido: {str(je)}")
 
+    # Algumas vezes o PostgREST retorna [{"nodes":[], "edges":[]}]
     if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
         data = data[0]
     if isinstance(data, str):
@@ -122,13 +127,54 @@ async def call_supabase_graph(
             data = json.loads(data)
         except Exception:
             data = {}
-
     if not isinstance(data, dict):
         data = {}
 
     data.setdefault("nodes", [])
     data.setdefault("edges", [])
     return data
+
+
+async def fetch_member_photos(ids: List[str]) -> Dict[str, Optional[str]]:
+    """
+    Busca em massa as fotos dos membros no Supabase:
+      GET /rest/v1/membros?select=id,photo_url&id=in.("1","2",...)
+    """
+    ids = sorted(set([s for s in (str(x).strip() for x in ids) if s]))
+    if not ids:
+        return {}
+
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return {}
+
+    # lista in.(...) — quote para strings não-numéricas
+    def qtok(v: str) -> str:
+        return v if v.isdigit() else f"\"{v}\""
+
+    in_list = ",".join(qtok(v) for v in ids)
+    base = SUPABASE_URL.rstrip("/")
+    query = f"select={MEMBERS_ID_COL},{MEMBERS_PHOTO_COL}&{MEMBERS_ID_COL}=in.({in_list})"
+    url = f"{base}/rest/v1/{MEMBERS_TABLE}?{query}"
+
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Accept": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=SUPABASE_TIMEOUT) as client:
+        r = await client.get(url, headers=headers)
+        if r.status_code != 200:
+            return {}
+        try:
+            rows = r.json()
+        except Exception:
+            return {}
+    out: Dict[str, Optional[str]] = {}
+    for row in rows:
+        _id = str(row.get(MEMBERS_ID_COL, "")).strip()
+        _url = row.get(MEMBERS_PHOTO_COL)
+        out[_id] = _url if (_url and str(_url).strip()) else None
+    return out
 
 
 def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -196,10 +242,11 @@ async def fetch_graph_sanitized(
     max_pairs: int,
     *,
     use_cache: bool = True,
+    with_photos: bool = True,
 ) -> Dict[str, Any]:
     cache_key = None
     if use_cache and REDIS:
-        cache_key = f"kg:v1:faccao={faccao_id}:co={int(include_co)}:pairs={max_pairs}"
+        cache_key = f"kg:v1:faccao={faccao_id}:co={int(include_co)}:pairs={max_pairs}:photos={int(with_photos)}"
         cached = await cache_get(cache_key)
         if cached:
             try:
@@ -210,12 +257,22 @@ async def fetch_graph_sanitized(
     raw = await call_supabase_graph(faccao_id, include_co, max_pairs)
     norm = normalize_graph_labels(raw)
 
+    # enriquecimento com fotos (supabase storage/table)
+    if with_photos:
+        ids = [str(n["id"]) for n in norm.get("nodes", []) if str(n.get("id", "")).strip()]
+        mapping = await fetch_member_photos(ids)
+        for n in norm["nodes"]:
+            nid = str(n["id"])
+            url = mapping.get(nid)
+            if url:
+                n["photo_url"] = url
+
     if use_cache and cache_key:
         await cache_set(cache_key, json.dumps(norm), CACHE_API_TTL)
     return norm
 
 
-# -------- Health --------
+# ----------------- Health -----------------
 @app.get("/health", response_class=PlainTextResponse, include_in_schema=False)
 @app.get("/healh", response_class=PlainTextResponse, include_in_schema=False)  # alias
 async def health():
@@ -252,7 +309,7 @@ async def openapi_yaml():
         return JSONResponse(app.openapi())
 
 
-# -------- API de dados --------
+# ----------------- API de dados -----------------
 @app.get("/v1/graph/membros", response_class=JSONResponse,
          summary="Retorna o grafo (nodes/edges) a partir do Supabase RPC")
 async def graph_membros(
@@ -262,13 +319,14 @@ async def graph_membros(
     max_nodes: int = Query(default=2000, ge=100, le=20000),
     max_edges: int = Query(default=4000, ge=100, le=200000),
     cache: bool = Query(default=True),
+    photos: bool = Query(default=True),
 ):
-    data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
+    data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache, with_photos=photos)
     data = truncate_preview(data, max_nodes, max_edges)
     return JSONResponse(data, status_code=200)
 
 
-# -------- VIS: vis-network --------
+# ----------------- VIS: vis-network -----------------
 @app.get("/v1/vis/visjs", response_class=HTMLResponse,
          summary="Visualização vis-network (server-embed + client fetch)")
 async def vis_visjs(
@@ -279,11 +337,11 @@ async def vis_visjs(
     max_nodes: int = Query(default=2000, ge=100, le=20000),
     max_edges: int = Query(default=4000, ge=100, le=200000),
     cache: bool = Query(default=True),
+    photos: bool = Query(default=True),
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (vis.js)",
     debug: bool = Query(default=False),
     source: str = Query(default="server", pattern="^(server|client)$"),
-    avatar_base: str = Query(default="/static/avatars")
 ):
     local_js = "static/vendor/vis-network/vis-network.min.js"
     local_css = "static/vendor/vis-network/vis-network.min.css"
@@ -298,7 +356,7 @@ async def vis_visjs(
 
     embedded_block = ""
     if source == "server":
-        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache, with_photos=photos)
         out = truncate_preview(data, max_nodes, max_edges)
         out = normalize_graph_labels(out)
         embedded_block = '<script id="__KG_DATA__" type="application/json">' + json.dumps(out, ensure_ascii=False) + '</script>'
@@ -340,8 +398,7 @@ async def vis_visjs(
          style="height:90vh;width:100%;"
          data-endpoint="/v1/graph/membros"
          data-debug="__DEBUG_BOOL__"
-         data-source="$source"
-         data-avatar="$avatar_base"></div>
+         data-source="$source"></div>
     $embedded_block
     <script src="$js_href" crossorigin="anonymous"></script>
     <script>
@@ -350,7 +407,6 @@ async def vis_visjs(
       var src = container.getAttribute('data-source') || 'server';
       var debug = container.getAttribute('data-debug') === 'true';
       var endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
-      var avatarBase = container.getAttribute('data-avatar') || '/static/avatars';
 
       var EDGE_COLORS = {
         "PERTENCE_A": "#10b981",
@@ -392,7 +448,6 @@ async def vis_visjs(
         return d;
       }
 
-      // Toolbar handlers
       function attachToolbar(net, dsNodes, nc, ec){
         var p=document.getElementById('btn-print'); if(p) p.onclick=function(){ window.print(); };
         var r=document.getElementById('btn-reload'); if(r) r.onclick=function(){ location.reload(); };
@@ -433,23 +488,16 @@ async def vis_visjs(
         var nodes=(data.nodes||[]).filter(function(n){return n && n.id;}).map(function(n){
           var group = String(n.group ?? n.type ?? '0');
           var label = cleanLabel(n.label)||String(n.id);
-          var isMembro = (String(n.type||'').toLowerCase()==='membro' || String(n.group||'').toLowerCase()==='membro');
-
           var baseDef = {
             id: String(n.id),
             label: label,
             group: group,
             color: colorForNode(n),
-            shape: 'dot'
+            shape: (n.photo_url ? 'circularImage' : 'dot')
           };
-
-          // fotos para membros
-          var url = n.photo_url || (avatarBase.replace(/\\/$/,'') + '/' + String(n.id) + '.jpg');
-          var defImg = avatarBase.replace(/\\/$/,'') + '/_default.png';
-          if(isMembro){
-            baseDef.shape = 'circularImage';
-            baseDef.image = url;
-            baseDef.brokenImage = defImg;
+          if(n.photo_url){
+            baseDef.image = n.photo_url;
+            baseDef.brokenImage = '/static/avatars/_default.png';
           }
           return baseDef;
         });
@@ -475,16 +523,15 @@ async def vis_visjs(
         var options={
           interaction:{ hover:true, dragNodes:true, dragView:false, zoomView:true, multiselect:true, navigationButtons:true },
           manipulation:{ enabled:false },
-          physics:{
-            enabled:true,
-            stabilization:{ enabled:true, iterations:500 },
-            barnesHut:{ gravitationalConstant:-8000, centralGravity:0.2, springLength:120, springConstant:0.04, avoidOverlap:0.2 }
-          },
+          physics:{ enabled:true, stabilization:{ enabled:true, iterations:500 },
+            barnesHut:{ gravitationalConstant:-8000, centralGravity:0.2, springLength:120, springConstant:0.04, avoidOverlap:0.2 } },
           nodes:{ borderWidth:1, shape:'dot' },
           edges:{ smooth:false, width:1, arrows:{ to:{enabled:true} } }
         };
 
         var net=new vis.Network(container, {nodes:dsNodes,edges:dsEdges}, options);
+
+        // trava o layout para "arrastar só o nó"
         net.once('stabilizationIterationsDone', function(){
           net.setOptions({ physics: false });
           net.fit({animation:{duration:300}});
@@ -513,6 +560,7 @@ async def vis_visjs(
           qs.set('max_nodes',  params.get('max_nodes')  || '2000');
           qs.set('max_edges',  params.get('max_edges')  || '4000');
           qs.set('cache',      params.get('cache')      || 'false');
+          qs.set('photos',     params.get('photos')     || 'true');
           fetch(('/v1/graph/membros')+'?'+qs.toString(), { headers:{'Accept':'application/json'} })
             .then(function(r){ if(!r.ok) return r.text().then(function(t){ throw new Error(r.status+': '+t); }); return r.json(); })
             .then(render)
@@ -527,21 +575,22 @@ async def vis_visjs(
 
     html = html_tpl.safe_substitute(
         title=title, css_href=css_href, js_href=js_href, bg=bg, theme=theme,
-        source=source, embedded_block=embedded_block, avatar_base=avatar_base
+        source=source, embedded_block=embedded_block
     ).replace("__DEBUG__", "inline-block" if debug else "none"
     ).replace("__DEBUG_BOOL__", "true" if debug else "false")
 
+    # permite imagens do Supabase Storage/CDN
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "style-src 'self' 'unsafe-inline' https://unpkg.com; "
         "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-        "img-src 'self' data:; font-src 'self' data:; connect-src 'self';"
+        "img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https:;"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
 
 
-# -------- VIS: PyVis --------
+# ----------------- VIS: PyVis -----------------
 @app.get("/v1/vis/pyvis", response_class=HTMLResponse,
          summary="Visualização pyvis (server-side render)")
 async def vis_pyvis(
@@ -552,13 +601,12 @@ async def vis_pyvis(
     max_nodes: int = Query(default=2000, ge=100, le=20000),
     max_edges: int = Query(default=4000, ge=100, le=200000),
     cache: bool = Query(default=True),
+    photos: bool = Query(default=True),
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (pyvis)",
     debug: bool = Query(default=False),
-    source: str = Query(default="server"),
-    avatar_base: str = Query(default="/static/avatars")
 ):
-    data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
+    data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache, with_photos=photos)
     data = truncate_preview(data, max_nodes, max_edges)
     data = normalize_graph_labels(data)
 
@@ -570,7 +618,7 @@ async def vis_pyvis(
         directed=True, notebook=False, cdn_resources="in_line"
     )
 
-    def color_for_node(label: str, group: str) -> str:
+    def color_for(label: str, group: str) -> str:
         u = (label or "").upper()
         g = (group or "").upper()
         if u == "CV" or g == "CV":
@@ -593,6 +641,7 @@ async def vis_pyvis(
     edges_raw = data.get("edges", [])
 
     node_ids = {str(n.get("id")).strip() for n in nodes_raw if str(n.get("id")).strip()}
+    # filtra arestas inválidas para evitar "non existent node '0'"
     edges_safe = []
     deg = {nid: 0 for nid in node_ids}
     for e in edges_raw:
@@ -604,17 +653,6 @@ async def vis_pyvis(
         deg[s] += 1
         deg[t] += 1
 
-    # avatar helpers
-    def avatar_for(nid: str, label: str, group: str, node: Dict[str, Any]) -> Optional[str]:
-        if str(node.get("type", "")).lower() != "membro" and str(node.get("group", "")).lower() != "membro":
-            return None
-        if node.get("photo_url"):
-            return str(node["photo_url"])
-        # assume arquivo local /static/avatars/<id>.jpg
-        local = avatar_base.rstrip("/") + f"/{nid}.jpg"
-        # não testamos existência de arquivo para não bloquear; browser resolve 404 e usa brokenImage
-        return local
-
     for n in nodes_raw:
         nid = str(n.get("id") or "").strip()
         if nid not in node_ids:
@@ -625,17 +663,16 @@ async def vis_pyvis(
         if not isinstance(size, (int, float)):
             size = 10 + (0 if deg.get(nid, 0) == 0 else (8 * (deg[nid] ** 0.5)))
 
-        img = avatar_for(nid, label, group, n)
-        if img:
+        if n.get("photo_url"):
             net.add_node(
                 nid, label=label, group=group, value=float(size),
-                color=color_for_node(label, group),
-                shape="circularImage", image=img
+                color=color_for(label, group),
+                shape="circularImage", image=str(n["photo_url"])
             )
         else:
             net.add_node(
                 nid, label=label, group=group, value=float(size),
-                color=color_for_node(label, group),
+                color=color_for(label, group),
                 shape="dot"
             )
 
@@ -647,6 +684,7 @@ async def vis_pyvis(
         col = EDGE_COLORS.get(rel, EDGE_COLORS["_default"])
         net.add_edge(s, t, title=title_e, color=col, arrows="to")
 
+    # estilo padrão alinhado ao seu repo
     net.set_options("""
     {
       "interaction": {
@@ -664,7 +702,7 @@ async def vis_pyvis(
 
     html_inner = net.generate_html(notebook=False)
 
-    # toolbar com busca + pan toggle
+    # toolbar + busca + pan toggle
     toolbar_tpl = Template(
         '<div class="kg-toolbar" '
         'style="display:flex;gap:.5rem;align-items:center;padding:.5rem .75rem;border-bottom:1px solid #e5e7eb;">'
@@ -676,10 +714,6 @@ async def vis_pyvis(
         '<button id="btn-print" type="button">Print</button>'
         '<button id="btn-reload" type="button">Reload</button>'
         '</div>'
-        '<script>'
-        'document.getElementById("btn-print").onclick=function(){window.print();};'
-        'document.getElementById("btn-reload").onclick=function(){location.reload();};'
-        '</script>'
     )
     toolbar = toolbar_tpl.safe_substitute(title=title)
 
@@ -687,24 +721,21 @@ async def vis_pyvis(
         "<!doctype html><html><head><meta charset='utf-8'><title>" + title + \
         "</title></head><body>" + toolbar + html_inner + "</body></html>"
 
-    # patches JS: congelar física, busca, pan toggle, brokenImage default
-    freeze_and_tools_js = """
+    # congela layout após estabilizar + busca
+    patch_js = """
     (function(){
       function ready(fn){ if(document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
       ready(function(){
         if(typeof network==='undefined' || typeof nodes==='undefined') return;
 
-        // congelar após estabilizar
         network.once('stabilizationIterationsDone', function(){
           network.setOptions({ physics: false });
           network.fit({animation:{duration:300}});
         });
 
-        // pan toggle
         var pan = document.getElementById('chk-pan');
         if(pan){ pan.onchange=function(){ network.setOptions({ interaction: { dragView: pan.checked } }); }; }
 
-        // busca
         function runSearch(){
           var box = document.getElementById('searchBox');
           var q = (box && box.value ? box.value : '').trim().toUpperCase();
@@ -727,7 +758,6 @@ async def vis_pyvis(
         var btnClear = document.getElementById('btn-clear');
         if(btnClear) btnClear.onclick=function(){ if(box) box.value=''; network.unselectAll(); };
 
-        // default avatar ao falhar imagem
         var def = '/static/avatars/_default.png';
         document.querySelectorAll('img').forEach(function(img){
           img.addEventListener('error', function(){ if(img && img.src!==def) img.src = def; });
@@ -737,21 +767,22 @@ async def vis_pyvis(
     """
 
     if "</body>" in html_with_toolbar:
-        html_final = html_with_toolbar.replace("</body>", f"<script>{freeze_and_tools_js}</script></body>")
+        html_final = html_with_toolbar.replace("</body>", f"<script>{patch_js}</script></body>")
     else:
-        html_final = html_with_toolbar + f"<script>{freeze_and_tools_js}</script>"
+        html_final = html_with_toolbar + f"<script>{patch_js}</script>"
 
+    # permite imagens do Supabase Storage/CDN
     response.headers["Content-Security-Policy"] = (
         "default-src 'self' blob: data:; "
         "style-src 'self' 'unsafe-inline'; "
         "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-        "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self';"
+        "img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https:;"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html_final, status_code=200)
 
 
-# -------- main --------
+# ----------------- main -----------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app:app", host="0.0.0.0", port=PORT, log_level=LOG_LEVEL)
