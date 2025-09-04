@@ -48,7 +48,7 @@ SERVICE_AKA = ["sic-kg"]
 
 app = FastAPI(
     title="svc-kg",
-    version="v1.7.14-photos",
+    version="v1.7.15-rpcfix",
     description="Micro serviço de Knowledge Graph com visualizações (vis.js e PyVis).",
     docs_url=None,
     redoc_url=None,
@@ -60,7 +60,7 @@ os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 if os.path.isdir("docs"):
     app.mount("/docs-static", StaticFiles(directory="docs"), name="docs-static")
-# NOVO: expõe /assets se existir (para fotos locais)
+# expõe /assets se existir (para fotos locais)
 if os.path.isdir("assets"):
     app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
@@ -158,31 +158,47 @@ def truncate_preview(data: Dict[str, Any], max_nodes: int, max_edges: int) -> Di
 
 
 async def supabase_rpc_get_graph(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> Dict[str, Any]:
+    """
+    Chama o RPC no PostgREST/Supabase com robustez:
+    1) tenta com parâmetros p_* (p_faccao_id, p_include_co, p_max_pairs) — o que o seu log indica;
+    2) se não casar (PGRST202 / 404), tenta com nomes simples (faccao_id, include_co, max_pairs);
+    3) último fallback: envia um JSON único {"args": {...}}.
+    """
     if not _env_backend_ok():
         raise RuntimeError("backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY")
 
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
-    payload = {
-        "faccao_id": faccao_id,
-        "p_faccao_id": faccao_id,
-        "include_co": include_co,
-        "p_include_co": include_co,
-        "max_pairs": max_pairs,
-        "p_max_pairs": max_pairs,
-    }
-
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-
     client = await _get_http()
-    resp = await client.post(url, json=payload, headers=headers)
-    if resp.status_code != 200:
+
+    async def _call(payload: Dict[str, Any]):
+        resp = await client.post(url, json=payload, headers=headers)
+        if resp.status_code == 200:
+            return resp.json()
+        # Tenta detectar assinatura incorreta para fallback
+        try:
+            j = resp.json()
+        except Exception:
+            j = None
+        if resp.status_code == 404 and isinstance(j, dict) and j.get("code") == "PGRST202":
+            return None  # sinaliza para tentar outra assinatura
+        # qualquer outro erro: propaga com detalhe
         raise RuntimeError(f"{resp.status_code}: Supabase RPC {SUPABASE_RPC_FN} falhou: {resp.text}")
-    data = resp.json()
+
+    # 1) p_*
+    data = await _call({"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs})
+    # 2) simples
+    if data is None:
+        data = await _call({"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs})
+    # 3) JSON único
+    if data is None:
+        data = await _call({"args": {"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs}})
+
     if not isinstance(data, dict):
         if isinstance(data, list) and data and isinstance(data[0], dict) and "nodes" in data[0]:
             data = data[0]
@@ -245,14 +261,6 @@ def platform_info() -> Dict[str, Any]:
 
 
 def resolve_photo_url(val: Optional[str]) -> Optional[str]:
-    """
-    Regras:
-      - http/https: usa direto
-      - começa com '/': usa direto
-      - começa com 'assets/': serve em /assets/...
-      - começa com 'static/': serve em /static/...
-      - caso contrário: prefixa /assets/ (padrão)
-    """
     if not val:
         return None
     v = str(val).strip()
@@ -403,9 +411,12 @@ async def graph_membros(
     max_edges: int = Query(default=4000, ge=100, le=200000),
     cache: bool = Query(default=True)
 ):
-    data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
-    data = truncate_preview(data, max_nodes, max_edges)
-    return JSONResponse(data, status_code=200)
+    try:
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
+        data = truncate_preview(data, max_nodes, max_edges)
+        return JSONResponse(data, status_code=200)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"graph_fetch_error: {e}")
 
 
 @app.get(
@@ -582,7 +593,6 @@ async def vis_pyvis(
         group = str(n.get("group") or n.get("faccao_id") or n.get("type") or "0")
         size = n.get("size")
 
-        # SUPORTE A FOTO: usa `photo_url` OU `foto_path`
         raw_photo = n.get("photo_url") or n.get("foto_path")
         photo = resolve_photo_url(raw_photo) if isinstance(raw_photo, str) else None
 
@@ -597,7 +607,6 @@ async def vis_pyvis(
             node_kwargs["shape"] = "circularImage"
             node_kwargs["image"] = photo
         else:
-            # Ícone padrão (SVG) — se quiser sempre “dot”, troque por shape='dot'
             node_kwargs["shape"] = "circularImage"
             node_kwargs["image"] = "/static/icons/person.svg"
 

@@ -5,53 +5,24 @@ info:
     description: |
         Micro serviço de Knowledge Graph (vis.js / PyVis).
         - Suporte a fotos em nós de **membros** via `photo_url` **ou** `foto_path`.
-          - `foto_path` absoluto (http/https) é usado diretamente.
-          - `foto_path` relativo é servido de **/assets/** (ou **/static/**), e há ícone padrão se ausente.
-        - Visualizações: `/v1/vis/visjs`, `/v1/vis/pyvis`
-        - Operação: `/live`, `/health`, `/ready`, `/ops/status`
-
 servers:
   - url: /
-
 tags:
   - name: graph
-    description: Endpoints de dados brutos do grafo.
   - name: viz
-    description: Visualizações do grafo.
   - name: ops
-    description: Saúde e operação do micro-serviço.
-
 paths:
     /v1/graph/membros:
         get:
             tags: [ graph ]
             summary: Retorna grafo (nodes/edges)
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                type: object
-                                properties:
-                                    nodes: { type: array, items: { type: object } }
-                                    edges: { type: array, items: { type: object } }
-
+            responses: { "200": { description: OK } }
     /v1/vis/visjs:
-        get:
-            tags: [ viz ]
-            summary: Visualização vis-network
-            responses: { "200": { description: HTML } }
-
+        get: { tags: [ viz ], summary: Visualização vis-network, responses: { "200": { description: HTML } } }
     /v1/vis/pyvis:
-        get:
-            tags: [ viz ]
-            summary: Visualização PyVis
-            responses: { "200": { description: HTML } }
-
+        get: { tags: [ viz ], summary: Visualização PyVis, responses: { "200": { description: HTML } } }
     /live:
         get: { tags: [ ops ], summary: Liveness, responses: { "200": { description: OK } } }
-
     /health:
         get:
             tags: [ ops ]
@@ -60,12 +31,8 @@ paths:
               - in: query
                 name: deep
                 schema: { type: boolean, default: false }
-            responses:
-                "200": { description: OK }
-                "503": { description: Serviço degradado }
-
+            responses: { "200": { description: OK }, "503": { description: Degradado } }
     /ready:
         get: { tags: [ ops ], summary: Readiness, responses: { "200": { description: OK }, "503": { description: Não pronto } } }
-
     /ops/status:
         get: { tags: [ ops ], summary: Status operacional, responses: { "200": { description: OK } } }
