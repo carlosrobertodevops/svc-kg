@@ -1,48 +1,120 @@
 openapi: 3.1.0
 info:
     title: svc-kg
-    version: v1.7.14
+    version: v1.7.13
     description: |
         Micro serviço de Knowledge Graph (vis.js / PyVis).
-        - Suporte a fotos em nós de **membros** via `photo_url` **ou** `foto_path`.
-          - `foto_path` absoluto (http/https) é usado diretamente.
-          - `foto_path` relativo é servido de **/assets/** (ou **/static/**), e há ícone padrão se ausente.
-        - Visualizações: `/v1/vis/visjs`, `/v1/vis/pyvis`
-        - Operação: `/live`, `/health`, `/ready`, `/ops/status`
+        - **svc-kg** (também referido como **“sic-kg”**)
+        - Endpoints de visualização: `/v1/vis/visjs`, `/v1/vis/pyvis`
+        - Endpoints operacionais (Ops): `/live`, `/health`, `/ready`, `/ops/status`
+
 servers:
   - url: /
+
 tags:
   - name: graph
+    description: Endpoints de dados brutos do grafo.
   - name: viz
+    description: Visualizações do grafo (vis.js / PyVis).
   - name: ops
+    description: Operação & saúde do micro-serviço (Coolify, Supabase, Redis).
+
 paths:
     /v1/graph/membros:
         get:
             tags: [ graph ]
             summary: Retorna grafo (nodes/edges)
-            responses: { "200": { description: OK } }
+            parameters:
+              - in: query
+                name: faccao_id
+                schema: { type: integer, nullable: true }
+              - in: query
+                name: include_co
+                schema: { type: boolean, default: true }
+              - in: query
+                name: max_pairs
+                schema: { type: integer, default: 8000 }
+              - in: query
+                name: max_nodes
+                schema: { type: integer, default: 2000 }
+              - in: query
+                name: max_edges
+                schema: { type: integer, default: 4000 }
+              - in: query
+                name: cache
+                schema: { type: boolean, default: true }
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    nodes: { type: array, items: { type: object } }
+                                    edges: { type: array, items: { type: object } }
+
     /v1/vis/visjs:
         get:
             tags: [ viz ]
             summary: Visualização vis-network
             responses: { "200": { description: HTML } }
+
     /v1/vis/pyvis:
         get:
             tags: [ viz ]
             summary: Visualização PyVis
             responses: { "200": { description: HTML } }
+
     /live:
-        get: { tags: [ ops ], summary: Liveness, responses: { "200": { description: OK } } }
+        get:
+            tags: [ ops ]
+            summary: Liveness
+            description: Retorna "ok" se o processo está vivo.
+            responses: { "200": { description: OK, content: { text/plain: {} } } }
+
     /health:
         get:
             tags: [ ops ]
             summary: Health check
+            description: |
+                Verifica Redis (ping) e backend (Supabase) configurado.  
+                Use `?deep=true` para executar um RPC real no Supabase e validar conectividade ativa.
             parameters:
               - in: query
                 name: deep
                 schema: { type: boolean, default: false }
-            responses: { "200": { description: OK }, "503": { description: Serviço degradado } }
+                description: "Se true, executa RPC no Supabase e ping no Redis."
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                "503":
+                    description: Serviço degradado
+
     /ready:
-        get: { tags: [ ops ], summary: Readiness, responses: { "200": { description: OK }, "503": { description: Não pronto } } }
+        get:
+            tags: [ ops ]
+            summary: Readiness
+            description: Teste ativo de Redis e RPC curto no Supabase (pronto para tráfego).
+            responses:
+                "200": { description: OK }
+                "503": { description: Não pronto }
+
     /ops/status:
-        get: { tags: [ ops ], summary: Status operacional, responses: { "200": { description: OK } } }
+        get:
+            tags: [ ops ]
+            summary: Status operacional (humano/automação)
+            description: |
+                Retorna informações do ambiente (Coolify/container), Redis, Supabase (sem expor segredos),
+                versão, hostname e parâmetros principais de CORS.
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: object
