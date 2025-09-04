@@ -1,5 +1,5 @@
 
-# svc-kg (v1.7.6)
+# svc-kg (v1.7.12)
 
 svc-kg/
 ├─ db/

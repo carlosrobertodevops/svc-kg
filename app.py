@@ -67,8 +67,8 @@ async def cache_set(key: str, value: str, ttl: int) -> None:
 # =========================
 app = FastAPI(
     title="svc-kg",
-    version="1.7.11",
-    docs_url="/docs",  # <- Swagger em /docs
+    version="1.7.12",
+    docs_url="/docs",  # Swagger UI
     redoc_url="/docs/redoc",
     openapi_url="/docs/openapi.json",
 )
@@ -130,6 +130,7 @@ async def call_supabase_graph(
                 status_code=502, detail=f"Supabase retornou JSON inválido: {str(je)}"
             )
 
+    # alguns setups retornam [{...}]
     if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
         data = data[0]
     if isinstance(data, str):
@@ -153,7 +154,8 @@ def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
     def clean_label(lbl: Any) -> str:
         if lbl is None:
             return ""
-        s = str(lbl).trim() if hasattr(lbl, "trim") else str(lbl).strip()
+        s = str(lbl).strip()
+        # "{A,B}" -> "A, B"
         if len(s) >= 2 and s[0] == "{" and s[-1] == "}":
             inner = s[1:-1]
             if not inner:
@@ -281,7 +283,6 @@ async def openapi_yaml():
         text = yaml.safe_dump(app.openapi(), sort_keys=False, allow_unicode=True)
         return PlainTextResponse(text, media_type="application/yaml")
     except Exception:
-        # fallback json
         return JSONResponse(app.openapi())
 
 
@@ -352,7 +353,6 @@ async def vis_visjs(
             "img-src 'self' data:; font-src 'self' data:; connect-src 'self';"
         )
 
-    # embed server
     embedded_block = ""
     if source == "server":
         data = await fetch_graph_sanitized(
@@ -409,7 +409,6 @@ async def vis_visjs(
       var debug = container.getAttribute('data-debug') === 'true';
       var endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
 
-      // Paleta de arestas por relação
       var EDGE_COLORS = {
         "PERTENCE_A": "#10b981",
         "EXERCE": "#f59e0b",
@@ -436,16 +435,13 @@ async def vis_visjs(
           .split(',').map(function(x){return x.trim();})
           .filter(Boolean).join(', ');
       }
-
-      // cor especial de nós
       function colorForNode(n){
         var lbl = (cleanLabel(n.label)||'').toUpperCase();
         var group = String(n.group ?? n.type ?? '');
-        if (lbl === 'CV' || group.toUpperCase() === 'CV') return '#e11d48';   // vermelho
-        if (lbl.indexOf('PCC') !== -1 || group.toUpperCase() === 'PCC') return '#2563eb'; // azul
+        if (lbl === 'CV' || group.toUpperCase() === 'CV') return '#e11d48';
+        if (lbl.indexOf('PCC') !== -1 || group.toUpperCase() === 'PCC') return '#2563eb';
         return hashColor(group || '0');
       }
-
       function degreeMap(nodes,edges){
         var d={}; nodes.forEach(function(n){ d[n.id]=0; });
         edges.forEach(function(e){ if(d.hasOwnProperty(e.from)) d[e.from]++; if(d.hasOwnProperty(e.to)) d[e.to]++; });
@@ -567,7 +563,7 @@ async def vis_visjs(
 
 
 # =========================
-# VIS: PyVis (mesmas cores)
+# VIS: PyVis (corrigido — ignora arestas órfãs e opções JSON puras)
 # =========================
 @app.get(
     "/v1/vis/pyvis",
@@ -584,6 +580,9 @@ async def vis_pyvis(
     cache: bool = Query(default=True),
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (pyvis)",
+    # aceito/ignorado (para compatibilidade com URLs usadas no visjs)
+    debug: bool = Query(default=False),
+    source: str = Query(default="server"),
 ):
     data = await fetch_graph_sanitized(
         faccao_id, include_co, max_pairs, use_cache=cache
@@ -600,6 +599,7 @@ async def vis_pyvis(
         font_color="#f3f4f6" if theme == "dark" else "#111827",
         directed=True,
         notebook=False,
+        cdn_resources="in_line",
     )
 
     def color_for_node(label: str, group: str) -> str:
@@ -609,7 +609,6 @@ async def vis_pyvis(
             return "#e11d48"
         if "PCC" in u or g == "PCC":
             return "#2563eb"
-        # fallback hash (simples)
         h = abs(hash(g or "0")) % 360
         return f"hsl({h},70%,50%)"
 
@@ -622,61 +621,72 @@ async def vis_pyvis(
         "_default": "#9ca3af",
     }
 
-    node_ids = set()
-    for n in data.get("nodes", []):
+    # ---- montar estruturas seguras
+    nodes_raw = data.get("nodes", [])
+    edges_raw = data.get("edges", [])
+
+    node_ids = {str(n.get("id")).strip() for n in nodes_raw if str(n.get("id")).strip()}
+    # manter apenas arestas que conectam nós existentes
+    edges_safe = []
+    deg = {nid: 0 for nid in node_ids}
+    for e in edges_raw:
+        s = str(e.get("source") or "").strip()
+        t = str(e.get("target") or "").strip()
+        if not s or not t or s not in node_ids or t not in node_ids:
+            continue
+        edges_safe.append(e)
+        deg[s] += 1
+        deg[t] += 1
+
+    # adicionar nós (com tamanho calculado se não vier)
+    for n in nodes_raw:
         nid = str(n.get("id") or "").strip()
-        if not nid:
+        if nid not in node_ids:
             continue
         label = (n.get("label") or nid).strip()
         group = str(n.get("group", n.get("type", "0")))
         size = n.get("size")
+        if not isinstance(size, (int, float)):
+            size = 10 + (0 if deg.get(nid, 0) == 0 else (8 * (deg[nid] ** 0.5)))
         net.add_node(
             nid,
             label=label,
             group=group,
-            value=(size if isinstance(size, (int, float)) else None),
+            value=float(size),
             color=color_for_node(label, group),
             shape="dot",
         )
-        node_ids.add(nid)
 
-    skipped = 0
-    for e in data.get("edges", []):
-        s = e.get("source")
-        t = e.get("target")
-        if s is None or t is None:
-            skipped += 1
-            continue
-        sf = str(s)
-        tf = str(t)
-        if sf not in node_ids or tf not in node_ids:
-            skipped += 1
-            continue
+    # adicionar arestas (já seguras)
+    for e in edges_safe:
+        s = str(e.get("source"))
+        t = str(e.get("target"))
         w = e.get("weight", 1)
         rel = e.get("relation", "")
         title_e = (rel + f" (w={w})") if rel else f"w={w}"
         col = EDGE_COLORS.get(rel, EDGE_COLORS["_default"])
         net.add_edge(
-            sf,
-            tf,
+            s,
+            t,
             value=(float(w) if isinstance(w, (int, float)) else 1.0),
             title=title_e,
             color=col,
             arrows="to",
         )
 
+    # PyVis espera JSON puro, não "var options = ..."
     net.set_options(
         """
-      var options = {
-        interaction: { hover: true, dragNodes: true, dragView: true, zoomView: true, navigationButtons: true },
-        physics: {
-          enabled: true,
-          stabilization: { enabled: true, iterations: 500 },
-          barnesHut: { gravitationalConstant: -8000, centralGravity: 0.2, springLength: 120, springConstant: 0.04, avoidOverlap: 0.2 }
-        },
-        nodes: { shape: "dot", borderWidth: 1 },
-        edges: { smooth: false, arrows: { to: { enabled: true } } }
-      }
+    {
+      "interaction": { "hover": true, "dragNodes": true, "dragView": true, "zoomView": true, "navigationButtons": true },
+      "physics": {
+        "enabled": true,
+        "stabilization": { "enabled": true, "iterations": 500 },
+        "barnesHut": { "gravitationalConstant": -8000, "centralGravity": 0.2, "springLength": 120, "springConstant": 0.04, "avoidOverlap": 0.2 }
+      },
+      "nodes": { "shape": "dot", "borderWidth": 1 },
+      "edges": { "smooth": false, "arrows": { "to": { "enabled": true } } }
+    }
     """
     )
 
