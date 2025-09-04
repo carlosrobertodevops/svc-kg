@@ -10,22 +10,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-APP_VERSION = "1.7.11"
+APP_VERSION = "1.7.12-safe"
 
 
 # -----------------------------------------------------------------------------
-# Config
+# Config helpers
 # -----------------------------------------------------------------------------
 def env_bool(name: str, default: bool) -> bool:
-    val = os.getenv(name)
-    if val is None:
+    v = os.getenv(name)
+    if v is None:
         return default
-    return val.lower() in ("1", "true", "yes", "on")
+    return v.lower() in ("1", "true", "yes", "on")
 
 
 APP_ENV = os.getenv("APP_ENV", "production")
 PORT = int(os.getenv("PORT", "8080"))
-LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
@@ -34,7 +33,6 @@ SUPABASE_TIMEOUT = int(os.getenv("SUPABASE_TIMEOUT", "15"))
 
 ENABLE_REDIS_CACHE = env_bool("ENABLE_REDIS_CACHE", True)
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
-
 CACHE_API_TTL = int(os.getenv("CACHE_API_TTL", "60"))
 
 # -----------------------------------------------------------------------------
@@ -48,7 +46,6 @@ app = FastAPI(
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ALLOW_ORIGINS", "*").split(","),
@@ -57,11 +54,10 @@ app.add_middleware(
     allow_headers=os.getenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type").split(","),
 )
 
-# Static
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Redis
+# Redis opcional
 redis_client: Optional[redis.Redis] = None
 if ENABLE_REDIS_CACHE:
     try:
@@ -75,10 +71,6 @@ if ENABLE_REDIS_CACHE:
 # Utils
 # -----------------------------------------------------------------------------
 def normalize_label(raw: Any) -> str:
-    """
-    Supabase pode retornar text[] como string "{a,b}" ou com aspas.
-    Esta função limpa isso para "a, b".
-    """
     if raw is None:
         return ""
     s = str(raw).strip()
@@ -96,12 +88,12 @@ def sanitize_graph(data: Dict[str, Any]) -> Dict[str, Any]:
     nodes = data.get("nodes") or []
     edges = data.get("edges") or []
 
-    out_nodes = []
+    out_nodes: List[Dict[str, Any]] = []
     seen = set()
     for n in nodes:
         if not n:
             continue
-        nid = str(n.get("id"))
+        nid = str(n.get("id") or "")
         if not nid or nid in seen:
             continue
         seen.add(nid)
@@ -115,7 +107,7 @@ def sanitize_graph(data: Dict[str, Any]) -> Dict[str, Any]:
             }
         )
 
-    out_edges = []
+    out_edges: List[Dict[str, Any]] = []
     for e in edges:
         if not e:
             continue
@@ -165,20 +157,14 @@ async def supabase_rpc(
         raise HTTPException(status_code=503, detail="Supabase não configurado")
 
     url = f"{SUPABASE_URL}/rest/v1/rpc/{SUPABASE_RPC_FN}"
-    payload = {
-        "p_faccao_id": faccao_id,
-        "p_include_co": include_co,
-        "p_max_pairs": max_pairs,
-    }
-
+    payload = {"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs}
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-
-    timeout = httpx.Timeout(SUPABASE_TIMEOUT)
+    timeout = httpx.Timeout(int(os.getenv("SUPABASE_TIMEOUT", "15")))
     async with httpx.AsyncClient(timeout=timeout) as client:
         r = await client.post(url, headers=headers, json=payload)
         if r.status_code != 200:
@@ -199,7 +185,6 @@ async def fetch_graph(
         val = redis_client.get(cache_key)
         if val:
             return json.loads(val)
-
     raw = await supabase_rpc(faccao_id, include_co, max_pairs)
     if use_cache and redis_client is not None:
         redis_client.setex(cache_key, CACHE_API_TTL, json.dumps(raw))
@@ -209,12 +194,10 @@ async def fetch_graph(
 async def fetch_graph_sanitized(
     faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool
 ) -> Dict[str, Any]:
-    raw = await fetch_graph(faccao_id, include_co, max_pairs, use_cache=use_cache)
-    return sanitize_graph(raw)
+    return sanitize_graph(await fetch_graph(faccao_id, include_co, max_pairs, use_cache))
 
 
-def csp_vis(theme: str) -> str:
-    # Permite inline scripts usados por pyvis e pelo fallback do vis.js
+def csp_inline() -> str:
     return (
         "default-src 'self'; "
         "style-src 'self' 'unsafe-inline' https://unpkg.com; "
@@ -224,20 +207,25 @@ def csp_vis(theme: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-# Health
+# Health e home (sempre 200)
 # -----------------------------------------------------------------------------
+@app.get("/")
+def root():
+    return {"svc": "kg", "version": APP_VERSION, "env": APP_ENV}
+
+
 @app.get("/health")
-def health() -> Dict[str, Any]:
-    return {"ok": True, "version": APP_VERSION, "env": APP_ENV}
+def health():
+    return {"ok": True, "version": APP_VERSION}
 
 
 @app.get("/live")
-def live() -> Dict[str, Any]:
+def live():
     return {"live": True}
 
 
 @app.get("/ready")
-async def ready() -> Dict[str, Any]:
+async def ready():
     ok_redis = False
     if redis_client is not None:
         try:
@@ -247,11 +235,7 @@ async def ready() -> Dict[str, Any]:
 
     backend_ok = False
     err = None
-    host = ""
-    dns_ok = False
     try:
-        host = (SUPABASE_URL or "").split("://", 1)[-1].split("/", 1)[0]
-        dns_ok = True if host else False
         _ = await supabase_rpc(None, True, 1)
         backend_ok = True
     except Exception as e:
@@ -259,20 +243,12 @@ async def ready() -> Dict[str, Any]:
 
     status = 200 if backend_ok else 503
     return JSONResponse(
-        content={
-            "redis": ok_redis,
-            "backend": "supabase",
-            "backend_ok": backend_ok,
-            "supabase_host": host,
-            "dns_ok": dns_ok,
-            "error": err,
-        },
-        status_code=status,
+        {"redis": ok_redis, "backend": "supabase", "backend_ok": backend_ok, "error": err}, status
     )
 
 
 # -----------------------------------------------------------------------------
-# API: grafo raw -> JSON
+# API JSON
 # -----------------------------------------------------------------------------
 @app.get("/v1/graph/membros")
 async def graph_membros(
@@ -286,17 +262,13 @@ async def graph_membros(
     data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
     data = truncate_graph(data, max_nodes, max_edges)
     degree_based_size(data["nodes"], data["edges"])
-    return JSONResponse(content=data)
+    return JSONResponse(data)
 
 
 # -----------------------------------------------------------------------------
-# Visualização: pyVis
+# Visualização: PyVis
 # -----------------------------------------------------------------------------
-@app.get(
-    "/v1/vis/pyvis",
-    response_class=HTMLResponse,
-    summary="Visualização com PyVis (HTML inline, sem depender de /static)",
-)
+@app.get("/v1/vis/pyvis", response_class=HTMLResponse)
 async def vis_pyvis(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -308,13 +280,12 @@ async def vis_pyvis(
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (PyVis)",
 ):
-    from pyvis.network import Network  # import tardio, evita custo quando não usado
+    from pyvis.network import Network
 
     data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
     data = truncate_graph(data, max_nodes, max_edges)
     degree_based_size(data["nodes"], data["edges"])
 
-    # pyvis embute libs no HTML (cdn_resources="in_line")
     net = Network(
         height="100%",
         width="100%",
@@ -324,7 +295,7 @@ async def vis_pyvis(
         notebook=False,
         directed=True,
     )
-    net.barnes_hut()  # layout/physics
+    net.barnes_hut()
     net.show_buttons(filter_=["physics"])
 
     for n in data["nodes"]:
@@ -332,12 +303,7 @@ async def vis_pyvis(
         group = str(n.get("group") or n.get("type") or "0")
         size = float(n.get("size") or 10)
         net.add_node(
-            n["id"],
-            label=label,
-            title=f"<b>{label}</b><br>grupo: {group}<br>tipo: {n.get('type','')}",
-            color=None,  # pyvis já colore por physics se quiser; podemos setar por grupo
-            value=size,
-            shape="dot",
+            n["id"], label=label, title=f"<b>{label}</b><br>grupo: {group}", value=size, shape="dot"
         )
 
     for e in data["edges"]:
@@ -346,23 +312,17 @@ async def vis_pyvis(
         net.add_edge(e["source"], e["target"], value=w, title=f"{rel} (w={w})" if rel else f"w={w}")
 
     html = net.generate_html(title=title)
-    # CSP relaxada para inline do pyvis
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; "
-        "script-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:;"
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:;"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
-    return HTMLResponse(content=html)
+    return HTMLResponse(html)
 
 
 # -----------------------------------------------------------------------------
 # Visualização: vis-network (vis.js)
 # -----------------------------------------------------------------------------
-@app.get(
-    "/v1/vis/visjs",
-    response_class=HTMLResponse,
-    summary="Visualização vis-network (server-embed + fallback inline)",
-)
+@app.get("/v1/vis/visjs", response_class=HTMLResponse)
 async def vis_visjs(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -374,80 +334,74 @@ async def vis_visjs(
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (vis.js)",
 ):
-    # dados embutidos no HTML
     data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
     data = truncate_graph(data, max_nodes, max_edges)
     degree_based_size(data["nodes"], data["edges"])
     json_str = json.dumps(data, ensure_ascii=False)
 
-    # usa CDN oficial
     js_href = "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"
     css_href = "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
     html = f"""<!doctype html>
 <html lang="pt-br">
-  <head>
-    <meta charset="utf-8" />
-    <title>{title}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="{css_href}">
-    <link rel="stylesheet" href="/static/vis-style.css">
-    <meta name="theme-color" content="{bg}">
-    <style>html,body,#mynetwork{{height:100%;margin:0}}</style>
-    <script id="__KG_DATA__" type="application/json">{json_str}</script>
-  </head>
-  <body data-theme="{theme}">
-    <div class="kg-toolbar">
-      <h4>{title}</h4>
-      <button onclick="window.print()">Print</button>
-      <button onclick="location.reload()">Reload</button>
-    </div>
-    <div id="mynetwork" style="height:90vh;width:100%"></div>
-    <script src="{js_href}" crossorigin="anonymous"></script>
-    <script>
-      (function(){{
-        const container = document.getElementById('mynetwork');
-        let data;
-        try {{
-          data = JSON.parse(document.getElementById('__KG_DATA__').textContent || '{{}}');
-        }} catch (e) {{
-          container.innerHTML = '<pre>'+String(e)+'</pre>';
-          return;
-        }}
-        const nodes = (data.nodes||[]).map(n=>({{
-          id: String(n.id),
-          label: String(n.label||n.id),
-          value: Number(n.size||10),
-          group: String(n.group||n.type||'0'),
-          shape: 'dot'
-        }}));
-        const edges = (data.edges||[]).map(e=>({{
-          from: String(e.source), to: String(e.target),
-          value: Number(e.weight||1), title: e.relation||''
-        }}));
-        if (!nodes.length) {{
-          container.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;opacity:.85">Nenhum dado para exibir (nodes=0).</div>';
-          return;
-        }}
-        const options = {{
-          interaction: {{ hover: true, dragNodes: true, dragView: true, zoomView: true, multiselect: true, navigationButtons: true }},
-          manipulation: {{ enabled: false }},
-          physics: {{
-            enabled: true,
-            stabilization: {{ enabled: true, iterations: 400 }},
-            barnesHut: {{ gravitationalConstant: -8000, centralGravity: 0.2, springLength: 120, springConstant: 0.04, avoidOverlap: 0.2 }}
-          }},
-          nodes: {{ borderWidth: 1 }},
-          edges: {{ smooth: false, arrows: {{ to: {{ enabled: true }} }} }}
-        }};
-        const network = new vis.Network(container, {{nodes, edges}}, options);
-        network.once('stabilizationIterationsDone', ()=>network.fit({{animation:{{duration:300}}}}));
-        network.on('doubleClick', ()=>network.fit({{animation:{{duration:300}}}}));
-      }})();
-    </script>
-  </body>
+<head>
+  <meta charset="utf-8" />
+  <title>{title}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{css_href}">
+  <link rel="stylesheet" href="/static/vis-style.css">
+  <meta name="theme-color" content="{bg}">
+  <style>html,body,#mynetwork{{height:100%;margin:0}}</style>
+  <script id="__KG_DATA__" type="application/json">{json_str}</script>
+</head>
+<body data-theme="{theme}">
+  <div class="kg-toolbar">
+    <h4>{title}</h4>
+    <button onclick="window.print()">Print</button>
+    <button onclick="location.reload()">Reload</button>
+  </div>
+  <div id="mynetwork" style="height:90vh;width:100%"></div>
+  <script src="{js_href}" crossorigin="anonymous"></script>
+  <script>
+  (function(){{
+    const container = document.getElementById('mynetwork');
+    let data;
+    try {{ data = JSON.parse(document.getElementById('__KG_DATA__').textContent || '{{}}'); }}
+    catch(e) {{ container.innerHTML = '<pre>'+String(e)+'</pre>'; return; }}
+
+    const nodes = (data.nodes||[]).map(n=>({{
+      id: String(n.id), label: String(n.label||n.id),
+      value: Number(n.size||10), group: String(n.group||n.type||'0'), shape:'dot'
+    }}));
+    const edges = (data.edges||[]).map(e=>({{
+      from: String(e.source), to: String(e.target),
+      value: Number(e.weight||1), title: e.relation||''
+    }}));
+
+    if(!nodes.length){{
+      container.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;opacity:.85">Nenhum dado para exibir (nodes=0).</div>';
+      return;
+    }}
+
+    const options = {{
+      interaction: {{ hover:true, dragNodes:true, dragView:true, zoomView:true, multiselect:true, navigationButtons:true }},
+      manipulation: {{ enabled:false }},
+      physics: {{
+        enabled:true,
+        stabilization: {{ enabled:true, iterations: 400 }},
+        barnesHut: {{ gravitationalConstant:-8000, centralGravity:0.2, springLength:120, springConstant:0.04, avoidOverlap:0.2 }}
+      }},
+      nodes: {{ borderWidth:1 }},
+      edges: {{ smooth:false, arrows: {{ to: {{ enabled:true }} }} }}
+    }};
+    const network = new vis.Network(container, {{nodes, edges}}, options);
+    network.once('stabilizationIterationsDone', ()=>network.fit({{animation:{{duration:300}}}}));
+    network.on('doubleClick', ()=>network.fit({{animation:{{duration:300}}}}));
+  }})();
+  </script>
+</body>
 </html>"""
-    response.headers["Content-Security-Policy"] = csp_vis(theme)
+    response.headers["Content-Security-Policy"] = csp_inline()
     response.headers["X-Content-Type-Options"] = "nosniff"
-    return HTMLResponse(content=html)
+    return HTMLResponse(html)
