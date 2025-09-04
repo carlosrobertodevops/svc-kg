@@ -11,12 +11,14 @@ svc-kg/
 ├─ docs/
 │  └─ openapi.yaml   # Swagger spec estático (usado no /docs)
 ├─ static/           # (montado no container)
+│   ├─ vis-embed.js
 │   ├─ vis-page.js
 │   └─ vis-style.css
 ├─ app.py
 ├─ Dockerfile
 ├─ docker-compose.local.yml
 ├─ docker-compose.coolify.yml
+├─ docker-compose.yml
 ├─ .env.example
 ├─ .gitignore
 ├─ .dockerignore
@@ -52,6 +54,7 @@ Microserviço de **Knowledge Graph** com:
 ## Rodando LOCAL (Postgres + Redis)
 
 1. Crie `.env` a partir de `.env.example` e defina:
+---
 ---
 ---
 ---
