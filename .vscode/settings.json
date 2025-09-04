@@ -7,5 +7,44 @@
     { "viewType": "default", "filenamePattern": "*.html" },
     { "viewType": "default", "filenamePattern": "*.svg" },
     { "viewType": "default", "filenamePattern": "*.pdf" }
+  ],
+    "editor.formatOnSave": true,
+  "editor.defaultFormatter": "ms-python.black-formatter",
+  "editor.rulers": [100],
+  "editor.renderWhitespace": "selection",
+  "files.trimTrailingWhitespace": true,
+  "files.trimFinalNewlines": true,
+
+  // Python
+  "python.analysis.typeCheckingMode": "basic",
+  "python.formatting.provider": "black",
+  "python.analysis.autoImportCompletions": true,
+
+  // Ruff (linter + import sorter)
+  "ruff.lint.enabled": true,
+  "ruff.lint.args": ["--line-length=100"],
+  "ruff.organizeImports": true,
+
+  // Desative outros linters para não duplicar mensagens
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": false,
+  "python.linting.flake8Enabled": false,
+
+  // Code Spell Checker
+  "cSpell.language": "pt,pt-BR,en",
+  "cSpell.words": [
+    "pyvis",
+    "visjs",
+    "visnetwork",
+    "supabase",
+    "uvicorn",
+    "gunicorn",
+    "coolify",
+    "faccao",
+    "membros",
+    "funcao",
+    "visjs",
+    "visnetwork",
+    "kgdb"
   ]
 }
