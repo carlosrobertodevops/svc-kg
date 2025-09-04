@@ -52,6 +52,7 @@ Microserviço de **Knowledge Graph** com:
 1. Crie `.env` a partir de `.env.example` e defina:
 ---
 ---
+---
 ```env
    APP_ENV=development
    PORT=8080
