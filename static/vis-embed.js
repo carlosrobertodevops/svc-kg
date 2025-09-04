@@ -1,276 +1,141 @@
-/* global vis */
+// static/vis-embed.js (v1.1) — suporta 'server' (embed) e 'client' (fetch) + limpeza de labels
 (function () {
-  const el = document.getElementById("mynetwork");
-  if (!el) return;
+  const container = document.getElementById('mynetwork');
+  const source = container.getAttribute('data-source') || 'server';
+  const endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
+  const debug = container.getAttribute('data-debug') === 'true';
 
-  const THEME = (el.getAttribute("data-theme") || "light").toLowerCase();
-  const SOURCE = (el.getAttribute("data-source") || "server").toLowerCase();
-  const ENDPOINT = el.getAttribute("data-endpoint") || "/v1/graph/membros";
-  const DEBUG = (el.getAttribute("data-debug") || "false") === "true";
-  const Q = (el.getAttribute("data-query") || "").trim();
+  const params = new URLSearchParams(window.location.search);
+  const qs = new URLSearchParams();
+  const faccao = params.get('faccao_id');
+  if (faccao && faccao.trim() !== '') qs.set('faccao_id', faccao.trim());
+  qs.set('include_co', params.get('include_co') ?? 'true');
+  qs.set('max_pairs', params.get('max_pairs') ?? '8000');
+  qs.set('max_nodes', params.get('max_nodes') ?? '2000');
+  qs.set('max_edges', params.get('max_edges') ?? '4000');
+  qs.set('cache', params.get('cache') ?? (source === 'server' ? 'true' : 'false'));
+  const url = endpoint + '?' + qs.toString();
 
-  // ícone padrão do projeto
-  const DEFAULT_ICON_URL = "/static/icons/person.svg";
-
-  // cores por facção
-  const CV_COLOR = "#d32f2f";
-  const PCC_COLOR = "#0d47a1";
-
-  const EDGE_COLORS = {
-    PERTENCE_A: "#9e9e9e",
-    EXERCE: "#00796b",
-    FUNCAO_DA_FACCAO: "#ef6c00",
-    CO_FACCAO: "#8e24aa",
-    CO_FUNCAO: "#546e7a",
+  const hashColor = (str) => {
+    let h = 0; const s = String(str);
+    for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; }
+    const hue = Math.abs(h) % 360; return `hsl(${hue},70%,50%)`;
   };
 
-  const bg = THEME === "dark" ? "#0b0f19" : "#ffffff";
-  document.body.style.backgroundColor = bg;
+  // --- limpeza de label "{...}" -> "..."
+  const isPgTextArray = (s) => {
+    s = (s || '').trim();
+    return s.length >= 2 && s[0] === '{' && s[s.length - 1] === '}';
+  };
+  const cleanLabel = (raw) => {
+    if (!raw) return '';
+    const s = String(raw).trim();
+    if (!isPgTextArray(s)) return s;
+    const inner = s.slice(1, -1);
+    if (!inner) return '';
+    // fallback simples (sem CSV parser no front):
+    return inner.replace(/(^|,)\s*"?null"?\s*(?=,|$)/gi, '')
+                .replace(/"/g, '')
+                .split(',')
+                .map(x => x.trim())
+                .filter(Boolean)
+                .join(', ');
+  };
 
-  function isHttp(u) {
-    return /^https?:\/\//i.test(String(u || ""));
-  }
-  function resolvePhotoPath(v) {
-    if (!v) return null;
-    const val = String(v).trim();
-    if (!val) return null;
-    if (isHttp(val)) return val;
-    if (val.startsWith("/")) return val;
-    if (val.startsWith("assets/")) return "/assets/" + val.slice(7);
-    if (val.startsWith("static/")) return "/" + val;
-    return "/assets/" + val;
-  }
+  const degreeMap = (nodes, edges) => {
+    const d = Object.create(null);
+    nodes.forEach(n => d[n.id] = 0);
+    edges.forEach(e => { if (e.from in d) d[e.from]++; if (e.to in d) d[e.to]++; });
+    return d;
+  };
 
-  function hashColor(str) {
-    let h = 0;
-    for (let i = 0; i < str.length; i++) {
-      h = (h << 5) - h + str.charCodeAt(i);
-      h |= 0;
-    }
-    const hue = Math.abs(h) % 360;
-    return `hsl(${hue},70%,50%)`;
-  }
+  const showEmpty = (msg) => {
+    container.innerHTML = `
+      <div style="display:flex;height:100%;align-items:center;justify-content:center;">
+        <div style="opacity:.9;text-align:center">
+          <div style="font-size:18px;margin-bottom:8px">${msg}</div>
+          <div style="font-size:12px;color:#888">URL: ${url}</div>
+        </div>
+      </div>`;
+  };
 
-  function faccaoColorByName(nameUpper) {
-    if (!nameUpper) return null;
-    if (nameUpper.includes("PCC")) return PCC_COLOR;
-    if (nameUpper === "CV" || nameUpper.includes("COMANDO VERMELHO")) return CV_COLOR;
-    return null;
-  }
+  const attachToolbar = (network, nodesCount, edgesCount) => {
+    const btnPrint = document.getElementById('btn-print');
+    const btnReload = document.getElementById('btn-reload');
+    if (btnPrint) btnPrint.addEventListener('click', () => window.print());
+    if (btnReload) btnReload.addEventListener('click', () => window.location.reload());
+    const badge = document.getElementById('badge');
+    if (badge && debug) badge.textContent = `nodes: ${nodesCount} · edges: ${edgesCount}`;
+  };
 
-  function buildVisData(raw) {
-    const nodes = [];
-    const edges = [];
+  const render = (data) => {
+    const nodesRaw = (data.nodes || []).filter(n => n && n.id);
+    const edgesRaw = (data.edges || []).filter(e => e && e.source && e.target);
 
-    // indexa rótulos das facções para colorir por nome
-    const faccaoLabelById = {};
-    (raw.nodes || []).forEach((n) => {
-      if (!n || n.type !== "faccao") return;
-      const id = String(n.id);
-      faccaoLabelById[id] = String(n.label || "").trim();
-    });
+    // normaliza label aqui também (caso source=client)
+    const nodes = nodesRaw.map(n => ({ ...n, label: cleanLabel(n.label) || String(n.id) }));
 
-    (raw.nodes || []).forEach((n) => {
-      if (!n || n.id == null) return;
-      const id = String(n.id);
-      const label = String(n.label || id);
-      const group = String(n.group || n.faccao_id || n.type || "0");
-      const photo = resolvePhotoPath(n.photo_url || n.foto_path);
-
-      let color = null;
-      const facName = faccaoLabelById[group]
-        ? faccaoLabelById[group].toUpperCase()
-        : String(group || "").toUpperCase();
-      color = faccaoColorByName(facName) || hashColor(group);
-
-      const node = {
-        id,
-        label,
-        title: label,
-        borderWidth: 1,
-        color,
-        _origColor: color,
-        shape: "circularImage",
-        image: photo || DEFAULT_ICON_URL,
-        brokenImage: DEFAULT_ICON_URL
-      };
-      if (n.type) node.type = n.type;
-
-      nodes.push(node);
-    });
-
-    const validIds = new Set(nodes.map((n) => String(n.id)));
-    (raw.edges || []).forEach((e) => {
-      if (!e) return;
-      const a = String(e.source);
-      const b = String(e.target);
-      if (!validIds.has(a) || !validIds.has(b)) return;
-      const rel = String(e.relation || "");
-      const color = EDGE_COLORS[rel] || "#90a4ae";
-      edges.push({
-        from: a,
-        to: b,
-        color,
-        width: 1,
-        arrows: "to",
-        title: rel || undefined,
-      });
-    });
-
-    return { nodes, edges };
-  }
-
-  async function getData() {
-    if (SOURCE === "server") {
-      const block = document.getElementById("__KG_DATA__");
-      if (!block) throw new Error("Bloco __KG_DATA__ ausente no modo server.");
-      return JSON.parse(block.textContent || "{}");
-    } else {
-      const url = new URL(ENDPOINT, location.origin);
-      for (const k of [
-        "faccao_id",
-        "include_co",
-        "max_pairs",
-        "max_nodes",
-        "max_edges",
-        "cache",
-      ]) {
-        const v = new URLSearchParams(location.search).get(k);
-        if (v != null) url.searchParams.set(k, v);
-      }
-      if (Q) url.searchParams.set("q", Q);
-      const r = await fetch(url.toString(), { credentials: "omit" });
-      if (!r.ok) throw new Error(`GET ${url} -> ${r.status}`);
-      return await r.json();
-    }
-  }
-
-  function initUI(network, nodesDS) {
-    const q = document.getElementById("kg-search");
-    const b = document.getElementById("btn-apply");
-    const c = document.getElementById("btn-clear");
-    const p = document.getElementById("btn-print");
-    const r = document.getElementById("btn-reload");
-
-    function colorObj(orig, opacity) {
-      if (typeof orig === "object" && orig)
-        return Object.assign({}, orig, { opacity });
-      return {
-        background: orig || "#90a4ae",
-        border: orig || "#90a4ae",
-        highlight: { background: orig || "#90a4ae", border: orig || "#90a4ae" },
-        hover: { background: orig || "#90a4ae", border: orig || "#90a4ae" },
-        opacity,
-      };
-    }
-
-    function runSearch(txt) {
-      const all = nodesDS.get();
-      const t = String(txt || "").trim().toLowerCase();
-
-      // reset
-      all.forEach((n) => {
-        const base = n._origColor || n.color || "#90a4ae";
-        nodesDS.update({ id: n.id, color: colorObj(base, 1) });
-      });
-
-      if (!t) return;
-
-      const hits = all.filter((n) => {
-        const lab = String(n.label || "").toLowerCase();
-        const typ = String(n.type || "").toLowerCase();
-        return lab.includes(t) || typ.includes(t) || String(n.id) === t;
-      });
-
-      const hitIds = new Set(hits.map((h) => h.id));
-      all.forEach((n) => {
-        if (!hitIds.has(n.id)) {
-          const base = n._origColor || n.color || "#90a4ae";
-          nodesDS.update({ id: n.id, color: colorObj(base, 0.25) });
-        }
-      });
-
-      if (hits.length) {
-        network.fit({ nodes: hits.map((h) => h.id), animation: { duration: 300 } });
-      }
-    }
-
-    if (p) p.onclick = () => window.print();
-    if (r) r.onclick = () => location.reload();
-    if (b && q) b.onclick = () => runSearch(q.value);
-    if (c && q) c.onclick = () => {
-      q.value = "";
-      runSearch("");
-    };
-  }
-
-  (async function main() {
     try {
-      if (typeof vis === "undefined" || !vis.Network) {
-        el.innerHTML =
-          "<pre style='padding:12px;color:#b71c1c'>vis-network não carregou. Verifique conectividade ao CDN ou arquivos locais.</pre>";
-        return;
-      }
+      console.log('[visjs] mode=', source, '| nodes=', nodes.length, '| edges=', edgesRaw.length);
+    } catch (_) {}
+    if (!nodes.length) { showEmpty('Nenhum dado para exibir (nodes=0).'); return; }
 
-      const raw = await getData();
-      if (!raw || !raw.nodes || !raw.nodes.length) {
-        el.innerHTML =
-          "<pre style='padding:12px'>Sem dados para exibir (nodes=0).</pre>";
-        if (DEBUG) console.log("payload vazio", raw);
-        return;
-      }
+    const nodesVis = nodes.map(n => ({
+      id: String(n.id),
+      label: n.label || String(n.id),
+      group: String(n.group ?? n.type ?? '0'),
+      value: n.size ? Number(n.size) : undefined,
+      color: hashColor(n.group ?? n.type ?? '0'),
+      shape: 'dot'
+    }));
+    const edgesVis = edgesRaw.map(e => ({
+      from: String(e.source),
+      to: String(e.target),
+      value: e.weight != null ? Number(e.weight) : 1.0,
+      title: e.relation ? `${e.relation} (w=${e.weight ?? 1})` : `w=${e.weight ?? 1}`
+    }));
 
-      const visData = buildVisData(raw);
-      const nodes = new vis.DataSet(visData.nodes);
-      const edges = new vis.DataSet(visData.edges);
-
-      const container = el;
-      const data = { nodes, edges };
-      const options = {
-        interaction: {
-          hover: true,
-          dragNodes: true,
-          dragView: false,
-          zoomView: true,
-          multiselect: true,
-          navigationButtons: true,
-        },
-        manipulation: { enabled: false },
-        physics: {
-          enabled: true,
-          stabilization: { enabled: true, iterations: 300 },
-          barnesHut: {
-            gravitationalConstant: -8000,
-            centralGravity: 0.2,
-            springLength: 120,
-            springConstant: 0.04,
-            avoidOverlap: 0.2,
-          },
-        },
-        nodes: { borderWidth: 1 },
-        edges: { smooth: false, width: 1 },
-      };
-
-      const network = new vis.Network(container, data, options);
-      network.once("stabilized", () => network.setOptions({ physics: false }));
-
-      // guarda a cor original para busca
-      nodes.get().forEach((n) => {
-        if (n._origColor == null) nodes.update({ id: n.id, _origColor: n.color });
-      });
-
-      initUI(network, nodes);
-
-      if (DEBUG) {
-        console.log("KG raw:", raw);
-        console.log("visData:", visData);
-      }
-    } catch (e) {
-      console.error(e);
-      el.innerHTML =
-        "<pre style='padding:12px;color:#b71c1c'>Falha ao carregar grafo: " +
-        String(e) +
-        "</pre>";
+    // valor por grau se não vier 'size'
+    const hasSize = nodesVis.some(n => typeof n.value === 'number');
+    if (!hasSize) {
+      const deg = degreeMap(nodesVis, edgesVis);
+      nodesVis.forEach(n => { const d = deg[n.id] || 0; n.value = 10 + Math.log(d + 1) * 8; });
     }
-  })();
+
+    const nodesDS = new vis.DataSet(nodesVis);
+    const edgesDS = new vis.DataSet(edgesVis);
+
+    const options = {
+      interaction: { hover: true, dragNodes: true, dragView: true, zoomView: true, multiselect: true, navigationButtons: true },
+      manipulation: { enabled: false },
+      physics: {
+        enabled: true, stabilization: { enabled: true, iterations: 500 },
+        barnesHut: { gravitationalConstant: -8000, centralGravity: 0.2, springLength: 120, springConstant: 0.04, avoidOverlap: 0.2 }
+      },
+      nodes: { borderWidth: 1, shape: 'dot' },
+      edges: { smooth: false, arrows: { to: { enabled: true } } }
+    };
+
+    const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, options);
+    network.once('stabilizationIterationsDone', () => network.fit({ animation: { duration: 300 } }));
+    network.on('doubleClick', () => network.fit({ animation: { duration: 300 } }));
+    attachToolbar(network, nodesVis.length, edgesVis.length);
+  };
+
+  if (source === 'server') {
+    const tag = document.getElementById('__KG_DATA__');
+    if (!tag) { showEmpty('Sem bloco de dados embedado.'); return; }
+    try {
+      const data = JSON.parse(tag.textContent || '{}');
+      render(data);
+    } catch (e) {
+      console.error('[visjs] parse embedded json error:', e);
+      showEmpty('Falha ao interpretar JSON embedado.');
+    }
+  } else {
+    fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(async (r) => { if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`); return r.json(); })
+      .then(render)
+      .catch((err) => { console.error('[visjs] fetch error:', err); showEmpty(`Falha ao carregar dados: ${String(err).replace(/</g, '&lt;')}`); });
+  }
 })();

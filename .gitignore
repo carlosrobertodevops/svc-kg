@@ -11,3 +11,6 @@ pg_data/
 .vscode/
 __pycache__
 .vincent/
+.env
+.editorconfig
+.vscode/
