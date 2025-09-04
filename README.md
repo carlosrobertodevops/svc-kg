@@ -8,7 +8,7 @@ Microserviço de **Knowledge Graph** (membros, facções, funções) com:
   - `/v1/vis/pyvis` → **PyVis** (usa **inline JS**; pode requerer CSP relaxada)
   - `/v1/vis/visjs` → **vis-network** (sem inline; compatível com CSP rígida)
 
-# svc-kg (v1.7.6)
+# svc-kg (v1.7.12)
 
 svc-kg/
 ├─ db/
