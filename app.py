@@ -673,6 +673,7 @@ async def vis_visjs(
         'CO_FACCAO':       '#8e24aa',
         'CO_FUNCAO':       '#546e7a'
       }};
+      // Preferimos SVG; PNG alternativo disponível em /static/icons/person.png
       const ICON_PERSON = '/static/icons/person.svg';
 
       const container = document.getElementById('mynetwork');
@@ -985,6 +986,7 @@ async def vis_pyvis(
             node_kwargs["shape"] = "circularImage"
             node_kwargs["image"] = photo
         elif is_person(n.get("type")):
+            # PNG alternativo disponível em /static/icons/person.png
             node_kwargs["shape"] = "image"
             node_kwargs["image"] = "/static/icons/person.svg"
         else:
