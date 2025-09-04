@@ -1,0 +1,32 @@
+0000000000000000000000000000000000000000 026bade0808070aa35c66ad4750d4b690aeed22c “carlosrobertodevops” <“carlos.roberto.devops@gmail.com”> 1756672221 -0300	commit (initial): first commit
+026bade0808070aa35c66ad4750d4b690aeed22c 0000000000000000000000000000000000000000 “carlosrobertodevops” <“carlos.roberto.devops@gmail.com”> 1756672229 -0300	Branch: renamed refs/heads/main to refs/heads/main
+026bade0808070aa35c66ad4750d4b690aeed22c 026bade0808070aa35c66ad4750d4b690aeed22c “carlosrobertodevops” <“carlos.roberto.devops@gmail.com”> 1756672229 -0300	Branch: renamed refs/heads/main to refs/heads/main
+026bade0808070aa35c66ad4750d4b690aeed22c 51883fbae570afc38cfd39c0aa4f26a3a16f5b25 “carlosrobertodevops” <“carlos.roberto.devops@gmail.com”> 1756673455 -0300	commit: Ajustes
+51883fbae570afc38cfd39c0aa4f26a3a16f5b25 328759959b56c6ae64348966b45ddad0484a3ffe “carlosrobertodevops” <“carlos.roberto.devops@gmail.com”> 1756674607 -0300	commit: Ajutes do Dockerfile
+328759959b56c6ae64348966b45ddad0484a3ffe 1c92dd6310b965651620d8e312b0f424473fa9b7 “carlosrobertodevops” <“carlos.roberto.devops@gmail.com”> 1756674747 -0300	commit: Ajustes da COPY do Dockerfile
+1c92dd6310b965651620d8e312b0f424473fa9b7 1e0d4e63486667ccb1fdfaf32f1ef64b67ad9822 “carlosrobertodevops” <“carlos.roberto.devops@gmail.com”> 1756679383 -0300	commit: Ajustes do docker-compose.yaml
+1e0d4e63486667ccb1fdfaf32f1ef64b67ad9822 f6c38950b7ceeb61bfcd9216eb4ba0bb422349fc “carlosrobertodevops” <“carlos.roberto.devops@gmail.com”> 1756679589 -0300	commit: Ajustes do docker-compose.yaml
+f6c38950b7ceeb61bfcd9216eb4ba0bb422349fc 252bc6f572a2ec9fbc49cdf75e24da36b220e4ac Carlos Roberto <carlos.roberto.devops@gmail.com> 1756680219 -0300	commit: Ajustes do Dockfile
+252bc6f572a2ec9fbc49cdf75e24da36b220e4ac dc95b5d2ffa8935f9cd21af373b50d0f4cea2471 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756734668 -0300	commit: Ajustes no Microservico
+dc95b5d2ffa8935f9cd21af373b50d0f4cea2471 28a4d826fff01d88056c786e6c31ba059efc4ab4 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756736630 -0300	commit: Ajustes geral
+28a4d826fff01d88056c786e6c31ba059efc4ab4 895147389426307a9571b317781c4c7955957e16 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756739594 -0300	commit: Ajustes
+895147389426307a9571b317781c4c7955957e16 085a27cdd22ad34358e9525b4bfbf220920b33bf Carlos Roberto <carlos.roberto.devops@gmail.com> 1756739988 -0300	commit: Ajustes
+085a27cdd22ad34358e9525b4bfbf220920b33bf d8ce9b67c40288cd122e0d936461d9de11dc6842 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756740887 -0300	commit: aAjustes
+d8ce9b67c40288cd122e0d936461d9de11dc6842 2b9461cfe007000f50426799b0c77dbf8178d5f2 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756748575 -0300	commit: Ajustes
+2b9461cfe007000f50426799b0c77dbf8178d5f2 2a2a5ed5ffb9e24e0134e6e6ed10e8354e701dcc Carlos Roberto <carlos.roberto.devops@gmail.com> 1756749323 -0300	commit: Ajustes
+2a2a5ed5ffb9e24e0134e6e6ed10e8354e701dcc 4a2d801bca6fb158fa95f77023cdeaeeb69609fe Carlos Roberto <carlos.roberto.devops@gmail.com> 1756750939 -0300	commit: Ajustes do docker-compose.yaml
+4a2d801bca6fb158fa95f77023cdeaeeb69609fe 52348987cb8f5f2bfbd8c8a6a417a2efdf5cdb9f Carlos Roberto <carlos.roberto.devops@gmail.com> 1756751912 -0300	commit: Ajustes
+52348987cb8f5f2bfbd8c8a6a417a2efdf5cdb9f 393e8bef73b5f7933134481a0403d0f54fa602c1 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756753207 -0300	commit: Ajustes de .env.local
+393e8bef73b5f7933134481a0403d0f54fa602c1 391187a16a3dfd482f747428ce2d4c5577c1bf27 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756759347 -0300	commit: Ajustes do app.py
+391187a16a3dfd482f747428ce2d4c5577c1bf27 a9619cf4081e5e7d9689d4f7d3454725479315d0 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756760065 -0300	commit: Ajustes
+a9619cf4081e5e7d9689d4f7d3454725479315d0 4b5ab46cdd98edefe93c13e10638fe4e2515c878 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756763360 -0300	commit: Ajustes Geral
+4b5ab46cdd98edefe93c13e10638fe4e2515c878 e144eaca4fe04d911a67574bed411f92f722b1e2 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756763471 -0300	commit: Ajustes
+e144eaca4fe04d911a67574bed411f92f722b1e2 3a921c572544c7c10f67862b046614c6846f1ef6 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756763793 -0300	commit: Ajustes
+3a921c572544c7c10f67862b046614c6846f1ef6 f25ae17a11874c468be4c785f68a76d435cc674e Carlos Roberto <carlos.roberto.devops@gmail.com> 1756765184 -0300	commit: Ajustes com o novo start.sh
+f25ae17a11874c468be4c785f68a76d435cc674e f436e1b56766d52ca5ede6256d239552a810ff10 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756767180 -0300	commit: Ajustes de Identação
+f436e1b56766d52ca5ede6256d239552a810ff10 4221bfbca1c77aee72aa110c513eec2095192e8c Carlos Roberto <carlos.roberto.devops@gmail.com> 1756768076 -0300	commit: Ajustes
+4221bfbca1c77aee72aa110c513eec2095192e8c 89346749b28e7456fbc6f6206a91cc8990418ea4 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756899305 -0300	pull: Fast-forward
+89346749b28e7456fbc6f6206a91cc8990418ea4 b9461774b8998fbd863ba8f53594f6fe35c798cd Carlos Roberto <carlos.roberto.devops@gmail.com> 1756909938 -0300	commit: Ajustes geram para v1.7.5.
+b9461774b8998fbd863ba8f53594f6fe35c798cd fed3ebfa6fb4d01885059973f302817030018a67 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756923574 -0300	commit: Ajustes
+fed3ebfa6fb4d01885059973f302817030018a67 4cca2fbbdbcb316659f0475b13e838c112553592 Carlos Roberto <carlos.roberto.devops@gmail.com> 1756930242 -0300	commit: Ajustes das confugurações do pyVis
+4cca2fbbdbcb316659f0475b13e838c112553592 f6738c8cece9bcf7c1fea5c9e17053ac9717c91e Carlos Roberto <carlos.roberto.devops@gmail.com> 1756932884 -0300	commit: Ajustes no endpoint /pyvis

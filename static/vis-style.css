@@ -1,8 +1,48 @@
-:root{--bg:#0b0f19;--fg:#e5e7eb}
-html,body{height:100%;margin:0}
-body{background:#fff;color:#111;font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial}
-body[data-theme="dark"]{background:var(--bg);color:var(--fg)}
-.kg-toolbar{position:fixed;top:.5rem;right:.5rem;z-index:10;display:flex;gap:.5rem;align-items:center;background:rgba(0,0,0,.6);color:#fff;border-radius:8px;padding:.35rem .5rem}
-.kg-toolbar h4{margin:0 .4rem 0 0;font-weight:600}
-.kg-toolbar button{cursor:pointer}
-.badge{background:#10b981;color:#fff;border-radius:9999px;padding:.1rem .4rem;font-size:12px}
+html,
+body,
+#mynetwork {
+  height: 100%;
+  margin: 0;
+}
+body {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+    sans-serif;
+  background: #fff;
+  color: #111;
+}
+body[data-theme="dark"] {
+  background: #0b0f19;
+  color: #e6e9ef;
+}
+.kg-toolbar {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.kg-toolbar h4 {
+  margin: 0 8px 0 0;
+  display: inline;
+  font-weight: 600;
+}
+.kg-toolbar button {
+  margin-left: 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #fff;
+  color: #111;
+}
+.badge {
+  margin-left: 10px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: #ffbe0b;
+  color: #111;
+  font-size: 12px;
+}

@@ -1,7 +1,6 @@
 // static/vis-embed.js (v1.1) — suporta 'server' (embed) e 'client' (fetch) + limpeza de labels
 (function () {
   const container = document.getElementById('mynetwork');
-  if (!container) return;
   const source = container.getAttribute('data-source') || 'server';
   const endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
   const debug = container.getAttribute('data-debug') === 'true';
@@ -18,11 +17,12 @@
   const url = endpoint + '?' + qs.toString();
 
   const hashColor = (str) => {
-    let h = 0; const s = String(str || '');
+    let h = 0; const s = String(str);
     for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; }
     const hue = Math.abs(h) % 360; return `hsl(${hue},70%,50%)`;
   };
 
+  // --- limpeza de label "{...}" -> "..."
   const isPgTextArray = (s) => {
     s = (s || '').trim();
     return s.length >= 2 && s[0] === '{' && s[s.length - 1] === '}';
@@ -33,6 +33,7 @@
     if (!isPgTextArray(s)) return s;
     const inner = s.slice(1, -1);
     if (!inner) return '';
+    // fallback simples (sem CSV parser no front):
     return inner.replace(/(^|,)\s*"?null"?\s*(?=,|$)/gi, '')
                 .replace(/"/g, '')
                 .split(',')
@@ -71,8 +72,12 @@
     const nodesRaw = (data.nodes || []).filter(n => n && n.id);
     const edgesRaw = (data.edges || []).filter(e => e && e.source && e.target);
 
+    // normaliza label aqui também (caso source=client)
     const nodes = nodesRaw.map(n => ({ ...n, label: cleanLabel(n.label) || String(n.id) }));
 
+    try {
+      console.log('[visjs] mode=', source, '| nodes=', nodes.length, '| edges=', edgesRaw.length);
+    } catch (_) {}
     if (!nodes.length) { showEmpty('Nenhum dado para exibir (nodes=0).'); return; }
 
     const nodesVis = nodes.map(n => ({
@@ -90,6 +95,7 @@
       title: e.relation ? `${e.relation} (w=${e.weight ?? 1})` : `w=${e.weight ?? 1}`
     }));
 
+    // valor por grau se não vier 'size'
     const hasSize = nodesVis.some(n => typeof n.value === 'number');
     if (!hasSize) {
       const deg = degreeMap(nodesVis, edgesVis);
