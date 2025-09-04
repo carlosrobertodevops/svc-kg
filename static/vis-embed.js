@@ -9,16 +9,19 @@
   const DEBUG = (el.getAttribute("data-debug") || "false") === "true";
   const Q = (el.getAttribute("data-query") || "").trim();
 
-  const CV_COLOR = "#d32f2f";      // vermelho
-  const PCC_COLOR = "#0d47a1";     // azul escuro
-  const DEFAULT_NODE_BORDER = 1;
+  // ícone padrão do projeto
+  const DEFAULT_ICON_URL = "/static/icons/person.svg";
+
+  // cores por facção
+  const CV_COLOR = "#d32f2f";
+  const PCC_COLOR = "#0d47a1";
 
   const EDGE_COLORS = {
-    "PERTENCE_A": "#9e9e9e",
-    "EXERCE": "#00796b",
-    "FUNCAO_DA_FACCAO": "#ef6c00",
-    "CO_FACCAO": "#8e24aa",
-    "CO_FUNCAO": "#546e7a",
+    PERTENCE_A: "#9e9e9e",
+    EXERCE: "#00796b",
+    FUNCAO_DA_FACCAO: "#ef6c00",
+    CO_FACCAO: "#8e24aa",
+    CO_FUNCAO: "#546e7a",
   };
 
   const bg = THEME === "dark" ? "#0b0f19" : "#ffffff";
@@ -59,44 +62,45 @@
     const nodes = [];
     const edges = [];
 
-    // indexa rótulo de nós facção para lookup por id -> nome
+    // indexa rótulos das facções para colorir por nome
     const faccaoLabelById = {};
-    (raw.nodes || []).forEach(n => {
+    (raw.nodes || []).forEach((n) => {
       if (!n || n.type !== "faccao") return;
       const id = String(n.id);
       faccaoLabelById[id] = String(n.label || "").trim();
     });
 
-    (raw.nodes || []).forEach(n => {
+    (raw.nodes || []).forEach((n) => {
       if (!n || n.id == null) return;
       const id = String(n.id);
       const label = String(n.label || id);
       const group = String(n.group || n.faccao_id || n.type || "0");
       const photo = resolvePhotoPath(n.photo_url || n.foto_path);
 
-      // cor por facção: procura pelo label da facção associada, senão por group string
       let color = null;
-      const facName = faccaoLabelById[group] ? faccaoLabelById[group].toUpperCase() : String(group || "").toUpperCase();
+      const facName = faccaoLabelById[group]
+        ? faccaoLabelById[group].toUpperCase()
+        : String(group || "").toUpperCase();
       color = faccaoColorByName(facName) || hashColor(group);
 
       const node = {
         id,
         label,
         title: label,
-        borderWidth: DEFAULT_NODE_BORDER,
+        borderWidth: 1,
         color,
+        _origColor: color,
         shape: "circularImage",
-        image: photo || "/static/icons/person.svg",
-        // guarda original para animações de busca
-        _origColor: color
+        image: photo || DEFAULT_ICON_URL,
+        brokenImage: DEFAULT_ICON_URL
       };
-      // mantém type para busca (membro/facção/função)
       if (n.type) node.type = n.type;
+
       nodes.push(node);
     });
 
-    const validIds = new Set(nodes.map(n => String(n.id)));
-    (raw.edges || []).forEach(e => {
+    const validIds = new Set(nodes.map((n) => String(n.id)));
+    (raw.edges || []).forEach((e) => {
       if (!e) return;
       const a = String(e.source);
       const b = String(e.target);
@@ -107,9 +111,9 @@
         from: a,
         to: b,
         color,
-        width: 1,          // linhas finas
+        width: 1,
         arrows: "to",
-        title: rel ? `${rel}` : undefined
+        title: rel || undefined,
       });
     });
 
@@ -123,9 +127,15 @@
       return JSON.parse(block.textContent || "{}");
     } else {
       const url = new URL(ENDPOINT, location.origin);
-      // repassa params padrão
-      for (const k of ["faccao_id", "include_co", "max_pairs", "max_nodes", "max_edges", "cache"]) {
-        const v = (new URLSearchParams(location.search)).get(k);
+      for (const k of [
+        "faccao_id",
+        "include_co",
+        "max_pairs",
+        "max_nodes",
+        "max_edges",
+        "cache",
+      ]) {
+        const v = new URLSearchParams(location.search).get(k);
         if (v != null) url.searchParams.set(k, v);
       }
       if (Q) url.searchParams.set("q", Q);
@@ -143,13 +153,14 @@
     const r = document.getElementById("btn-reload");
 
     function colorObj(orig, opacity) {
-      if (typeof orig === "object" && orig) return Object.assign({}, orig, { opacity });
+      if (typeof orig === "object" && orig)
+        return Object.assign({}, orig, { opacity });
       return {
         background: orig || "#90a4ae",
         border: orig || "#90a4ae",
         highlight: { background: orig || "#90a4ae", border: orig || "#90a4ae" },
         hover: { background: orig || "#90a4ae", border: orig || "#90a4ae" },
-        opacity
+        opacity,
       };
     }
 
@@ -157,22 +168,22 @@
       const all = nodesDS.get();
       const t = String(txt || "").trim().toLowerCase();
 
-      // reset opacidade
-      all.forEach(n => {
+      // reset
+      all.forEach((n) => {
         const base = n._origColor || n.color || "#90a4ae";
         nodesDS.update({ id: n.id, color: colorObj(base, 1) });
       });
 
       if (!t) return;
 
-      const hits = all.filter(n => {
+      const hits = all.filter((n) => {
         const lab = String(n.label || "").toLowerCase();
         const typ = String(n.type || "").toLowerCase();
         return lab.includes(t) || typ.includes(t) || String(n.id) === t;
       });
 
-      const hitIds = new Set(hits.map(h => h.id));
-      all.forEach(n => {
+      const hitIds = new Set(hits.map((h) => h.id));
+      all.forEach((n) => {
         if (!hitIds.has(n.id)) {
           const base = n._origColor || n.color || "#90a4ae";
           nodesDS.update({ id: n.id, color: colorObj(base, 0.25) });
@@ -180,21 +191,36 @@
       });
 
       if (hits.length) {
-        network.fit({ nodes: hits.map(h => h.id), animation: { duration: 300 } });
+        network.fit({ nodes: hits.map((h) => h.id), animation: { duration: 300 } });
       }
     }
 
     if (p) p.onclick = () => window.print();
     if (r) r.onclick = () => location.reload();
     if (b && q) b.onclick = () => runSearch(q.value);
-    if (c && q) c.onclick = () => { q.value = ""; runSearch(""); };
+    if (c && q) c.onclick = () => {
+      q.value = "";
+      runSearch("");
+    };
   }
 
   (async function main() {
     try {
-      const raw = await getData();
-      const visData = buildVisData(raw);
+      if (typeof vis === "undefined" || !vis.Network) {
+        el.innerHTML =
+          "<pre style='padding:12px;color:#b71c1c'>vis-network não carregou. Verifique conectividade ao CDN ou arquivos locais.</pre>";
+        return;
+      }
 
+      const raw = await getData();
+      if (!raw || !raw.nodes || !raw.nodes.length) {
+        el.innerHTML =
+          "<pre style='padding:12px'>Sem dados para exibir (nodes=0).</pre>";
+        if (DEBUG) console.log("payload vazio", raw);
+        return;
+      }
+
+      const visData = buildVisData(raw);
       const nodes = new vis.DataSet(visData.nodes);
       const edges = new vis.DataSet(visData.edges);
 
@@ -207,7 +233,7 @@
           dragView: false,
           zoomView: true,
           multiselect: true,
-          navigationButtons: true
+          navigationButtons: true,
         },
         manipulation: { enabled: false },
         physics: {
@@ -218,23 +244,19 @@
             centralGravity: 0.2,
             springLength: 120,
             springConstant: 0.04,
-            avoidOverlap: 0.2
-          }
+            avoidOverlap: 0.2,
+          },
         },
         nodes: { borderWidth: 1 },
-        edges: { smooth: false, width: 1 }
+        edges: { smooth: false, width: 1 },
       };
 
       const network = new vis.Network(container, data, options);
-
-      // após estabilizar, desliga física => arrastar só o nó, não o grafo inteiro
       network.once("stabilized", () => network.setOptions({ physics: false }));
 
-      // guarda cor original (para busca)
-      nodes.get().forEach(n => {
-        if (n._origColor == null) {
-          nodes.update({ id: n.id, _origColor: n.color });
-        }
+      // guarda a cor original para busca
+      nodes.get().forEach((n) => {
+        if (n._origColor == null) nodes.update({ id: n.id, _origColor: n.color });
       });
 
       initUI(network, nodes);
@@ -245,7 +267,10 @@
       }
     } catch (e) {
       console.error(e);
-      el.innerHTML = "<pre style='padding:12px'>Falha ao carregar grafo: " + String(e) + "</pre>";
+      el.innerHTML =
+        "<pre style='padding:12px;color:#b71c1c'>Falha ao carregar grafo: " +
+        String(e) +
+        "</pre>";
     }
   })();
 })();
