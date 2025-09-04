@@ -1,4 +1,4 @@
-// static/vis-embed.js
+// // static/vis-embed.js
 (function () {
   if (!document.currentScript) return;
   const container = document.getElementById('mynetwork');
@@ -13,8 +13,6 @@
     'CO_FACCAO': '#8e24aa',
     'CO_FUNCAO': '#546e7a'
   };
-  // Preferimos SVG; PNG alternativo disponível em /static/icons/person.png
-  const ICON_PERSON = '/static/icons/person.svg';
 
   function hashColor(s) {
     s = String(s || ''); let h = 0;
@@ -57,11 +55,6 @@
     const base = EDGE_COLORS[relation] || '#90a4ae';
     return { color: base };
   }
-  const isPersonType = (t) => {
-    t = String(t || '').toLowerCase();
-    return t.includes('pessoa') || t.includes('membro');
-  };
-
   function attachToolbar(net, nc, ec, dsNodes) {
     const q = document.getElementById('kg-search');
     const btnPrint = document.getElementById('btn-print');
@@ -100,7 +93,6 @@
   qs.set('max_nodes', params.get('max_nodes') ?? '2000');
   qs.set('max_edges', params.get('max_edges') ?? '4000');
   qs.set('cache', params.get('cache') ?? 'false');
-  qs.set('enrich_photos', params.get('enrich_photos') ?? 'true');
 
   const endpoint = (container.getAttribute('data-endpoint') || '/v1/graph/membros') + '?' + qs.toString();
   fetch(endpoint, { headers: { 'Accept': 'application/json' } })
@@ -118,11 +110,10 @@
           const label = cleanLabel(n.label) || id;
           const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
           const value = (typeof n.size === 'number') ? n.size : undefined;
-          const photo = n.photo_url && (/^https?:\/\//i.test(n.photo_url) || n.photo_url.startsWith('/assets/')) ? n.photo_url : null;
+          const photo = n.photo_url && /^https?:\/\//i.test(n.photo_url) ? n.photo_url : null;
           const color = colorForNode({ group, type: n.type }, faccaoColorById);
           const base = { id, label, group, value, color, borderWidth: 1 };
           if (photo) { base.shape = 'circularImage'; base.image = photo; }
-          else if (isPersonType(n.type)) { base.shape = 'image'; base.image = ICON_PERSON; }
           else { base.shape = 'dot'; }
           return base;
         });
@@ -183,8 +174,7 @@
       };
 
       const net = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
-      // Desliga física após estabilização -> arrastar não puxa o grafo todo
-      net.once('stabilizationIterationsDone', () => { net.setOptions({ physics: false }); net.fit({ animation: { duration: 300 } }); });
+      net.once('stabilizationIterationsDone', () => net.fit({ animation: { duration: 300 } }));
       net.on('doubleClick', () => net.fit({ animation: { duration: 300 } }));
       attachToolbar(net, nodes.length, edges.length, dsNodes);
     })
