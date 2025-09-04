@@ -21,36 +21,38 @@ APP_ENV = os.getenv("APP_ENV", "production")
 PORT = int(os.getenv("PORT", "8080"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
 
-CORS_ALLOW_ORIGINS = [
-    o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", "*").split(",")
-]
-CORS_ALLOW_METHODS = [
-    m.strip() for m in os.getenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS").split(",")
-]
-CORS_ALLOW_HEADERS = [
-    h.strip()
-    for h in os.getenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type").split(",")
-]
+CORS_ALLOW_ORIGINS = [o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", "*").split(",")]
+CORS_ALLOW_METHODS = [m.strip() for m in os.getenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS").split(",")]
+CORS_ALLOW_HEADERS = [h.strip() for h in os.getenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type").split(",")]
 CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() == "true"
 
 ENABLE_REDIS_CACHE = os.getenv("ENABLE_REDIS_CACHE", "false").lower() == "true"
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 CACHE_API_TTL = int(os.getenv("CACHE_API_TTL", "60"))
 
+# Backends (Supabase/PostgREST)
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "").strip()
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "").strip()
+# Para ambiente local (PostgREST), alguns setups usam SUPABASE_KEY:
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
 SUPABASE_RPC_FN = os.getenv("SUPABASE_RPC_FN", "get_graph_membros")
 SUPABASE_TIMEOUT = int(os.getenv("SUPABASE_TIMEOUT", "15"))
 
+# Fotos dos membros (quando o RPC retornar esses campos)
 MEMBERS_TABLE = os.getenv("MEMBERS_TABLE", "membros")
 MEMBERS_ID_COL = os.getenv("MEMBERS_ID_COL", "id")
-MEMBERS_PHOTO_COL = os.getenv("MEMBERS_PHOTO_COL", "photo_url")  # ou "foto_path"
+MEMBERS_PHOTO_COL = os.getenv("MEMBERS_PHOTO_COL", "photo_url")  # ex.: "photo_url" ou "foto_path"
 
 # =========================
 # App
 # =========================
-app = FastAPI(title="svc-kg", version="1.7.12", docs_url="/docs", redoc_url="/redoc")
+app = FastAPI(
+    title="svc-kg",
+    version="1.7.13",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
@@ -70,11 +72,9 @@ REDIS = None
 if ENABLE_REDIS_CACHE:
     try:
         import redis.asyncio as aioredis
-
         REDIS = aioredis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
     except Exception:
         REDIS = None
-
 
 # =========================
 # Utils / Errors
@@ -85,17 +85,12 @@ class GraphFetchError(Exception):
         self.message = message
         self.status_code = status_code
 
-
 def orjson_dumps(v, *, default):
     return orjson.dumps(v, default=default).decode()
 
-
 def make_cache_key(prefix: str, params: Dict[str, Any]) -> str:
-    h = hashlib.sha256(
-        json.dumps(params, sort_keys=True, ensure_ascii=False).encode("utf-8")
-    ).hexdigest()
+    h = hashlib.sha256(json.dumps(params, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
     return f"{prefix}:{h}"
-
 
 async def cache_get(key: str) -> Optional[Dict[str, Any]]:
     if not REDIS:
@@ -103,30 +98,23 @@ async def cache_get(key: str) -> Optional[Dict[str, Any]]:
     val = await REDIS.get(key)
     return json.loads(val) if val else None
 
-
 async def cache_set(key: str, value: Dict[str, Any], ttl: int = CACHE_API_TTL):
     if not REDIS:
         return
     await REDIS.setex(key, ttl, json.dumps(value, ensure_ascii=False))
 
-
 def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
     """Converte rótulos vindos como '{A,B}' / '{"X"}' em 'A, B' / 'X'."""
-
     def clean_label(raw):
         if raw is None:
             return ""
-        s = str(raw).strip()
+        s = str(raw).trim() if hasattr(raw, "trim") else str(raw).strip()
         if len(s) >= 2 and s[0] == "{" and s[-1] == "}":
             inner = s[1:-1]
             if not inner:
                 return ""
-            inner = inner.replace('"', "")
-            parts = [
-                p.strip()
-                for p in inner.split(",")
-                if p.strip().lower() != "null" and p.strip() != ""
-            ]
+            inner = inner.replace('"', '')
+            parts = [p.strip() for p in inner.split(",") if p.strip().lower() != "null" and p.strip() != ""]
             return ", ".join(parts)
         return s
 
@@ -138,24 +126,16 @@ def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
 
     return {"nodes": nodes, "edges": data.get("edges", [])}
 
-
-def truncate_preview(
-    data: Dict[str, Any], max_nodes: int, max_edges: int
-) -> Dict[str, Any]:
+def truncate_preview(data: Dict[str, Any], max_nodes: int, max_edges: int) -> Dict[str, Any]:
     nodes = data.get("nodes", [])
     edges = data.get("edges", [])
     if len(nodes) > max_nodes:
         keep_ids = {str(n["id"]) for n in nodes[:max_nodes]}
         nodes = nodes[:max_nodes]
-        edges = [
-            e
-            for e in edges
-            if str(e.get("source")) in keep_ids and str(e.get("target")) in keep_ids
-        ]
+        edges = [e for e in edges if str(e.get("source")) in keep_ids and str(e.get("target")) in keep_ids]
     if len(edges) > max_edges:
         edges = edges[:max_edges]
     return {"nodes": nodes, "edges": edges}
-
 
 def color_for_label(label: str) -> Optional[str]:
     """CV → vermelho, 'PCC' → azul-escuro; senão None (usa hash)."""
@@ -168,110 +148,67 @@ def color_for_label(label: str) -> Optional[str]:
         return "#0d47a1"  # azul-escuro
     return None
 
-
 def hash_color(s: str) -> str:
     h = hashlib.sha1(str(s).encode()).hexdigest()
     hue = int(h[:2], 16) % 360
     return f"hsl({hue},70%,50%)"
 
-
 # =========================
-# Backend (Supabase/PostgREST) com Fallback de Parâmetros
+# Backend (Supabase/PostgREST) com Fallback de Parâmetros e Credenciais
 # =========================
-def _rpc_headers() -> Dict[str, str]:
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
-    token = SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY
-    if token:
-        headers["apikey"] = token
-        headers["Authorization"] = f"Bearer {token}"
-    return headers
-
-
 def _rpc_url() -> str:
     return f"{SUPABASE_URL.rstrip('/')}/rpc/{SUPABASE_RPC_FN}"
 
+def _rpc_header_variants() -> List[Dict[str, str]]:
+    """
+    Tenta na ordem:
+    1) SERVICE key (Supabase)
+    2) ANON key (Supabase)
+    3) SUPABASE_KEY (ambientes PostgREST locais)
+    4) Sem Authorization (PostgREST sem JWT)
+    """
+    variants = []
+    if SUPABASE_SERVICE_KEY:
+        variants.append({
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "apikey": SUPABASE_SERVICE_KEY,
+            "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        })
+    if SUPABASE_ANON_KEY:
+        variants.append({
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+        })
+    if SUPABASE_KEY:
+        variants.append({
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+        })
+    # sem auth
+    variants.append({
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    })
+    return variants
 
-def _payload_variants(
-    faccao_id: Optional[int], include_co: bool, max_pairs: int
-) -> List[Tuple[str, Dict[str, Any]]]:
+def _payload_variants(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> List[Dict[str, Any]]:
     """
     Retorna variantes de payload para máxima compatibilidade:
     1) p_faccao_id / p_include_co / p_max_pairs
     2) faccao_id / include_co / max_pairs
     """
     return [
-        (
-            "p_",
-            {
-                "p_faccao_id": faccao_id,
-                "p_include_co": include_co,
-                "p_max_pairs": max_pairs,
-            },
-        ),
-        (
-            "no_p",
-            {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs},
-        ),
+        {"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs},
+        {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs},
     ]
 
-
-def _looks_like_pgrst202(text: str) -> bool:
-    return "PGRST202" in text or "Could not find the function" in text
-
-
-async def fetch_graph_raw(
-    faccao_id: Optional[int], include_co: bool, max_pairs: int
-) -> Dict[str, Any]:
-    """
-    Chama o RPC com fallback de forma automática.
-    Erros são convertidos para GraphFetchError com detalhes.
-    """
-    if not SUPABASE_URL:
-        # Sem backend: retorna vazio
-        return {"nodes": [], "edges": []}
-
-    url = _rpc_url()
-    headers = _rpc_headers()
-
-    last_err_text = None
-    for tag, payload in _payload_variants(faccao_id, include_co, max_pairs):
-        try:
-            r = await HTTP_CLIENT.post(url, headers=headers, json=payload)
-            if r.status_code == 200:
-                data = r.json()
-                # Aceita {nodes, edges} ou lista/objeto compatível
-                if isinstance(data, dict) and ("nodes" in data and "edges" in data):
-                    return data
-                # Alguns RPCs retornam já no formato certinho
-                return (
-                    {"nodes": data.get("nodes", []), "edges": data.get("edges", [])}
-                    if isinstance(data, dict)
-                    else {"nodes": [], "edges": []}
-                )
-            else:
-                txt = await _safe_text(r)
-                last_err_text = f"{r.status_code}: {txt}"
-                # se for mismatch de assinatura, tenta próxima variante
-                if _looks_like_pgrst202(txt):
-                    continue
-                # qualquer outro erro: aborta
-                raise GraphFetchError(
-                    f"graph_fetch_error: {last_err_text}", status_code=502
-                )
-        except httpx.HTTPError as he:
-            raise GraphFetchError(f"graph_fetch_http_error: {str(he)}", status_code=502)
-
-    # Se chegou aqui, todas variantes falharam (provável PGRST202)
-    raise GraphFetchError(
-        "graph_fetch_error: 404: Supabase RPC falhou — verifique o nome/sigantura do RPC "
-        f"({SUPABASE_RPC_FN}) e os parâmetros (com ou sem prefixo 'p_'). "
-        f"Detalhes: {last_err_text or 'sem corpo'}",
-        status_code=502,
-    )
-
+def _looks_signature_miss(text: str) -> bool:
+    return ("PGRST202" in text) or ("Could not find the function" in text)
 
 async def _safe_text(resp: httpx.Response) -> str:
     try:
@@ -282,20 +219,72 @@ async def _safe_text(resp: httpx.Response) -> str:
         except Exception:
             return "<no-body>"
 
+async def fetch_graph_raw(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> Dict[str, Any]:
+    """
+    Chama o RPC com fallback de CREDENCIAIS (para evitar 401)
+    e fallback de PARÂMETROS (para evitar PGRST202).
+    """
+    if not SUPABASE_URL:
+        return {"nodes": [], "edges": []}
 
-async def fetch_graph_sanitized(
-    faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool = True
-) -> Dict[str, Any]:
-    cache_key = make_cache_key(
-        "kg:graph",
-        {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs},
-    )
+    url = _rpc_url()
+    last_err_text = None
+    last_status = None
+
+    for headers in _rpc_header_variants():
+        for payload in _payload_variants(faccao_id, include_co, max_pairs):
+            try:
+                r = await HTTP_CLIENT.post(url, headers=headers, json=payload)
+                if r.status_code == 200:
+                    data = r.json()
+                    if isinstance(data, dict) and ("nodes" in data and "edges" in data):
+                        return data
+                    return {"nodes": data.get("nodes", []) if isinstance(data, dict) else [],
+                            "edges": data.get("edges", []) if isinstance(data, dict) else []}
+                # captura o corpo
+                txt = await _safe_text(r)
+                last_err_text = txt
+                last_status = r.status_code
+
+                # 401 → tenta próximo header (outra credencial)
+                if r.status_code == 401:
+                    break  # sai do loop de payload e tenta próximo header
+
+                # 404 / PGRST202 → tenta próxima variante de payload
+                if r.status_code in (404, 400) and _looks_signature_miss(txt):
+                    continue  # próxima variante de payload
+
+                # outros erros → aborta com detalhe
+                raise GraphFetchError(f"graph_fetch_error: {r.status_code}: {txt}", status_code=502)
+
+            except httpx.HTTPError as he:
+                raise GraphFetchError(f"graph_fetch_http_error: {str(he)}", status_code=502)
+
+        # se 401, continua para próximo header
+        if last_status == 401:
+            continue
+        # se não foi 401, não tente novos headers sem necessidade
+        if last_status and last_status != 401:
+            break
+
+    # se chegou aqui, falhou todas as opções
+    detail = last_err_text or "sem detalhe"
+    status = last_status or 502
+    raise GraphFetchError(f"graph_fetch_error: {status}: {detail}", status_code=502)
+
+async def fetch_graph_sanitized(faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool=True) -> Dict[str, Any]:
+    cache_key = make_cache_key("kg:graph", {
+        "faccao_id": faccao_id,
+        "include_co": include_co,
+        "max_pairs": max_pairs
+    })
     if use_cache:
         hit = await cache_get(cache_key)
         if hit:
             return hit
 
     raw = await fetch_graph_raw(faccao_id, include_co, max_pairs)
+
     # saneia ids como string
     nodes = []
     seen = set()
@@ -306,16 +295,15 @@ async def fetch_graph_sanitized(
         if not _id or _id in seen:
             continue
         seen.add(_id)
-        nodes.append(
-            {
-                "id": _id,
-                "label": n.get("label") or "",
-                "type": n.get("type") or n.get("tipo") or "membro",
-                "group": n.get("group") or n.get("faccao_id") or "",
-                "size": n.get("size"),
-                "photo_url": n.get("photo_url") or n.get("foto_path") or "",
-            }
-        )
+        nodes.append({
+            "id": _id,
+            "label": n.get("label") or "",
+            "type": n.get("type") or n.get("tipo") or "membro",
+            "group": n.get("group") or n.get("faccao_id") or "",
+            "size": n.get("size"),
+            # aceita "photo_url" OU "foto_path"
+            "photo_url": n.get("photo_url") or n.get("foto_path") or ""
+        })
 
     valid_ids = {n["id"] for n in nodes}
     edges = []
@@ -326,21 +314,18 @@ async def fetch_graph_sanitized(
             continue
         if s not in valid_ids or t not in valid_ids:
             continue
-        edges.append(
-            {
-                "source": s,
-                "target": t,
-                "weight": e.get("weight", 1.0),
-                "relation": e.get("relation") or e.get("relacao") or "",
-            }
-        )
+        edges.append({
+            "source": s,
+            "target": t,
+            "weight": e.get("weight", 1.0),
+            "relation": e.get("relation") or e.get("relacao") or ""
+        })
 
     out = {"nodes": nodes, "edges": edges}
     out = normalize_graph_labels(out)
     if use_cache:
         await cache_set(cache_key, out, CACHE_API_TTL)
     return out
-
 
 # =========================
 # Health / Status
@@ -349,11 +334,9 @@ async def fetch_graph_sanitized(
 async def health():
     return PlainTextResponse("ok", status_code=200)
 
-
 @app.get("/live", summary="Liveness probe")
 async def live():
     return PlainTextResponse("alive", status_code=200)
-
 
 @app.get("/ready", summary="Readiness (backend/cache)")
 async def ready():
@@ -365,7 +348,7 @@ async def ready():
             status["redis"] = bool(pong)
         except Exception:
             status["redis"] = False
-    # supabase
+    # backend
     try:
         _ = await fetch_graph_raw(None, True, 1)
         status["backend_ok"] = True
@@ -374,7 +357,6 @@ async def ready():
     code = 200 if status["backend_ok"] else 503
     return JSONResponse(status, status_code=code)
 
-
 @app.get("/status", summary="Status detalhado do microserviço")
 async def status():
     info = {
@@ -382,19 +364,23 @@ async def status():
         "version": app.version,
         "env": APP_ENV,
         "time_utc": datetime.now(timezone.utc).isoformat(),
-        "cache": {"enabled": ENABLE_REDIS_CACHE, "redis_url": REDIS_URL, "ok": False},
+        "cache": {
+            "enabled": ENABLE_REDIS_CACHE,
+            "redis_url": REDIS_URL,
+            "ok": False
+        },
         "backend": {
-            "type": "supabase",
+            "type": "supabase/postgrest",
             "url": SUPABASE_URL,
             "rpc_function": SUPABASE_RPC_FN,
-            "ok": False,
+            "ok": False
         },
         "openapi": {
             "json": "/openapi.json",
             "yaml": "/openapi.yaml",
             "ui_swagger": "/docs",
-            "ui_redoc": "/redoc",
-        },
+            "ui_redoc": "/redoc"
+        }
     }
     # redis
     if REDIS:
@@ -410,34 +396,31 @@ async def status():
         info["backend"]["ok"] = False
     return JSONResponse(info)
 
-
 # =========================
-# API JSON
+# API JSON (com alias curto)
 # =========================
 @app.get("/v1/graph/membros", summary="Grafo (JSON)")
+@app.get("/membros", include_in_schema=False)
 async def graph_membros(
     faccao_id: Optional[int] = Query(default=None),
     include_co: bool = Query(default=True),
     max_pairs: int = Query(default=8000, ge=1, le=200000),
     cache: bool = Query(default=True),
     max_nodes: int = Query(default=2000, ge=100, le=20000),
-    max_edges: int = Query(default=4000, ge=100, le=200000),
+    max_edges: int = Query(default=4000, ge=100, le=200000)
 ):
     """
     Retorna o grafo em JSON, já normalizado e truncado.
     Em caso de erro do backend, retorna 502 com detail descritivo.
     """
     try:
-        data = await fetch_graph_sanitized(
-            faccao_id, include_co, max_pairs, use_cache=cache
-        )
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
         data = truncate_preview(data, max_nodes, max_edges)
         return JSONResponse(data, dumps=orjson_dumps, media_type="application/json")
     except GraphFetchError as ge:
         return JSONResponse({"detail": ge.message}, status_code=ge.status_code)
     except Exception as e:
         return JSONResponse({"detail": f"unexpected_error: {str(e)}"}, status_code=500)
-
 
 # =========================
 # Template helper (sem f-string — evita conflitos com { })
@@ -448,15 +431,12 @@ def render_template(src: str, **kw) -> str:
         out = out.replace(f"%%{k}%%", str(v))
     return out
 
-
 # =========================
 # VIS.JS VIEWER (com busca, fotos, cores CV/PCC)
 # =========================
-@app.get(
-    "/v1/vis/visjs",
-    response_class=HTMLResponse,
-    summary="Visualização vis-network (com busca, fotos, CV/PCC)",
-)
+@app.get("/v1/vis/visjs", response_class=HTMLResponse,
+         summary="Visualização vis-network (com busca, fotos, CV/PCC)")
+@app.get("/visjs", include_in_schema=False)
 async def vis_visjs(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -468,29 +448,23 @@ async def vis_visjs(
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = Query(default="Knowledge Graph (vis.js)"),
     debug: bool = Query(default=False),
-    source: str = Query(default="server", pattern="^(server|client)$"),
+    source: str = Query(default="server", pattern="^(server|client)$")
 ):
     # Assets locais (sem CDN)
     js_href = "/static/vendor/vis-network.min.js"
     css_href = "/static/vendor/vis-network.min.css"
-    csp = (
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; "
-        "script-src 'self' 'unsafe-inline'; img-src 'self' data: *; "
-        "font-src 'self' data:; connect-src 'self';"
-    )
+    csp = ("default-src 'self'; style-src 'self' 'unsafe-inline'; "
+           "script-src 'self' 'unsafe-inline'; img-src 'self' data: *; "
+           "font-src 'self' data:; connect-src 'self';")
 
     embedded_block = ""
     if source == "server":
         try:
-            data = await fetch_graph_sanitized(
-                faccao_id, include_co, max_pairs, use_cache=cache
-            )
+            data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
             out = truncate_preview(data, max_nodes, max_edges)
             out = normalize_graph_labels(out)
             json_str = json.dumps(out, ensure_ascii=False)
-            embedded_block = (
-                f'<script id="__KG_DATA__" type="application/json">{json_str}</script>'
-            )
+            embedded_block = f'<script id="__KG_DATA__" type="application/json">{json_str}</script>'
         except GraphFetchError as ge:
             err_html = f"<pre style='padding:12px;color:#b00020'>Erro backend: {ge.message}</pre>"
             embedded_block = f'<script id="__KG_DATA__" type="application/json">{{"nodes":[],"edges":[]}}</script>{err_html}'
@@ -608,7 +582,7 @@ async def vis_visjs(
           const shape = n.photo_url ? 'circularImage' : 'dot';
           const image = n.photo_url || undefined;
           const value = (typeof n.size==='number') ? n.size : undefined;
-          return { id:String(n.id), label, group:String(n.group ?? n.type ?? '0'), value, color:baseColor, __baseColor:baseColor, shape, image };
+          return { id:String(n.id), label, group:String(n.group ?? n.type ?? '0'), value, color:baseColor, __baseColor:baseColor, shape, image, physics:true };
         });
         const edges=(data.edges||[]).filter(e=>e&&e.source&&e.target).map(e=>({
           from:String(e.source), to:String(e.target),
@@ -635,7 +609,11 @@ async def vis_visjs(
           edges:{ smooth:false, width:1, arrows:{ to:{enabled:true, scaleFactor:0.6} } }
         };
         const net=new vis.Network(container,{nodes:dsNodes, edges:dsEdges},options);
-        net.once('stabilizationIterationsDone',()=>net.fit({animation:{duration:300}}));
+        net.once('stabilizationIterationsDone',()=>{
+          // congela física: agora só o nó arrastado se move, o grafo fica no lugar
+          net.setOptions({physics:false});
+          net.fit({animation:{duration:300}});
+        });
         net.on('doubleClick',()=>net.fit({animation:{duration:300}}));
         attachToolbar(net,dsNodes,dsEdges);
       }
@@ -687,15 +665,12 @@ async def vis_visjs(
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
 
-
 # =========================
 # PYVIS VIEWER (com busca, fotos, cores CV/PCC)
 # =========================
-@app.get(
-    "/v1/vis/pyvis",
-    response_class=HTMLResponse,
-    summary="Visualização PyVis (com busca, fotos, CV/PCC)",
-)
+@app.get("/v1/vis/pyvis", response_class=HTMLResponse,
+         summary="Visualização PyVis (com busca, fotos, CV/PCC)")
+@app.get("/pyvis", include_in_schema=False)
 async def vis_pyvis(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -706,7 +681,7 @@ async def vis_pyvis(
     cache: bool = Query(default=True),
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = Query(default="Knowledge Graph (PyVis)"),
-    debug: bool = Query(default=False),
+    debug: bool = Query(default=False)
 ):
     try:
         from pyvis.network import Network
@@ -715,21 +690,13 @@ async def vis_pyvis(
 
     # 1) Busca os dados
     try:
-        data = await fetch_graph_sanitized(
-            faccao_id, include_co, max_pairs, use_cache=cache
-        )
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
         data = truncate_preview(data, max_nodes, max_edges)
         data = normalize_graph_labels(data)
     except GraphFetchError as ge:
-        return HTMLResponse(
-            f"<pre style='padding:12px;color:#b00020'>Erro backend: {ge.message}</pre>",
-            status_code=502,
-        )
+        return HTMLResponse(f"<pre style='padding:12px;color:#b00020'>Erro backend: {ge.message}</pre>", status_code=502)
     except Exception as e:
-        return HTMLResponse(
-            f"<pre style='padding:12px;color:#b00020'>Erro inesperado: {str(e)}</pre>",
-            status_code=500,
-        )
+        return HTMLResponse(f"<pre style='padding:12px;color:#b00020'>Erro inesperado: {str(e)}</pre>", status_code=500)
 
     # 2) Monta o network PyVis
     height = "92vh"
@@ -737,15 +704,8 @@ async def vis_pyvis(
     bgcolor = "#0b0f19" if theme == "dark" else "#ffffff"
     font_color = "#e6edf7" if theme == "dark" else "#222"
 
-    net = Network(
-        height=height,
-        width=width,
-        bgcolor=bgcolor,
-        font_color=font_color,
-        directed=True,
-    )
-    net.set_options(
-        """
+    net = Network(height=height, width=width, bgcolor=bgcolor, font_color=font_color, directed=True)
+    net.set_options("""
     {
       "interaction": {"hover": true, "dragNodes": true, "dragView": false, "zoomView": true, "multiselect": true},
       "physics": {"enabled": true, "stabilization": {"enabled": true, "iterations": 400},
@@ -753,8 +713,7 @@ async def vis_pyvis(
       "edges": {"smooth": false, "width": 1, "arrows": {"to": {"enabled": true, "scaleFactor": 0.6}}},
       "nodes": {"borderWidth": 1}
     }
-    """
-    )
+    """)
 
     # 3) Adiciona nós primeiro
     existing = set()
@@ -782,7 +741,7 @@ async def vis_pyvis(
             color=color if shape == "dot" else None,  # circularImage ignora bg color
             shape=shape,
             image=img,
-            value=size,
+            value=size
         )
 
     # 4) Depois as arestas
@@ -794,13 +753,12 @@ async def vis_pyvis(
         w = e.get("weight", 1.0)
         rel = e.get("relation") or ""
         net.add_edge(
-            s,
-            t,
+            s, t,
             value=float(w) if isinstance(w, (int, float)) else 1.0,
-            title=f"{rel} (w={w})" if rel else f"w={w}",
+            title=f"{rel} (w={w})" if rel else f"w={w}"
         )
 
-    # 5) Gera HTML e injeta barra de busca + script de interação
+    # 5) Gera HTML e injeta barra de busca + congelamento da física
     html = net.generate_html(notebook=False)
 
     toolbar = r"""
@@ -837,9 +795,13 @@ async def vis_pyvis(
         }
       }
     });
-    // impedir arrasto do grafo
+
+    // impedir arrasto do grafo e congelar física ao estabilizar
+    network.once('stabilizationIterationsDone', function(){
+      network.setOptions({physics:false});
+      network.fit({animation:{duration:300}});
+    });
     network.setOptions({interaction:{dragView:false}});
-    // arestas finas
     network.setOptions({edges:{width:1}});
 
     var i = document.getElementById('searchInput');
@@ -877,15 +839,12 @@ async def vis_pyvis(
 """
     html = html.replace("</body>", enhance + "\n</body>")
 
-    csp = (
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; "
-        "script-src 'self' 'unsafe-inline'; img-src 'self' data: *; "
-        "font-src 'self' data:; connect-src 'self';"
-    )
+    csp = ("default-src 'self'; style-src 'self' 'unsafe-inline'; "
+           "script-src 'self' 'unsafe-inline'; img-src 'self' data: *; "
+           "font-src 'self' data:; connect-src 'self';")
     response.headers["Content-Security-Policy"] = csp
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(html, status_code=200)
-
 
 # =========================
 # OpenAPI em YAML

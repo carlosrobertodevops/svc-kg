@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
     title: svc-kg
-    version: 1.7.12
+    version: 1.7.13
     description: |
         Microserviço de Knowledge Graph com viewers vis.js e PyVis.
 
@@ -12,8 +12,15 @@ info:
         - `/status` (JSON detalhado de ambiente, cache e backend)
 
         **Viewers com busca embutida (UI)**
-        - `/v1/vis/visjs`
-        - `/v1/vis/pyvis`
+        - `/v1/vis/visjs` (alias: `/visjs`)
+        - `/v1/vis/pyvis` (alias: `/pyvis`)
+
+        **API JSON**
+        - `/v1/graph/membros` (alias: `/membros`)
+
+        **Autenticação Supabase/PostgREST**
+        - O cliente tenta automaticamente: `SERVICE_KEY` → `ANON_KEY` → `SUPABASE_KEY` → **sem** Authorization.
+        - Também tenta duas assinaturas de RPC: `p_faccao_id/p_include_co/p_max_pairs` e `faccao_id/include_co/max_pairs`.
 
         **Esquema YAML:** `/openapi.yaml` | **Swagger UI:** `/docs` | **Redoc:** `/redoc`
 servers:
@@ -154,8 +161,6 @@ paths:
                     description: HTML interativo (vis.js)
                     content:
                         text/html: {}
-                '200 (erro mostrado em HTML)':
-                    description: Quando backend falha, página exibe a mensagem em <pre> no topo.
     /v1/vis/pyvis:
         get:
             summary: Visualização PyVis (com busca, fotos, CV/PCC)
@@ -192,5 +197,3 @@ paths:
                     description: HTML interativo (PyVis)
                     content:
                         text/html: {}
-                '502':
-                    description: backend indisponível (mensagem em HTML)
