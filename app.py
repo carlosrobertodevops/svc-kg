@@ -42,8 +42,7 @@ if ENABLE_REDIS_CACHE:
         import redis.asyncio as redis
 
         REDIS = redis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
-    except Exception as e:
-        # Mantém a app funcionando sem Redis
+    except Exception:
         REDIS = None
 
 
@@ -70,7 +69,7 @@ async def cache_set(key: str, value: str, ttl: int) -> None:
 # -----------------------------
 app = FastAPI(
     title="svc-kg",
-    version="1.7.6-fix-html",
+    version="1.7.6-pyvisfix",
     docs_url="/docs/swagger",
     redoc_url="/docs/redoc",
     openapi_url="/docs/openapi.json",
@@ -134,12 +133,10 @@ async def call_supabase_graph(
         try:
             r.raise_for_status()
         except httpx.HTTPStatusError as he:
-            # Encaminha erro com contexto
             raise HTTPException(
                 status_code=he.response.status_code,
                 detail=f"Supabase RPC {SUPABASE_RPC_FN} falhou: {he.response.text}",
             )
-
         try:
             data = r.json()
         except json.JSONDecodeError as je:
@@ -147,14 +144,12 @@ async def call_supabase_graph(
                 status_code=502, detail=f"Supabase retornou JSON inválido: {str(je)}"
             )
 
-    # Possíveis formatos
     if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
         data = data[0]
     if isinstance(data, str):
         try:
             data = json.loads(data)
         except Exception:
-            # pode já ser um JSONB serializado como string não-JSON => força estrutura vazia
             data = {}
 
     if not isinstance(data, dict):
@@ -189,16 +184,19 @@ def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
         return s
 
     out_nodes = []
+    ids_seen = set()
     for n in nodes:
         nid = str(n.get("id", "")).strip()
         if not nid:
             continue
+        if nid in ids_seen:
+            continue
+        ids_seen.add(nid)
         n["id"] = nid
         n["label"] = clean_label(n.get("label"))
         if "group" not in n:
             g = n.get("faccao_id") or n.get("type") or 0
             n["group"] = g
-        # size -> float, se vier string
         if isinstance(n.get("size"), str):
             try:
                 n["size"] = float(n["size"])
@@ -287,7 +285,6 @@ async def ready():
         "backend_ok": False,
     }
 
-    # Redis
     if REDIS:
         try:
             pong = await REDIS.ping()
@@ -296,13 +293,11 @@ async def ready():
             info["redis"] = False
             info["redis_error"] = str(e)
 
-    # SUPABASE_URL válida?
     if not SUPABASE_URL or not SUPABASE_URL.startswith("http"):
         info["error"] = "SUPABASE_URL inválida ou ausente"
         return JSONResponse(info, status_code=503)
 
     try:
-        # smoke-test: chamada rápida (sem filtro, poucas arestas)
         _ = await call_supabase_graph(None, False, 1)
         info["backend_ok"] = True
         return JSONResponse(info, status_code=200)
@@ -315,7 +310,7 @@ async def ready():
 
 
 # -----------------------------
-# API: dados JSON para o gráfico
+# API: dados JSON
 # -----------------------------
 @app.get(
     "/v1/graph/membros",
@@ -338,7 +333,7 @@ async def graph_membros(
 
 
 # -----------------------------
-# VIS: vis-network (vis.js) – SEM f-strings
+# VIS: vis-network (vis.js) – sem f-strings
 # -----------------------------
 @app.get(
     "/v1/vis/visjs",
@@ -358,7 +353,6 @@ async def vis_visjs(
     debug: bool = Query(default=False),
     source: str = Query(default="server", pattern="^(server|client)$"),
 ):
-    # Local vs CDN
     local_js = "static/vendor/vis-network/vis-network.min.js"
     local_css = "static/vendor/vis-network/vis-network.min.css"
     has_local = os.path.exists(local_js) and os.path.exists(local_css)
@@ -381,12 +375,9 @@ async def vis_visjs(
             "default-src 'self'; "
             "style-src 'self' 'unsafe-inline' https://unpkg.com; "
             "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-            "img-src 'self' data:; "
-            "font-src 'self' data:; "
-            "connect-src 'self';"
+            "img-src 'self' data:; font-src 'self' data:; connect-src 'self';"
         )
 
-    # Dados embutidos (server)
     embedded_block = ""
     if source == "server":
         data = await fetch_graph_sanitized(
@@ -401,7 +392,6 @@ async def vis_visjs(
 
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
-    # HTML com Template – sem f-strings; sem template literals
     html_tpl = Template(
         """<!doctype html>
 <html lang="pt-br">
@@ -479,7 +469,7 @@ async def vis_visjs(
           var v = (typeof n.size==='number') ? n.size : undefined;
           return {
             id: String(n.id),
-            label: cleanLabel(n.label) || String(n.id),
+            label: (function(lbl){var s=String(lbl||'').trim(); if(s.length>=2 && s[0]=='{' && s[s.length-1]=='}'){ var inner=s.slice(1,-1); if(!inner) return ''; return inner.replace(/(^|,)\\s*"?null"?\\s*(?=,|$)/gi,'').replace(/"/g,'').split(',').map(function(x){return x.trim();}).filter(Boolean).join(', ');} return s; })(n.label),
             group: String(n.group != null ? n.group : (n.type != null ? n.type : '0')),
             value: v,
             color: hashColor(n.group != null ? n.group : (n.type != null ? n.type : '0')),
@@ -526,7 +516,7 @@ async def vis_visjs(
           container.innerHTML='<div style="padding:12px">vis-network não carregou. Verifique CSP/CDN.</div>';
           return;
         }
-        if(src==='server'){
+        if((container.getAttribute('data-source')||'server')==='server'){
           var tag=document.getElementById('__KG_DATA__');
           if(!tag){ container.innerHTML='<div style="padding:12px">Bloco de dados ausente.</div>'; return; }
           try { render(JSON.parse(tag.textContent||'{}')); }
@@ -540,7 +530,7 @@ async def vis_visjs(
           qs.set('max_nodes',  params.get('max_nodes')  || '2000');
           qs.set('max_edges',  params.get('max_edges')  || '4000');
           qs.set('cache',      params.get('cache')      || 'false');
-          fetch(endpoint+'?'+qs.toString(), { headers:{'Accept':'application/json'} })
+          fetch(('/v1/graph/membros')+'?'+qs.toString(), { headers:{'Accept':'application/json'} })
             .then(function(r){ if(!r.ok) return r.text().then(function(t){ throw new Error(r.status+': '+t); }); return r.json(); })
             .then(render)
             .catch(function(err){ console.error(err); container.innerHTML='<pre>'+String(err).replace(/</g,'&lt;')+'</pre>'; });
@@ -553,6 +543,22 @@ async def vis_visjs(
   </body>
 </html>"""
     )
+
+    bg = "#0b0f19" if theme == "dark" else "#ffffff"
+
+    # server-embed
+    embedded_block = ""
+    if source == "server":
+        data = await fetch_graph_sanitized(
+            faccao_id, include_co, max_pairs, use_cache=cache
+        )
+        out = truncate_preview(data, max_nodes, max_edges)
+        out = normalize_graph_labels(out)
+        embedded_block = (
+            '<script id="__KG_DATA__" type="application/json">'
+            + json.dumps(out, ensure_ascii=False)
+            + "</script>"
+        )
 
     html = (
         html_tpl.safe_substitute(
@@ -574,7 +580,7 @@ async def vis_visjs(
 
 
 # -----------------------------
-# VIS: PyVis – SEM f-strings
+# VIS: PyVis – sem f-strings (com filtro de arestas inválidas)
 # -----------------------------
 @app.get(
     "/v1/vis/pyvis",
@@ -592,13 +598,13 @@ async def vis_pyvis(
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (pyvis)",
 ):
+    # dados sanitizados e truncados
     data = await fetch_graph_sanitized(
         faccao_id, include_co, max_pairs, use_cache=cache
     )
     data = truncate_preview(data, max_nodes, max_edges)
     data = normalize_graph_labels(data)
 
-    # PyVis
     from pyvis.network import Network
 
     net = Network(
@@ -610,8 +616,10 @@ async def vis_pyvis(
         notebook=False,
     )
 
+    # adiciona nós e guarda o conjunto de IDs adicionados
+    node_ids = set()
     for n in data.get("nodes", []):
-        nid = str(n.get("id"))
+        nid = str(n.get("id") or "").strip()
         if not nid:
             continue
         label = n.get("label") or nid
@@ -621,25 +629,35 @@ async def vis_pyvis(
             nid,
             label=label,
             group=group,
-            value=size if isinstance(size, (int, float)) else None,
+            value=(size if isinstance(size, (int, float)) else None),
         )
+        node_ids.add(nid)
 
+    # adiciona arestas **apenas** se ambos os nós existem
+    skipped = 0
     for e in data.get("edges", []):
         s = e.get("source")
         t = e.get("target")
-        if not s or not t:
+        if s is None or t is None:
+            skipped += 1
+            continue
+        sf = str(s)
+        tf = str(t)
+        if sf not in node_ids or tf not in node_ids:
+            skipped += 1
             continue
         w = e.get("weight", 1)
         rel = e.get("relation", "")
         title_e = (rel + " (w=" + str(w) + ")") if rel else ("w=" + str(w))
         net.add_edge(
-            str(s),
-            str(t),
-            value=float(w) if isinstance(w, (int, float)) else 1.0,
+            sf,
+            tf,
+            value=(float(w) if isinstance(w, (int, float)) else 1.0),
             title=title_e,
             arrows="to",
         )
 
+    # opções
     net.set_options(
         """
       var options = {
@@ -656,13 +674,11 @@ async def vis_pyvis(
     )
 
     html_inner = net.generate_html(notebook=False)
-
-    # Insere uma toolbar simples no <body> gerado pelo pyvis
     toolbar = (
         '<div class="kg-toolbar" '
         'style="display:flex;gap:.5rem;align-items:center;padding:.5rem .75rem;'
         'border-bottom:1px solid #e5e7eb;">'
-        f'<h4 style="margin:0;font-size:14px;font-weight:600;">{title}</h4>'
+        '<h4 style="margin:0;font-size:14px;font-weight:600;">' + title + "</h4>"
         '<button id="btn-print" type="button">Print</button>'
         '<button id="btn-reload" type="button">Reload</button>'
         "</div>"
@@ -673,7 +689,6 @@ async def vis_pyvis(
     if "<body>" in html_inner:
         html_final = html_inner.replace("<body>", "<body>" + toolbar, 1)
     else:
-        # fallback raro
         html_final = (
             "<!doctype html><html><head><meta charset='utf-8'><title>"
             + title
@@ -683,7 +698,7 @@ async def vis_pyvis(
             + "</body></html>"
         )
 
-    # CSP mais permissivo (pyvis usa inline script)
+    # CSP (pyvis usa inline script)
     response.headers["Content-Security-Policy"] = (
         "default-src 'self' blob: data:; "
         "style-src 'self' 'unsafe-inline'; "
@@ -697,7 +712,7 @@ async def vis_pyvis(
 
 
 # -----------------------------
-# Main (opcional para debug local)
+# Main (debug local)
 # -----------------------------
 if __name__ == "__main__":
     import uvicorn

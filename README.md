@@ -1,11 +1,4 @@
 
-Microserviço de **Knowledge Graph** (membros, facções, funções) com:
-- Backend: **Supabase RPC** (`get_graph_membros`) **ou** Postgres.
-- Cache: Redis (fallback em memória).
-- Visualização:
-  - `/v1/vis/pyvis` → **PyVis** (usa **inline JS**; pode requerer CSP relaxada)
-  - `/v1/vis/visjs` → **vis-network** (sem inline; compatível com CSP rígida)
-
 # svc-kg (v1.7.6)
 
 svc-kg/
@@ -29,6 +22,13 @@ svc-kg/
 
 
 
+Microserviço de **Knowledge Graph** (membros, facções, funções) com:
+- Backend: **Supabase RPC** (`get_graph_membros`) **ou** Postgres.
+- Cache: Redis (fallback em memória).
+- Visualização:
+  - `/v1/vis/pyvis` → **PyVis** (usa **inline JS**; pode requerer CSP relaxada)
+  - `/v1/vis/visjs` → **vis-network** (sem inline; compatível com CSP rígida)
+
 Microserviço de **Knowledge Graph** com:
 - Backend: **Supabase RPC** (`get_graph_membros`) ou **Postgres**.
 - Cache: **Redis** (fallback em memória).
@@ -50,6 +50,7 @@ Microserviço de **Knowledge Graph** com:
 ## Rodando LOCAL (Postgres + Redis)
 
 1. Crie `.env` a partir de `.env.example` e defina:
+---
 ---
 ```env
    APP_ENV=development
