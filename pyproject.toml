@@ -1,0 +1,16 @@
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+# Conjunto de regras úteis e pragmáticas
+select = ["E", "F", "I", "B", "UP"]
+# Ignora alguns falsos positivos comuns
+ignore = ["E203", "W503"]
+exclude = ["static", "assets", "docs", "tmp"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
