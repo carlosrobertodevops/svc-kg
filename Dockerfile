@@ -11,16 +11,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY requirements.txt ./
+# Instala dependências primeiro (cache mais eficiente)
+COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia app e assets estáticos
-COPY app.py ./app.py
-COPY static ./static
-COPY assets ./assets
-COPY docs ./docs
+# Copia TODO o projeto (com .dockerignore para não levar lixo)
+COPY . .
+
+# Garante que as pastas existam (caso não estejam no repo)
+RUN mkdir -p /app/static /app/assets /app/docs
 
 EXPOSE 8080
 
-# usa gunicorn com workers uvicorn (respeita $WORKERS e $PORT)
+# gunicorn + uvicorn worker = produção
 CMD ["bash", "-lc", "exec gunicorn -k uvicorn.workers.UvicornWorker -w ${WORKERS:-2} -b 0.0.0.0:${PORT:-8080} app:app --access-logfile - --error-logfile -"]

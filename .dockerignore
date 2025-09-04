@@ -1,13 +1,25 @@
+# Git / VCS
 .git
 .gitignore
-**/__pycache__/
-**/*.pyc
-**/*.pyo
-**/*.pyd
+.gitattributes
+
+# Coolify/helper/temp
+/artifacts
+.coolify
+*.log
+tmp/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.swo
+
+# Node/outros (caso apareçam)
+/node_modules
+dist
+build
+
+# Arquivos locais que não devem ir para a imagem
 .env
-venv
 .env.local
-.idea
-.vscode
-db/*.sql~
-.vincent/

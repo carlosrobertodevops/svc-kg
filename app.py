@@ -1,4 +1,4 @@
-# app.py (v1.7.9)
+# app.py (v1.7.10)
 import os, json, hashlib, asyncio, logging, traceback, socket, math, csv, io
 from typing import List, Optional, Tuple
 from time import time
@@ -16,7 +16,7 @@ import httpx
 from psycopg_pool import AsyncConnectionPool
 from redis import asyncio as aioredis
 from pyvis.network import Network
-import networkx as nx  # NEW
+import networkx as nx  # centralidade/comunidades (PyVis2)
 
 # ------------------ utils/env ------------------
 def env_bool(v: Optional[str], default=False) -> bool:
@@ -73,7 +73,7 @@ log = logging.getLogger("svc-kg")
 # ------------------ app ------------------
 app = FastAPI(
     title="svc-kg",
-    version="1.7.9",
+    version="1.7.10",
     description="Microserviço de Knowledge Graph (membros, facções, funções)",
     default_response_class=ORJSONResponse,
     swagger_ui_parameters={
@@ -725,7 +725,7 @@ async def vis_pyvis2(
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
 
-# ------------------ VIS: vis-network (server-embed + fallback inline seguro) ------------------
+# ------------------ VIS: vis-network (server-embed + fallback inline) ------------------
 @app.get("/v1/vis/visjs", response_class=HTMLResponse,
          summary="Visualização vis-network (server-embed + fallback inline)")
 async def vis_visjs(
