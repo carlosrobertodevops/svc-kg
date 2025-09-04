@@ -1,78 +1,62 @@
 openapi: 3.0.3
 info:
-    title: svc-kg
-    version: 1.7.13
-    description: |
-        Microserviço de Knowledge Graph com viewers vis.js e PyVis.
-
-        **Status & Health**
-        - `/health` (200 ok)
-        - `/live` (200 alive)
-        - `/ready` (verifica backend e cache)
-        - `/status` (JSON detalhado de ambiente, cache e backend)
-
-        **Viewers com busca embutida (UI)**
-        - `/v1/vis/visjs` (alias: `/visjs`)
-        - `/v1/vis/pyvis` (alias: `/pyvis`)
-
-        **API JSON**
-        - `/v1/graph/membros` (alias: `/membros`)
-
-        **Autenticação Supabase/PostgREST**
-        - O cliente tenta automaticamente: `SERVICE_KEY` → `ANON_KEY` → `SUPABASE_KEY` → **sem** Authorization.
-        - Também tenta duas assinaturas de RPC: `p_faccao_id/p_include_co/p_max_pairs` e `faccao_id/include_co/max_pairs`.
-
-        **Esquema YAML:** `/openapi.yaml` | **Swagger UI:** `/docs` | **Redoc:** `/redoc`
+    title: svc-kg API
+    version: v1.7.15-photos-docs
+    description: >
+        Micro serviço de Knowledge Graph com visualizações (vis.js e PyVis).
 servers:
-  - url: https://kg.mondaha.com
+  - url: /
 paths:
-    /health:
-        get:
-            summary: Healthcheck simples
-            responses:
-                '200':
-                    description: ok
-                    content:
-                        text/plain:
-                            schema:
-                                type: string
-                                example: ok
     /live:
         get:
+            tags: [ ops ]
             summary: Liveness probe
             responses:
-                '200':
-                    description: alive
+                "200":
+                    description: OK
                     content:
                         text/plain:
+                            schema: { type: string, example: ok }
+
+    /health:
+        get:
+            tags: [ ops ]
+            summary: Health probe (com checagens opcionais)
+            parameters:
+              - in: query
+                name: deep
+                schema: { type: boolean, default: false }
+            responses:
+                "200":
+                    description: OK (ou 503 se algum requisito crítico falhar)
+                    content:
+                        application/json:
                             schema:
-                                type: string
-                                example: alive
+                                type: object
+
     /ready:
         get:
-            summary: Readiness (backend/cache)
+            tags: [ ops ]
+            summary: Readiness probe
             responses:
-                '200':
-                    description: pronto
-                    content:
-                        application/json:
-                            schema:
-                                type: object
-                '503':
-                    description: indisponível
-    /status:
+                "200":
+                    description: OK (ou 503 se backend/cache indisponíveis)
+
+    /ops/status:
         get:
-            summary: Status detalhado do microserviço
+            tags: [ ops ]
+            summary: Status detalhado (plataforma/redis/supabase)
             responses:
-                '200':
-                    description: status json
+                "200":
+                    description: OK
                     content:
                         application/json:
-                            schema:
-                                type: object
+                            schema: { type: object }
+
     /v1/graph/membros:
         get:
-            summary: Grafo (JSON)
+            tags: [ graph ]
+            summary: Retorna grafo (nodes/edges) pronto para visualização
             parameters:
               - in: query
                 name: faccao_id
@@ -84,17 +68,21 @@ paths:
                 name: max_pairs
                 schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
               - in: query
-                name: cache
-                schema: { type: boolean, default: true }
-              - in: query
                 name: max_nodes
                 schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 }
               - in: query
                 name: max_edges
                 schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 }
+              - in: query
+                name: cache
+                schema: { type: boolean, default: true }
+              - in: query
+                name: enrich_photos
+                schema: { type: boolean, default: true }
+                description: "Se true, consulta a tabela membros (MEMBERS_TABLE) para preencher a foto (coluna MEMBERS_PHOTO_COL)."
             responses:
-                '200':
-                    description: grafo em formato {nodes, edges}
+                "200":
+                    description: OK
                     content:
                         application/json:
                             schema:
@@ -107,10 +95,10 @@ paths:
                                             properties:
                                                 id: { type: string }
                                                 label: { type: string }
-                                                type: { type: string }
                                                 group: { type: string }
-                                                size: { type: number, nullable: true }
-                                                photo_url: { type: string, nullable: true }
+                                                type: { type: string }
+                                                size: { type: number }
+                                                photo_url: { type: string }
                                     edges:
                                         type: array
                                         items:
@@ -118,13 +106,13 @@ paths:
                                             properties:
                                                 source: { type: string }
                                                 target: { type: string }
-                                                weight: { type: number }
                                                 relation: { type: string }
-                '502':
-                    description: backend indisponível/erro no RPC (mensagem detalhada em `detail`)
+                                                weight: { type: number }
+
     /v1/vis/visjs:
         get:
-            summary: Visualização vis-network (com busca, fotos, CV/PCC)
+            tags: [ viz ]
+            summary: Visualização interativa com vis-network (HTML)
             parameters:
               - in: query
                 name: faccao_id
@@ -156,14 +144,20 @@ paths:
               - in: query
                 name: source
                 schema: { type: string, enum: [ server, client ], default: server }
+              - in: query
+                name: enrich_photos
+                schema: { type: boolean, default: true }
             responses:
-                '200':
-                    description: HTML interativo (vis.js)
+                "200":
+                    description: HTML da visualização
                     content:
-                        text/html: {}
+                        text/html:
+                            schema: { type: string }
+
     /v1/vis/pyvis:
         get:
-            summary: Visualização PyVis (com busca, fotos, CV/PCC)
+            tags: [ viz ]
+            summary: Visualização interativa com PyVis (HTML)
             parameters:
               - in: query
                 name: faccao_id
@@ -192,8 +186,19 @@ paths:
               - in: query
                 name: debug
                 schema: { type: boolean, default: false }
+              - in: query
+                name: enrich_photos
+                schema: { type: boolean, default: true }
             responses:
-                '200':
-                    description: HTML interativo (PyVis)
+                "200":
+                    description: HTML da visualização
                     content:
-                        text/html: {}
+                        text/html:
+                            schema: { type: string }
+tags:
+  - name: ops
+    description: Operação/Observabilidade
+  - name: graph
+    description: Dados do grafo
+  - name: viz
+    description: Visualizações
