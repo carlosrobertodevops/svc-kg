@@ -1,29 +1,118 @@
-openapi: 3.1.0
+openapi: 3.0.3
 info:
-    title: svc-kg
-    version: v1.7.13
-    description: |
-        Micro serviço de Knowledge Graph (vis.js / PyVis).
-        - **svc-kg** (também referido como **“sic-kg”**)
-        - Endpoints de visualização: `/v1/vis/visjs`, `/v1/vis/pyvis`
-        - Endpoints operacionais (Ops): `/live`, `/health`, `/ready`, `/ops/status`
-
+    title: svc-kg API
+    version: v1.7.15-photos-docs
+    description: >
+        Micro serviço de Knowledge Graph com visualizações (vis.js e PyVis).
 servers:
   - url: /
-
-tags:
-  - name: graph
-    description: Endpoints de dados brutos do grafo.
-  - name: viz
-    description: Visualizações do grafo (vis.js / PyVis).
-  - name: ops
-    description: Operação & saúde do micro-serviço (Coolify, Supabase, Redis).
-
 paths:
+    /live:
+        get:
+            tags: [ ops ]
+            summary: Liveness probe
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        text/plain:
+                            schema: { type: string, example: ok }
+
+    /health:
+        get:
+            tags: [ ops ]
+            summary: Health probe (com checagens opcionais)
+            parameters:
+              - in: query
+                name: deep
+                schema: { type: boolean, default: false }
+            responses:
+                "200":
+                    description: OK (ou 503 se algum requisito crítico falhar)
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+
+    /ready:
+        get:
+            tags: [ ops ]
+            summary: Readiness probe
+            responses:
+                "200":
+                    description: OK (ou 503 se backend/cache indisponíveis)
+
+    /ops/status:
+        get:
+            tags: [ ops ]
+            summary: Status detalhado (plataforma/redis/supabase)
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { type: object }
+
     /v1/graph/membros:
         get:
             tags: [ graph ]
-            summary: Retorna grafo (nodes/edges)
+            summary: Retorna grafo (nodes/edges) pronto para visualização
+            parameters:
+              - in: query
+                name: faccao_id
+                schema: { type: integer, nullable: true }
+              - in: query
+                name: include_co
+                schema: { type: boolean, default: true }
+              - in: query
+                name: max_pairs
+                schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
+              - in: query
+                name: max_nodes
+                schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 }
+              - in: query
+                name: max_edges
+                schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 }
+              - in: query
+                name: cache
+                schema: { type: boolean, default: true }
+              - in: query
+                name: enrich_photos
+                schema: { type: boolean, default: true }
+                description: "Se true, consulta a tabela membros (MEMBERS_TABLE) para preencher a foto (coluna MEMBERS_PHOTO_COL). Se foto_path for relativo, usa MEMBERS_PHOTO_BASE_URL."
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    nodes:
+                                        type: array
+                                        items:
+                                            type: object
+                                            properties:
+                                                id: { type: string }
+                                                label: { type: string }
+                                                group: { type: string }
+                                                type: { type: string }
+                                                size: { type: number }
+                                                photo_url: { type: string }
+                                    edges:
+                                        type: array
+                                        items:
+                                            type: object
+                                            properties:
+                                                source: { type: string }
+                                                target: { type: string }
+                                                relation: { type: string }
+                                                weight: { type: number }
+
+    /v1/vis/visjs:
+        get:
+            tags: [ viz ]
+            summary: Visualização interativa com vis-network (HTML)
             parameters:
               - in: query
                 name: faccao_id
@@ -43,78 +132,73 @@ paths:
               - in: query
                 name: cache
                 schema: { type: boolean, default: true }
+              - in: query
+                name: theme
+                schema: { type: string, enum: [ light, dark ], default: light }
+              - in: query
+                name: title
+                schema: { type: string, default: "Knowledge Graph (vis.js)" }
+              - in: query
+                name: debug
+                schema: { type: boolean, default: false }
+              - in: query
+                name: source
+                schema: { type: string, enum: [ server, client ], default: server }
+              - in: query
+                name: enrich_photos
+                schema: { type: boolean, default: true }
             responses:
                 "200":
-                    description: OK
+                    description: HTML da visualização
                     content:
-                        application/json:
-                            schema:
-                                type: object
-                                properties:
-                                    nodes: { type: array, items: { type: object } }
-                                    edges: { type: array, items: { type: object } }
-
-    /v1/vis/visjs:
-        get:
-            tags: [ viz ]
-            summary: Visualização vis-network
-            responses: { "200": { description: HTML } }
+                        text/html:
+                            schema: { type: string }
 
     /v1/vis/pyvis:
         get:
             tags: [ viz ]
-            summary: Visualização PyVis
-            responses: { "200": { description: HTML } }
-
-    /live:
-        get:
-            tags: [ ops ]
-            summary: Liveness
-            description: Retorna "ok" se o processo está vivo.
-            responses: { "200": { description: OK, content: { text/plain: {} } } }
-
-    /health:
-        get:
-            tags: [ ops ]
-            summary: Health check
-            description: |
-                Verifica Redis (ping) e backend (Supabase) configurado.
-                Use `?deep=true` para executar um RPC real no Supabase e validar conectividade ativa.
+            summary: Visualização interativa com PyVis (HTML)
             parameters:
               - in: query
-                name: deep
+                name: faccao_id
+                schema: { type: integer, nullable: true }
+              - in: query
+                name: include_co
+                schema: { type: boolean, default: true }
+              - in: query
+                name: max_pairs
+                schema: { type: integer, default: 8000 }
+              - in: query
+                name: max_nodes
+                schema: { type: integer, default: 2000 }
+              - in: query
+                name: max_edges
+                schema: { type: integer, default: 4000 }
+              - in: query
+                name: cache
+                schema: { type: boolean, default: true }
+              - in: query
+                name: theme
+                schema: { type: string, enum: [ light, dark ], default: light }
+              - in: query
+                name: title
+                schema: { type: string, default: "Knowledge Graph (PyVis)" }
+              - in: query
+                name: debug
                 schema: { type: boolean, default: false }
-                description: "Se true, executa RPC no Supabase e ping no Redis."
+              - in: query
+                name: enrich_photos
+                schema: { type: boolean, default: true }
             responses:
                 "200":
-                    description: OK
+                    description: HTML da visualização
                     content:
-                        application/json:
-                            schema:
-                                type: object
-                "503":
-                    description: Serviço degradado
-
-    /ready:
-        get:
-            tags: [ ops ]
-            summary: Readiness
-            description: Teste ativo de Redis e RPC curto no Supabase (pronto para tráfego).
-            responses:
-                "200": { description: OK }
-                "503": { description: Não pronto }
-
-    /ops/status:
-        get:
-            tags: [ ops ]
-            summary: Status operacional (humano/automação)
-            description: |
-                Retorna informações do ambiente (Coolify/container), Redis, Supabase (sem expor segredos),
-                versão, hostname e parâmetros principais de CORS.
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                type: object
+                        text/html:
+                            schema: { type: string }
+tags:
+  - name: ops
+    description: Operação/Observabilidade
+  - name: graph
+    description: Dados do grafo
+  - name: viz
+    description: Visualizações

@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pyvis.network import Network
 
 try:
-    from redis import asyncio as aioredis  # redis==5
+    from redis import asyncio as aioredis
 except Exception:
     aioredis = None
 
@@ -49,27 +49,35 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 CACHE_API_TTL = int(os.getenv("CACHE_API_TTL", "60"))
 CACHE_STATIC_MAX_AGE = int(os.getenv("CACHE_STATIC_MAX_AGE", "86400"))
 
+# Fotos (tabela membros)
+MEMBERS_TABLE = os.getenv("MEMBERS_TABLE", "membros")
+MEMBERS_ID_COL = os.getenv("MEMBERS_ID_COL", "id")
+MEMBERS_PHOTO_COL = os.getenv("MEMBERS_PHOTO_COL", "photo_url")  # ex.: "foto_path"
+MEMBERS_PHOTO_BASE_URL = os.getenv("MEMBERS_PHOTO_BASE_URL", "").strip()
+
 # Metadata
 SERVICE_ID = "svc-kg"
-SERVICE_AKA = ["sic-kg"]  # solicitado para aparecer nos status
+SERVICE_AKA = ["sic-kg"]
 
 # -----------------------------------------------------------------------------
-# FastAPI app (docs custom será gerado abaixo)
+# FastAPI app
 # -----------------------------------------------------------------------------
 app = FastAPI(
     title="svc-kg",
-    version="v1.7.13-docs-ops",
+    version="v1.7.15-photos-docs",
     description="Micro serviço de Knowledge Graph com visualizações (vis.js e PyVis).",
-    docs_url=None,  # <— desliga docs padrão
-    redoc_url=None,  # (usaremos /docs custom abaixo)
+    docs_url=None,
+    redoc_url=None,
     openapi_url="/openapi.json",
 )
 
-# Static
+# Static mounts
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 if os.path.isdir("docs"):
     app.mount("/docs-static", StaticFiles(directory="docs"), name="docs-static")
+if os.path.isdir("assets"):
+    app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 # CORS
 app.add_middleware(
@@ -229,35 +237,6 @@ async def supabase_rpc_get_graph(
     return data
 
 
-async def fetch_graph_sanitized(
-    faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool = True
-) -> Dict[str, Any]:
-    cache_key = _cache_key(
-        "graph",
-        {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs},
-    )
-    if use_cache:
-        r = await _get_redis()
-        if r:
-            cached = await r.get(cache_key)
-            if cached:
-                try:
-                    return json.loads(cached)
-                except Exception:
-                    pass
-
-    raw = await supabase_rpc_get_graph(faccao_id, include_co, max_pairs)
-    fixed = normalize_graph_labels(raw)
-
-    if use_cache:
-        r = await _get_redis()
-        if r:
-            await r.set(
-                cache_key, json.dumps(fixed, ensure_ascii=False), ex=CACHE_API_TTL
-            )
-    return fixed
-
-
 def redact(token: Optional[str], keep: int = 4) -> Optional[str]:
     if not token:
         return token
@@ -271,7 +250,8 @@ def running_in_container() -> bool:
         return True
     try:
         with open("/proc/1/cgroup", "rt") as fh:
-            return "docker" in fh.read() or "kubepods" in fh.read()
+            txt = fh.read()
+            return "docker" in txt or "kubepods" in txt
     except Exception:
         return False
 
@@ -286,6 +266,120 @@ def platform_info() -> Dict[str, Any]:
         "aka": SERVICE_AKA,
         "version": app.version,
     }
+
+
+# ------------------------- Fotos: resolução e enriquecimento ------------------
+def resolve_photo_url(value: Optional[str]) -> Optional[str]:
+    """Monta URL final da foto."""
+    if not value:
+        return None
+    s = str(value).strip()
+    if s.startswith(("http://", "https://", "data:")):
+        return s
+    if s.startswith("/assets/"):
+        return s
+    if MEMBERS_PHOTO_BASE_URL:
+        return MEMBERS_PHOTO_BASE_URL.rstrip("/") + "/" + s.lstrip("/")
+    return "/assets/" + s.lstrip("/")
+
+
+def map_photo_field_on_nodes(nodes: List[Dict[str, Any]]):
+    src = MEMBERS_PHOTO_COL or "photo_url"
+    for n in nodes:
+        v = n.get("photo_url") or n.get(src) or n.get("foto_path")
+        url = resolve_photo_url(v) if v else None
+        if url:
+            n["photo_url"] = url
+
+
+async def enrich_nodes_with_member_photos(nodes: List[Dict[str, Any]]):
+    if not _env_backend_ok() or not nodes:
+        return
+    missing_ids = [
+        str(n["id"])
+        for n in nodes
+        if n.get("id") is not None and not n.get("photo_url")
+    ]
+    if not missing_ids:
+        return
+
+    base = SUPABASE_URL.rstrip("/")
+    table = MEMBERS_TABLE
+    idcol = MEMBERS_ID_COL
+    pcol = MEMBERS_PHOTO_COL or "photo_url"
+
+    headers = {
+        "apikey": SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "Accept": "application/json",
+    }
+    client = await _get_http()
+
+    batch = 100
+    found: Dict[str, str] = {}
+    for i in range(0, len(missing_ids), batch):
+        chunk = missing_ids[i : i + batch]
+        in_list = ",".join(chunk)  # ids numéricos; adapte se for string
+        url = f"{base}/rest/v1/{table}?select={idcol},{pcol}&{idcol}=in.({in_list})"
+        r = await client.get(url, headers=headers)
+        if r.status_code != 200:
+            log.warning("enrich photos failed %s: %s", r.status_code, r.text)
+            continue
+        rows = r.json()
+        for row in rows:
+            rid = str(row.get(idcol))
+            path = row.get(pcol)
+            if rid and path:
+                final_url = resolve_photo_url(str(path))
+                if final_url:
+                    found[rid] = final_url
+
+    for n in nodes:
+        nid = str(n.get("id"))
+        if nid and not n.get("photo_url") and nid in found:
+            n["photo_url"] = found[nid]
+
+
+async def fetch_graph_sanitized(
+    faccao_id: Optional[int],
+    include_co: bool,
+    max_pairs: int,
+    use_cache: bool = True,
+    enrich_photos: bool = True,
+) -> Dict[str, Any]:
+    cache_key = _cache_key(
+        "graph",
+        {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs},
+    )
+    if use_cache:
+        r = await _get_redis()
+        if r:
+            cached = await r.get(cache_key)
+            if cached:
+                try:
+                    data = json.loads(cached)
+                    return data
+                except Exception:
+                    pass
+
+    raw = await supabase_rpc_get_graph(faccao_id, include_co, max_pairs)
+    fixed = normalize_graph_labels(raw)
+
+    nodes = fixed.get("nodes", []) or []
+    map_photo_field_on_nodes(nodes)
+    if enrich_photos:
+        try:
+            await enrich_nodes_with_member_photos(nodes)
+        except Exception as e:
+            log.warning("photo enrichment error: %s", e)
+
+    if use_cache:
+        r = await _get_redis()
+        if r:
+            await r.set(
+                cache_key, json.dumps(fixed, ensure_ascii=False), ex=CACHE_API_TTL
+            )
+    return fixed
 
 
 # -----------------------------------------------------------------------------
@@ -321,23 +415,11 @@ async def _shutdown():
     "/live", response_class=PlainTextResponse, include_in_schema=True, tags=["ops"]
 )
 async def live():
-    """Liveness probe simples."""
     return PlainTextResponse("ok", status_code=200)
 
 
 @app.get("/health", response_class=JSONResponse, include_in_schema=True, tags=["ops"])
-async def health(
-    deep: bool = Query(
-        default=False, description="Se true, executa RPC no Supabase e ping no Redis"
-    )
-):
-    """
-    Health check:
-    - `redis`: ping
-    - `backend`: 'supabase' ou 'none'
-    - `backend_ok`: True se variáveis estão configuradas
-    - `deep`: (opcional) faz chamada real ao backend e validações adicionais
-    """
+async def health(deep: bool = Query(default=False)):
     out = platform_info()
     out.update(
         {
@@ -348,7 +430,6 @@ async def health(
         }
     )
 
-    # Redis
     r_ok = True
     r = await _get_redis()
     if r:
@@ -359,7 +440,6 @@ async def health(
             r_ok = False
             out["redis_error"] = str(e)
 
-    # Deep check (RPC no Supabase)
     if deep:
         b_ok = False
         if _env_backend_ok():
@@ -375,20 +455,17 @@ async def health(
     else:
         out["ok"] = (not ENABLE_REDIS_CACHE or r_ok) and _env_backend_ok()
 
-    # Informações do Supabase (sem segredos)
     out["supabase"] = {
         "url": SUPABASE_URL,
         "rpc_fn": SUPABASE_RPC_FN,
         "timeout": SUPABASE_TIMEOUT,
         "service_key_tail": redact(SUPABASE_SERVICE_KEY),
     }
-
     return JSONResponse(out, status_code=200 if out.get("ok") else 503)
 
 
 @app.get("/ready", response_class=JSONResponse, include_in_schema=True, tags=["ops"])
 async def ready():
-    """Readiness probe (valida Redis e executa RPC curto no Supabase)."""
     r_ok = True
     out = platform_info()
     out.update(
@@ -426,16 +503,8 @@ async def ready():
 
 @app.get("/ops/status", response_class=JSONResponse, tags=["ops"])
 async def ops_status():
-    """
-    Status operacional amigável para humanos/automação:
-    - plataforma (Coolify/container)
-    - Redis (ativo/config)
-    - Supabase (config/redacted)
-    - variáveis-chave (sem segredos)
-    """
     info = platform_info()
 
-    # Redis presence
     redis_cfg = {"enabled": ENABLE_REDIS_CACHE, "url": REDIS_URL}
     if ENABLE_REDIS_CACHE and aioredis:
         try:
@@ -446,7 +515,6 @@ async def ops_status():
         except Exception as e:
             redis_cfg["error"] = str(e)
 
-    # Supabase
     supa = {
         "configured": _env_backend_ok(),
         "url": SUPABASE_URL,
@@ -485,28 +553,25 @@ async def graph_membros(
     max_nodes: int = Query(default=2000, ge=100, le=20000),
     max_edges: int = Query(default=4000, ge=100, le=200000),
     cache: bool = Query(default=True),
+    enrich_photos: bool = Query(
+        default=True,
+        description="Se true, tenta preencher foto consultando a tabela membros",
+    ),
 ):
-    """
-    Saída:
-      {
-        "nodes": [ {id, label, type, group, size, faccao_id?, photo_url?}, ...],
-        "edges": [ {source, target, weight, relation}, ...]
-      }
-    """
     data = await fetch_graph_sanitized(
-        faccao_id, include_co, max_pairs, use_cache=cache
+        faccao_id, include_co, max_pairs, use_cache=cache, enrich_photos=enrich_photos
     )
     data = truncate_preview(data, max_nodes, max_edges)
     return JSONResponse(data, status_code=200)
 
 
 # -----------------------------------------------------------------------------
-# VIS.JS (vis-network) — mantém visual custom anterior
+# VIS.JS
 # -----------------------------------------------------------------------------
 @app.get(
     "/v1/vis/visjs",
     response_class=HTMLResponse,
-    summary="Visualização vis-network (cores CV/PCC, arestas finas, drag isolado, busca, fotos)",
+    summary="Visualização vis-network (fotos circulares, fallback ícone, cores CV/PCC, arestas finas, drag isolado, busca)",
     tags=["viz"],
 )
 async def vis_visjs(
@@ -521,6 +586,7 @@ async def vis_visjs(
     title: str = "Knowledge Graph (vis.js)",
     debug: bool = Query(default=False),
     source: str = Query(default="server", pattern="^(server|client)$"),
+    enrich_photos: bool = Query(default=True),
 ):
     local_js = "static/vendor/vis-network.min.js"
     local_css = "static/vendor/vis-network.min.css"
@@ -545,7 +611,11 @@ async def vis_visjs(
     embedded_block = ""
     if source == "server":
         data = await fetch_graph_sanitized(
-            faccao_id, include_co, max_pairs, use_cache=cache
+            faccao_id,
+            include_co,
+            max_pairs,
+            use_cache=cache,
+            enrich_photos=enrich_photos,
         )
         out = truncate_preview(data, max_nodes, max_edges)
         out = normalize_graph_labels(out)
@@ -556,7 +626,6 @@ async def vis_visjs(
 
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
-    # NOTA: string normal (não f-string) para evitar problemas com chaves JS/CSS.
     html = """
 <!doctype html>
 <html lang="pt-br">
@@ -564,7 +633,7 @@ async def vis_visjs(
     <meta charset="utf-8" />
     <meta http-equiv="x-ua-compatible" content="ie=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Knowledge Graph (vis.js)</title>
+    <title>{title}</title>
     <link rel="stylesheet" href="{css_href}">
     <link rel="stylesheet" href="/static/vis-style.css">
     <meta name="theme-color" content="{bg}">
@@ -577,7 +646,7 @@ async def vis_visjs(
   </head>
   <body data-theme="{theme}">
     <div class="kg-toolbar">
-      <h4 style="margin:0">Knowledge Graph (vis.js)</h4>
+      <h4 style="margin:0">{title}</h4>
       <input id="kg-search" type="search" placeholder="Buscar nó por rótulo ou ID…" />
       <button id="btn-print" type="button" title="Imprimir">Print</button>
       <button id="btn-reload" type="button" title="Recarregar">Reload</button>
@@ -604,6 +673,8 @@ async def vis_visjs(
         'CO_FACCAO':       '#8e24aa',
         'CO_FUNCAO':       '#546e7a'
       }};
+      // Preferimos SVG; PNG alternativo disponível em /static/icons/person.png
+      const ICON_PERSON = '/static/icons/person.svg';
 
       const container = document.getElementById('mynetwork');
       const source = container.getAttribute('data-source') || 'server';
@@ -680,6 +751,11 @@ async def vis_visjs(
         net.fit({{ nodes: ids, animation: {{ duration: 300 }} }});
       }}
 
+      function isPersonType(t) {{
+        t = String(t||'').toLowerCase();
+        return t.includes('pessoa') || t.includes('membro');
+      }}
+
       function render(data) {{
         const rawNodes = data.nodes || [];
         const rawEdges = data.edges || [];
@@ -692,10 +768,14 @@ async def vis_visjs(
             const label = cleanLabel(n.label)||id;
             const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
             const value = (typeof n.size==='number') ? n.size : undefined;
-            const photo = n.photo_url && /^https?:\\/\\//i.test(n.photo_url) ? n.photo_url : null;
+            const photo = n.photo_url && /^https?:\\/\\//i.test(n.photo_url) ? n.photo_url
+                        : (n.photo_url && n.photo_url.startsWith('/assets/')) ? n.photo_url
+                        : null;
             const color = colorForNode({{group, type:n.type}}, faccaoColorById);
             const base = {{ id, label, group, value, color, borderWidth: 1 }};
-            if (photo) {{ base.shape = 'circularImage'; base.image = photo; }} else {{ base.shape = 'dot'; }}
+            if (photo) {{ base.shape = 'circularImage'; base.image = photo; }}
+            else if (isPersonType(n.type)) {{ base.shape = 'image'; base.image = ICON_PERSON; }}
+            else {{ base.shape = 'dot'; }}
             return base;
           }});
 
@@ -735,8 +815,11 @@ async def vis_visjs(
         }};
 
         const net = new vis.Network(container, {{nodes: dsNodes, edges: dsEdges}}, options);
-        net.once('stabilizationIterationsDone',()=>net.fit({{animation:{{duration:300}}}}));
+
+        // Após estabilizar, desliga a física: ao arrastar, só o nó move (não puxa o grafo todo)
+        net.once('stabilizationIterationsDone',()=>{{ net.setOptions({{ physics: false }}); net.fit({{animation:{{duration:300}}}}); }});
         net.on('doubleClick',()=>net.fit({{animation:{{duration:300}}}}));
+
         attachToolbar(net, nodes.length, edges.length, dsNodes);
       }}
 
@@ -759,6 +842,7 @@ async def vis_visjs(
           qs.set('max_nodes',  params.get('max_nodes')  ?? '2000');
           qs.set('max_edges',  params.get('max_edges')  ?? '4000');
           qs.set('cache',      params.get('cache')      ?? 'false');
+          qs.set('enrich_photos', params.get('enrich_photos') ?? 'true');
           const url=endpoint+'?'+qs.toString();
           fetch(url,{{headers:{{'Accept':'application/json'}}}})
             .then(async r=>{{ if(!r.ok) throw new Error(r.status+': '+await r.text()); return r.json(); }})
@@ -774,6 +858,7 @@ async def vis_visjs(
   </body>
 </html>
 """.format(
+        title=title,
         css_href=css_href,
         bg=bg,
         theme=theme,
@@ -790,12 +875,12 @@ async def vis_visjs(
 
 
 # -----------------------------------------------------------------------------
-# PYVIS (mantém visual + busca)
+# PYVIS
 # -----------------------------------------------------------------------------
 @app.get(
     "/v1/vis/pyvis",
     response_class=HTMLResponse,
-    summary="Visualização com PyVis (cores CV/PCC, arestas finas, drag isolado, busca, fotos)",
+    summary="Visualização com PyVis (fotos circulares, fallback ícone, cores CV/PCC, arestas finas, drag isolado, busca)",
     tags=["viz"],
 )
 async def vis_pyvis(
@@ -808,10 +893,15 @@ async def vis_pyvis(
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (PyVis)",
     debug: bool = Query(default=False),
+    enrich_photos: bool = Query(default=True),
 ):
     try:
         data = await fetch_graph_sanitized(
-            faccao_id, include_co, max_pairs, use_cache=cache
+            faccao_id,
+            include_co,
+            max_pairs,
+            use_cache=cache,
+            enrich_photos=enrich_photos,
         )
         data = truncate_preview(data, max_nodes, max_edges)
         data = normalize_graph_labels(data)
@@ -863,6 +953,10 @@ async def vis_pyvis(
         cdn_resources="in_line",
     )
 
+    def is_person(t: Optional[str]) -> bool:
+        t2 = (t or "").lower()
+        return "pessoa" in t2 or "membro" in t2
+
     seen = set()
     for n in nodes:
         if not n or n.get("id") is None:
@@ -875,12 +969,11 @@ async def vis_pyvis(
         label = str(n.get("label") or nid)
         group = str(n.get("group") or n.get("faccao_id") or n.get("type") or "0")
         size = n.get("size")
-        photo = (
-            n.get("photo_url")
-            if isinstance(n.get("photo_url"), str)
-            and n["photo_url"].startswith(("http://", "https://"))
-            else None
-        )
+        photo = n.get("photo_url")
+        if photo and not (
+            str(photo).startswith(("http://", "https://", "data:", "/assets/"))
+        ):
+            photo = resolve_photo_url(str(photo))
 
         fixed_color = color_from_faccao(group)
         color = fixed_color or hash_color(group)
@@ -892,6 +985,10 @@ async def vis_pyvis(
         if photo:
             node_kwargs["shape"] = "circularImage"
             node_kwargs["image"] = photo
+        elif is_person(n.get("type")):
+            # PNG alternativo disponível em /static/icons/person.png
+            node_kwargs["shape"] = "image"
+            node_kwargs["image"] = "/static/icons/person.svg"
         else:
             node_kwargs["shape"] = "dot"
 
@@ -969,6 +1066,10 @@ async def vis_pyvis(
     toolbar_js = """
     <script>
       (function(){
+        // Desliga física após estabilização: arrastar não puxa o grafo todo
+        if (window.network) {
+          window.network.once('stabilizationIterationsDone', function(){ window.network.setOptions({ physics: false }); });
+        }
         function colorObj(c, opacity){
           if (typeof c === 'object' && c) { return Object.assign({}, c, { opacity: opacity }); }
           return {
@@ -1013,14 +1114,10 @@ async def vis_pyvis(
 
 
 # -----------------------------------------------------------------------------
-# /docs custom (Swagger UI + painel de status)
+# /docs custom (Swagger + painel de status)
 # -----------------------------------------------------------------------------
 @app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
 async def custom_docs():
-    """
-    Página Swagger customizada com painel de status (live/health/ready/ops).
-    """
-    # CSP permitindo CDN do swagger-ui + self
     csp = (
         "default-src 'self'; "
         "img-src 'self' data: https://cdn.jsdelivr.net; "
@@ -1038,11 +1135,8 @@ async def custom_docs():
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist/swagger-ui.css">
     <style>
       body { margin:0; }
-      .ops-bar {
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-        padding: 12px 16px; border-bottom: 1px solid #eee; background:#fafafa;
-        display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
-      }
+      .ops-bar { padding: 12px 16px; border-bottom: 1px solid #eee; background:#fafafa;
+                 display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; }
       .ops-right { display:flex; gap:8px; align-items:center; }
       .ops-pill { padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #e0e0e0; background:#fff; }
       .ops-pill.ok { border-color:#c8e6c9; background:#e8f5e9; }
@@ -1069,7 +1163,7 @@ async def custom_docs():
           <div class="ops-kv"><b>RPC</b><div id="kv-rpc">—</div></div>
           <div class="ops-kv"><b>Timeout</b><div id="kv-timeout">—</div></div>
         </div>
-        <div class="note">Use os botões para testar live/health/ready. O painel atualiza automaticamente ao abrir.</div>
+        <div class="note">Painel de status + Swagger UI.</div>
       </div>
       <div class="ops-right">
         <a class="ops-pill" href="/live" target="_blank">/live</a>
@@ -1098,7 +1192,6 @@ async def custom_docs():
         setKV('kv-rpc', (ops.supabase && ops.supabase.rpc_fn) ? ops.supabase.rpc_fn : '—');
         setKV('kv-timeout', (ops.supabase && ops.supabase.timeout) ? ops.supabase.timeout : '—');
 
-        // pinta pílulas conforme health
         const pills = document.querySelectorAll('.ops-right .ops-pill');
         pills.forEach(p => p.classList.remove('ok','err'));
         if (health && health.ok){ pills.forEach(p => p.classList.add('ok')); }
@@ -1106,13 +1199,7 @@ async def custom_docs():
       }
 
       window.onload = function(){
-        const ui = SwaggerUIBundle({
-          url: '/openapi.json',
-          dom_id: '#swagger-ui',
-          deepLinking: true,
-          docExpansion: 'none',
-          defaultModelsExpandDepth: -1
-        });
+        SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui', deepLinking: true, docExpansion: 'none', defaultModelsExpandDepth: -1 });
         refresh();
       };
     </script>
