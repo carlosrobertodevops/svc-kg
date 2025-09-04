@@ -1,27 +1,35 @@
 FROM python:3.11-slim
 
-ENV PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PORT=8080 \
-    WORKERS=2
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Instala dependências primeiro (cache mais eficiente)
-COPY requirements.txt ./requirements.txt
+# deps básicos
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia TODO o projeto (com .dockerignore para não levar lixo)
-COPY . .
-
-# Garante que as pastas existam (caso não estejam no repo)
-RUN mkdir -p /app/static /app/assets /app/docs
+# app + assets
+COPY app.py ./app.py
+# estáticos (se faltar, o app usa CDN mesmo assim)
+COPY static ./static
+# diretórios vazios não quebram o build
+RUN mkdir -p assets docs tmp && \
+    touch assets/.keep docs/.keep tmp/.keep
 
 EXPOSE 8080
 
-# gunicorn + uvicorn worker = produção
-CMD ["bash", "-lc", "exec gunicorn -k uvicorn.workers.UvicornWorker -w ${WORKERS:-2} -b 0.0.0.0:${PORT:-8080} app:app --access-logfile - --error-logfile -"]
+ENV PORT=8080 APP_ENV=production WORKERS=2 LOG_LEVEL=info
+
+# gunicorn com uvicorn workers
+CMD exec gunicorn app:app \
+    --bind 0.0.0.0:${PORT} \
+    --workers ${WORKERS} \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --timeout 60 \
+    --access-logfile - \
+    --error-logfile -
