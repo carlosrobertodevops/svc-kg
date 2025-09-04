@@ -3,7 +3,7 @@ import json
 import asyncio
 import logging
 import socket
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 import httpx
 from fastapi import FastAPI, Query, Response, HTTPException
@@ -43,12 +43,16 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 CACHE_API_TTL = int(os.getenv("CACHE_API_TTL", "60"))
 CACHE_STATIC_MAX_AGE = int(os.getenv("CACHE_STATIC_MAX_AGE", "86400"))
 
+MEMBERS_TABLE = os.getenv("MEMBERS_TABLE", "membros")
+MEMBERS_ID_COL = os.getenv("MEMBERS_ID_COL", "id")
+MEMBERS_PHOTO_COL = os.getenv("MEMBERS_PHOTO_COL", "photo_url")  # também aceitamos foto_path no payload
+
 SERVICE_ID = "svc-kg"
 SERVICE_AKA = ["sic-kg"]
 
 app = FastAPI(
     title="svc-kg",
-    version="v1.7.15-rpcfix",
+    version="v1.7.17-visfix",
     description="Micro serviço de Knowledge Graph com visualizações (vis.js e PyVis).",
     docs_url=None,
     redoc_url=None,
@@ -60,7 +64,6 @@ os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 if os.path.isdir("docs"):
     app.mount("/docs-static", StaticFiles(directory="docs"), name="docs-static")
-# expõe /assets se existir (para fotos locais)
 if os.path.isdir("assets"):
     app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
@@ -132,6 +135,9 @@ def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
         fixed["id"] = nid
         if label is not None:
             fixed["label"] = label
+        # normaliza possíveis campos de foto
+        if "foto_path" in fixed and fixed.get("foto_path") and not fixed.get("photo_url"):
+            fixed["photo_url"] = fixed.get("foto_path")
         fixed_nodes.append(fixed)
 
     fixed_edges = []
@@ -158,16 +164,14 @@ def truncate_preview(data: Dict[str, Any], max_nodes: int, max_edges: int) -> Di
 
 
 async def supabase_rpc_get_graph(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> Dict[str, Any]:
-    """
-    Chama o RPC no PostgREST/Supabase com robustez:
-    1) tenta com parâmetros p_* (p_faccao_id, p_include_co, p_max_pairs) — o que o seu log indica;
-    2) se não casar (PGRST202 / 404), tenta com nomes simples (faccao_id, include_co, max_pairs);
-    3) último fallback: envia um JSON único {"args": {...}}.
-    """
     if not _env_backend_ok():
         raise RuntimeError("backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY")
 
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
+    variants = [
+        {"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs},
+        {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs},
+    ]
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
@@ -175,36 +179,36 @@ async def supabase_rpc_get_graph(faccao_id: Optional[int], include_co: bool, max
         "Accept": "application/json",
     }
     client = await _get_http()
-
-    async def _call(payload: Dict[str, Any]):
-        resp = await client.post(url, json=payload, headers=headers)
-        if resp.status_code == 200:
-            return resp.json()
-        # Tenta detectar assinatura incorreta para fallback
+    last_err = None
+    for idx, payload in enumerate(variants, start=1):
         try:
-            j = resp.json()
-        except Exception:
-            j = None
-        if resp.status_code == 404 and isinstance(j, dict) and j.get("code") == "PGRST202":
-            return None  # sinaliza para tentar outra assinatura
-        # qualquer outro erro: propaga com detalhe
-        raise RuntimeError(f"{resp.status_code}: Supabase RPC {SUPABASE_RPC_FN} falhou: {resp.text}")
+            resp = await client.post(url, json=payload, headers=headers)
+        except Exception as e:
+            last_err = f"request_error: {e}"
+            log.warning("RPC %s erro de request (var%d): %s", SUPABASE_RPC_FN, idx, last_err)
+            continue
 
-    # 1) p_*
-    data = await _call({"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs})
-    # 2) simples
-    if data is None:
-        data = await _call({"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs})
-    # 3) JSON único
-    if data is None:
-        data = await _call({"args": {"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs}})
-
-    if not isinstance(data, dict):
-        if isinstance(data, list) and data and isinstance(data[0], dict) and "nodes" in data[0]:
-            data = data[0]
+        if resp.status_code == 200:
+            try:
+                data = resp.json()
+            except Exception as e:
+                raise RuntimeError(f"invalid_json: {e}")
+            if not isinstance(data, dict):
+                if isinstance(data, list) and data and isinstance(data[0], dict) and "nodes" in data[0]:
+                    data = data[0]
+                else:
+                    raise RuntimeError(f"unexpected_payload_type: {type(data)}")
+            if idx > 1:
+                log.info("RPC %s OK via fallback (var%d)", SUPABASE_RPC_FN, idx)
+            else:
+                log.info("RPC %s OK (var1 p_*).")
+            return data
         else:
-            raise RuntimeError("Formato inesperado do RPC (esperado objeto com nodes/edges)")
-    return data
+            body = resp.text
+            last_err = f"{resp.status_code}: {body}"
+            log.warning("RPC %s falhou (var%d): %s", SUPABASE_RPC_FN, idx, last_err)
+
+    raise RuntimeError(f"Supabase RPC {SUPABASE_RPC_FN} falhou: {last_err}")
 
 
 async def fetch_graph_sanitized(faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool = True) -> Dict[str, Any]:
@@ -409,14 +413,36 @@ async def graph_membros(
     max_pairs: int = Query(default=8000, ge=1, le=200000),
     max_nodes: int = Query(default=2000, ge=100, le=20000),
     max_edges: int = Query(default=4000, ge=100, le=200000),
-    cache: bool = Query(default=True)
+    cache: bool = Query(default=True),
+    q: Optional[str] = Query(default=None, description="Busca por membro/facção/função (label contém)")
 ):
     try:
         data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
         data = truncate_preview(data, max_nodes, max_edges)
+
+        # filtro simples por texto (label, type)
+        if q:
+            t = q.strip().lower()
+            ns = []
+            keep = set()
+            for n in data.get("nodes", []):
+                label = str(n.get("label") or "").lower()
+                ntype = str(n.get("type") or "").lower()
+                if t in label or t in ntype:
+                    ns.append(n)
+                    keep.add(str(n["id"]))
+            # mantém arestas entre nós filtrados
+            es = []
+            for e in data.get("edges", []):
+                a = str(e.get("source")); b = str(e.get("target"))
+                if a in keep and b in keep:
+                    es.append(e)
+            data = {"nodes": ns, "edges": es}
+
         return JSONResponse(data, status_code=200)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"graph_fetch_error: {e}")
+        log.exception("graph_membros error")
+        return JSONResponse({"error": f"{e}"}, status_code=502)
 
 
 @app.get(
@@ -437,6 +463,7 @@ async def vis_visjs(
     title: str = "Knowledge Graph (vis.js)",
     debug: bool = Query(default=False),
     source: str = Query(default="server", pattern="^(server|client)$"),
+    q: Optional[str] = Query(default=None)
 ):
     local_js = "static/vendor/vis-network.min.js"
     local_css = "static/vendor/vis-network.min.css"
@@ -452,11 +479,33 @@ async def vis_visjs(
 
     embedded_block = ""
     if source == "server":
-        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
-        out = truncate_preview(data, max_nodes, max_edges)
-        out = normalize_graph_labels(out)
-        json_str = json.dumps(out, ensure_ascii=False)
-        embedded_block = '<script id="__KG_DATA__" type="application/json">' + json_str + "</script>"
+        try:
+            data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
+            data = truncate_preview(data, max_nodes, max_edges)
+            data = normalize_graph_labels(data)
+            if q:
+                # aplica o mesmo filtro do endpoint JSON
+                t = q.strip().lower()
+                ns = []
+                keep = set()
+                for n in data.get("nodes", []):
+                    label = str(n.get("label") or "").lower()
+                    ntype = str(n.get("type") or "").lower()
+                    if t in label or t in ntype:
+                        ns.append(n)
+                        keep.add(str(n["id"]))
+                es = []
+                for e in data.get("edges", []):
+                    a = str(e.get("source")); b = str(e.get("target"))
+                    if a in keep and b in keep:
+                        es.append(e)
+                data = {"nodes": ns, "edges": es}
+
+            json_str = json.dumps(data, ensure_ascii=False)
+            embedded_block = '<script id="__KG_DATA__" type="application/json">' + json_str + "</script>"
+        except Exception as e:
+            html_err = f"<pre style='padding:12px'>Erro ao carregar grafo: {e}</pre>"
+            embedded_block = f"<div>{html_err}</div>"
 
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
@@ -471,17 +520,13 @@ async def vis_visjs(
     <link rel="stylesheet" href="{css_href}">
     <link rel="stylesheet" href="/static/vis-style.css">
     <meta name="theme-color" content="{bg}">
-    <style>
-      html,body,#mynetwork {{ height:100%; margin:0; }}
-      .kg-toolbar {{ display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }}
-      .kg-toolbar input[type="search"] {{ flex: 1; min-width: 220px; padding:6px 10px; }}
-      .badge {{ background:#eee; border-radius:6px; padding:2px 8px; font-size:12px; }}
-    </style>
   </head>
   <body data-theme="{theme}">
     <div class="kg-toolbar">
-      <h4 style="margin:0">Knowledge Graph (vis.js)</h4>
-      <input id="kg-search" type="search" placeholder="Buscar nó por rótulo ou ID…" />
+      <h4 class="kg-title">{title}</h4>
+      <input id="kg-search" type="search" placeholder="Buscar nó (membro/facção/função)…" />
+      <button id="btn-apply" type="button" title="Aplicar busca">Buscar</button>
+      <button id="btn-clear" type="button" title="Limpar filtro">Limpar</button>
       <button id="btn-print" type="button" title="Imprimir">Print</button>
       <button id="btn-reload" type="button" title="Recarregar">Reload</button>
       <span id="badge" class="badge" style="display:{debug_display}">debug</span>
@@ -491,7 +536,9 @@ async def vis_visjs(
          style="height:90vh;width:100%;"
          data-endpoint="/v1/graph/membros"
          data-debug="{debug_bool}"
-         data-source="{source}"></div>
+         data-source="{source}"
+         data-theme="{theme}"
+         data-query="{q}"></div>
 
     {embedded_block}
     <script src="{js_href}" crossorigin="anonymous"></script>
@@ -499,11 +546,11 @@ async def vis_visjs(
   </body>
 </html>
 """.format(
-        css_href=css_href, bg=bg, theme=theme,
+        css_href=css_href, bg=bg, theme=theme, title=title,
         debug_display="inline-block" if debug else "none",
         debug_bool=str(debug).lower(),
         source=source, js_href=js_href,
-        embedded_block=embedded_block,
+        embedded_block=embedded_block, q=(q or "")
     )
 
     response.headers["Content-Security-Policy"] = csp
@@ -527,6 +574,7 @@ async def vis_pyvis(
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (PyVis)",
     debug: bool = Query(default=False),
+    q: Optional[str] = Query(default=None),
 ):
     try:
         data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
@@ -534,6 +582,24 @@ async def vis_pyvis(
         data = normalize_graph_labels(data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"graph_fetch_error: {e}")
+
+    # filtro textual (membro/facção/função via label/type)
+    if q:
+        t = q.strip().lower()
+        ns = []
+        keep = set()
+        for n in data.get("nodes", []):
+            label = str(n.get("label") or "").lower()
+            ntype = str(n.get("type") or "").lower()
+            if t in label or t in ntype:
+                ns.append(n)
+                keep.add(str(n["id"]))
+        es = []
+        for e in data.get("edges", []):
+            a = str(e.get("source")); b = str(e.get("target"))
+            if a in keep and b in keep:
+                es.append(e)
+        data = {"nodes": ns, "edges": es}
 
     nodes = data.get("nodes", []) or []
     edges = data.get("edges", []) or []
@@ -554,9 +620,9 @@ async def vis_pyvis(
         if not name:
             return None
         if "PCC" in name:
-            return "#0d47a1"
+            return "#0d47a1"  # azul escuro
         if name == "CV" or "COMANDO VERMELHO" in name:
-            return "#d32f2f"
+            return "#d32f2f"  # vermelho
         return None
 
     def hash_color(s: str) -> str:
@@ -603,12 +669,9 @@ async def vis_pyvis(
         if isinstance(size, (int, float)):
             node_kwargs["value"] = float(size)
 
-        if photo:
-            node_kwargs["shape"] = "circularImage"
-            node_kwargs["image"] = photo
-        else:
-            node_kwargs["shape"] = "circularImage"
-            node_kwargs["image"] = "/static/icons/person.svg"
+        # exibe foto se houver, senão ícone padrão
+        node_kwargs["shape"] = "circularImage"
+        node_kwargs["image"] = photo or "/static/icons/person.svg"
 
         net.add_node(nid, label=label, **node_kwargs)
 
@@ -634,35 +697,37 @@ async def vis_pyvis(
             color = EDGE_COLORS.get(rel, "#90a4ae")
             net.add_edge(a, b, value=w, width=1, color=color, title=f"{rel} (w={w})")
 
+    # ⚠️ PyVis espera JSON PURO, sem 'const ... ='
     net.set_options("""
-    const options = {
-      interaction: {
-        hover: true,
-        dragNodes: true,
-        dragView: false,
-        zoomView: true,
-        multiselect: true,
-        navigationButtons: true
-      },
-      manipulation: { enabled: false },
-      physics: {
-        enabled: true,
-        stabilization: { enabled: true, iterations: 300 },
-        barnesHut: {
-          gravitationalConstant: -8000,
-          centralGravity: 0.2,
-          springLength: 120,
-          springConstant: 0.04,
-          avoidOverlap: 0.2
-        }
-      },
-      nodes: { shape: 'dot', borderWidth: 1 },
-      edges: { smooth: false }
-    };
+{
+  "interaction": {
+    "hover": true,
+    "dragNodes": true,
+    "dragView": false,
+    "zoomView": true,
+    "multiselect": true,
+    "navigationButtons": true
+  },
+  "manipulation": { "enabled": false },
+  "physics": {
+    "enabled": true,
+    "stabilization": { "enabled": true, "iterations": 300 },
+    "barnesHut": {
+      "gravitationalConstant": -8000,
+      "centralGravity": 0.2,
+      "springLength": 120,
+      "springConstant": 0.04,
+      "avoidOverlap": 0.2
+    }
+  },
+  "nodes": { "borderWidth": 1 },
+  "edges": { "smooth": false }
+}
     """)
 
     html = net.generate_html(title=title)
 
+    # toolbar + congelar física após estabilizar (arrastar só o nó)
     toolbar_css = """
     <style>
       .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
@@ -675,6 +740,8 @@ async def vis_pyvis(
     <div class="kg-toolbar">
       <h4 style="margin:0">{title}</h4>
       <input id="kg-search" type="search" placeholder="Buscar nó por rótulo ou ID…" />
+      <button id="btn-apply" type="button">Buscar</button>
+      <button id="btn-clear" type="button">Limpar</button>
       <button id="btn-print" type="button" title="Imprimir">Print</button>
       <button id="btn-reload" type="button" title="Recarregar">Reload</button>
     </div>
@@ -698,23 +765,43 @@ async def vis_pyvis(
             if (!ds) return;
             var all = ds.get();
             var t = (txt||'').trim().toLowerCase();
+            // reset
+            all.forEach(function(n){
+              var orig = (n._origColor || n.color || '#90a4ae');
+              ds.update({ id: n.id, color: colorObj(orig, 1) });
+            });
             if (!t){ return; }
-            var hits = all.filter(function(n){ return (String(n.label||'').toLowerCase().indexOf(t) >= 0) || (String(n.id)===t); });
-            if (!hits.length) return;
-
-            all.forEach(function(n){ ds.update({ id: n.id, color: colorObj(n.color, 0.25) }); });
-            hits.forEach(function(h){ var cur = ds.get(h.id); ds.update({ id: h.id, color: colorObj(cur.color, 1) }); });
-            network.fit({ nodes: hits.map(function(h){return h.id;}), animation: { duration: 300 } });
+            var hits = all.filter(function(n){
+              var lab = String(n.label||'').toLowerCase();
+              var typ = String(n.type||'').toLowerCase();
+              return (lab.indexOf(t) >= 0) || (typ.indexOf(t) >= 0) || (String(n.id)===t);
+            });
+            // escurece os não-hits
+            var hitIds = new Set(hits.map(h => h.id));
+            all.forEach(function(n){
+              if (!hitIds.has(n.id)){
+                var orig = (n._origColor || n.color || '#90a4ae');
+                ds.update({ id: n.id, color: colorObj(orig, 0.25) });
+              }
+            });
+            if (hits.length){
+              network.fit({ nodes: hits.map(h=>h.id), animation: { duration: 300 } });
+            }
           }catch(e){ console.error(e); }
         }
         var q = document.getElementById('kg-search');
+        var b = document.getElementById('btn-apply');
+        var c = document.getElementById('btn-clear');
         var p = document.getElementById('btn-print');
         var r = document.getElementById('btn-reload');
         if (p) p.onclick = function(){ window.print(); };
         if (r) r.onclick = function(){ location.reload(); };
-        if (q){
-          q.addEventListener('change', function(){ runSearch(q.value); });
-          q.addEventListener('keyup', function(e){ if(e.key==='Enter') runSearch(q.value); });
+        if (b && q) b.onclick = function(){ runSearch(q.value); };
+        if (c && q) c.onclick = function(){ q.value=''; runSearch(''); };
+
+        // congela a física após estabilizar -> arrastar só o nó
+        if (typeof network !== 'undefined'){
+          network.once('stabilized', function(){ network.setOptions({ physics: false }); });
         }
       })();
     </script>

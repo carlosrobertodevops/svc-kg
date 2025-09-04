@@ -1,26 +1,27 @@
-:root {
-	--kg-bg: #ffffff;
-	--kg-fg: #111827;
-	--kg-border: #e0e0e0;
-}
-[data-theme="dark"] {
-	--kg-bg: #0b0f19;
-	--kg-fg: #e8eaed;
-	--kg-border: #263238;
-}
 html,
 body {
-	background: var(--kg-bg);
-	color: var(--kg-fg);
+	height: 100%;
+	margin: 0;
 }
 .kg-toolbar {
-	background: var(--kg-bg);
-	color: var(--kg-fg);
-	border-bottom: 1px solid var(--kg-border);
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	padding: 8px;
+	border-bottom: 1px solid #e0e0e0;
+	background: #fafafa;
+}
+.kg-title {
+	margin: 0;
+}
+.kg-toolbar input[type="search"] {
+	flex: 1;
+	min-width: 220px;
+	padding: 6px 10px;
 }
 .kg-toolbar button {
 	padding: 6px 10px;
-	border: 1px solid var(--kg-border);
+	border: 1px solid #e0e0e0;
 	background: transparent;
 	border-radius: 6px;
 	cursor: pointer;
@@ -28,8 +29,9 @@ body {
 .kg-toolbar button:hover {
 	background: rgba(0, 0, 0, 0.04);
 }
-.kg-toolbar input[type="search"] {
-	border: 1px solid var(--kg-border);
+.badge {
+	background: #eee;
 	border-radius: 6px;
-	outline: none;
+	padding: 2px 8px;
+	font-size: 12px;
 }
