@@ -13,6 +13,7 @@
     'CO_FACCAO': '#8e24aa',
     'CO_FUNCAO': '#546e7a'
   };
+  // Preferimos SVG; PNG alternativo disponível em /static/icons/person.png
   const ICON_PERSON = '/static/icons/person.svg';
 
   function hashColor(s) {
