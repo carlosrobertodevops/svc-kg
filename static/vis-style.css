@@ -1,4 +1,4 @@
-html,
+/* html,
 body,
 #mynetwork {
   height: 100%;
@@ -45,4 +45,15 @@ body[data-theme="dark"] {
   background: #ffbe0b;
   color: #111;
   font-size: 12px;
+} */
+html,
+body {
+	margin: 0;
+	height: 100%;
+}
+.kg-toolbar {
+	user-select: none;
+}
+.kg-toolbar button {
+	cursor: pointer;
 }

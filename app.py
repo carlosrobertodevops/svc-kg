@@ -9,9 +9,6 @@ from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-# =========================
-# Config
-# =========================
 APP_ENV = os.getenv("APP_ENV", "development")
 PORT = int(os.getenv("PORT", "8080"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
@@ -31,14 +28,11 @@ CACHE_API_TTL = int(os.getenv("CACHE_API_TTL", "60"))
 ENABLE_REDIS_CACHE = os.getenv("ENABLE_REDIS_CACHE", "false").lower() == "true"
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-# =========================
 # Redis opcional
-# =========================
 REDIS = None
 if ENABLE_REDIS_CACHE:
     try:
-        import redis.asyncio as redis
-
+        import redis.asyncio as redis  # type: ignore
         REDIS = redis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
     except Exception:
         REDIS = None
@@ -62,13 +56,11 @@ async def cache_set(key: str, value: str, ttl: int) -> None:
         pass
 
 
-# =========================
-# App + CORS + Static
-# =========================
+# App
 app = FastAPI(
     title="svc-kg",
-    version="1.7.12",
-    docs_url="/docs",  # Swagger UI
+    version="1.7.14",
+    docs_url="/docs",
     redoc_url="/docs/redoc",
     openapi_url="/docs/openapi.json",
 )
@@ -86,13 +78,12 @@ app.add_middleware(
     allow_headers=cors_headers,
 )
 
+# static
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# =========================
-# Supabase helpers
-# =========================
+# -------- Supabase helpers --------
 async def call_supabase_graph(
     faccao_id: Optional[int], include_co: bool, max_pairs: int
 ) -> Dict[str, Any]:
@@ -102,11 +93,7 @@ async def call_supabase_graph(
         raise RuntimeError("SUPABASE_URL inválida")
 
     url = SUPABASE_URL.rstrip("/") + f"/rest/v1/rpc/{SUPABASE_RPC_FN}"
-    payload = {
-        "p_faccao_id": faccao_id,
-        "p_include_co": include_co,
-        "p_max_pairs": max_pairs,
-    }
+    payload = {"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs}
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -126,11 +113,8 @@ async def call_supabase_graph(
         try:
             data = r.json()
         except json.JSONDecodeError as je:
-            raise HTTPException(
-                status_code=502, detail=f"Supabase retornou JSON inválido: {str(je)}"
-            )
+            raise HTTPException(status_code=502, detail=f"Supabase retornou JSON inválido: {str(je)}")
 
-    # alguns setups retornam [{...}]
     if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
         data = data[0]
     if isinstance(data, str):
@@ -155,7 +139,6 @@ def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
         if lbl is None:
             return ""
         s = str(lbl).strip()
-        # "{A,B}" -> "A, B"
         if len(s) >= 2 and s[0] == "{" and s[-1] == "}":
             inner = s[1:-1]
             if not inner:
@@ -185,34 +168,23 @@ def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
 
     out_edges = []
     for e in edges:
-        s = e.get("source")
-        t = e.get("target")
+        s = e.get("source"); t = e.get("target")
         if s is None or t is None:
             continue
-        out_edges.append(
-            {
-                "source": str(s),
-                "target": str(t),
-                "weight": e.get("weight"),
-                "relation": e.get("relation"),
-            }
-        )
+        out_edges.append({
+            "source": str(s), "target": str(t),
+            "weight": e.get("weight"), "relation": e.get("relation"),
+        })
     return {"nodes": out_nodes, "edges": out_edges}
 
 
-def truncate_preview(
-    data: Dict[str, Any], max_nodes: int, max_edges: int
-) -> Dict[str, Any]:
+def truncate_preview(data: Dict[str, Any], max_nodes: int, max_edges: int) -> Dict[str, Any]:
     nodes = data.get("nodes", [])
     edges = data.get("edges", [])
     if max_nodes and len(nodes) > max_nodes:
         keep_ids = set(str(n.get("id")) for n in nodes[:max_nodes])
         nodes = nodes[:max_nodes]
-        edges = [
-            e
-            for e in edges
-            if e.get("source") in keep_ids and e.get("target") in keep_ids
-        ]
+        edges = [e for e in edges if e.get("source") in keep_ids and e.get("target") in keep_ids]
     if max_edges and len(edges) > max_edges:
         edges = edges[:max_edges]
     return {"nodes": nodes, "edges": edges}
@@ -243,18 +215,15 @@ async def fetch_graph_sanitized(
     return norm
 
 
-# =========================
-# Básicos
-# =========================
+# -------- Health --------
 @app.get("/health", response_class=PlainTextResponse, include_in_schema=False)
+@app.get("/healh", response_class=PlainTextResponse, include_in_schema=False)  # alias
 async def health():
     return PlainTextResponse("ok", status_code=200)
-
 
 @app.get("/live", response_class=PlainTextResponse, include_in_schema=False)
 async def live():
     return PlainTextResponse("ok", status_code=200)
-
 
 @app.get("/ready", response_class=JSONResponse, include_in_schema=False)
 async def ready():
@@ -273,27 +242,19 @@ async def ready():
         info["error"] = str(e)
         return JSONResponse(info, status_code=503)
 
-
-# OpenAPI em YAML
 @app.get("/docs/openapi.yaml", include_in_schema=False)
 async def openapi_yaml():
     try:
         import yaml
-
         text = yaml.safe_dump(app.openapi(), sort_keys=False, allow_unicode=True)
         return PlainTextResponse(text, media_type="application/yaml")
     except Exception:
         return JSONResponse(app.openapi())
 
 
-# =========================
-# API de dados
-# =========================
-@app.get(
-    "/v1/graph/membros",
-    response_class=JSONResponse,
-    summary="Retorna o grafo (nodes/edges) a partir do Supabase RPC",
-)
+# -------- API de dados --------
+@app.get("/v1/graph/membros", response_class=JSONResponse,
+         summary="Retorna o grafo (nodes/edges) a partir do Supabase RPC")
 async def graph_membros(
     faccao_id: Optional[int] = Query(default=None),
     include_co: bool = Query(default=True),
@@ -302,21 +263,14 @@ async def graph_membros(
     max_edges: int = Query(default=4000, ge=100, le=200000),
     cache: bool = Query(default=True),
 ):
-    data = await fetch_graph_sanitized(
-        faccao_id, include_co, max_pairs, use_cache=cache
-    )
+    data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
     data = truncate_preview(data, max_nodes, max_edges)
     return JSONResponse(data, status_code=200)
 
 
-# =========================
-# VIS: vis-network (cores especiais + arestas por relação)
-# =========================
-@app.get(
-    "/v1/vis/visjs",
-    response_class=HTMLResponse,
-    summary="Visualização vis-network (server-embed + client fetch)",
-)
+# -------- VIS: vis-network --------
+@app.get("/v1/vis/visjs", response_class=HTMLResponse,
+         summary="Visualização vis-network (server-embed + client fetch)")
 async def vis_visjs(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -329,6 +283,7 @@ async def vis_visjs(
     title: str = "Knowledge Graph (vis.js)",
     debug: bool = Query(default=False),
     source: str = Query(default="server", pattern="^(server|client)$"),
+    avatar_base: str = Query(default="/static/avatars")
 ):
     local_js = "static/vendor/vis-network/vis-network.min.js"
     local_css = "static/vendor/vis-network/vis-network.min.css"
@@ -337,39 +292,20 @@ async def vis_visjs(
     if has_local:
         js_href = "/static/vendor/vis-network/vis-network.min.js"
         css_href = "/static/vendor/vis-network/vis-network.min.css"
-        csp = (
-            "default-src 'self'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; font-src 'self' data:; connect-src 'self';"
-        )
     else:
         js_href = "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"
         css_href = "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
-        csp = (
-            "default-src 'self'; "
-            "style-src 'self' 'unsafe-inline' https://unpkg.com; "
-            "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-            "img-src 'self' data:; font-src 'self' data:; connect-src 'self';"
-        )
 
     embedded_block = ""
     if source == "server":
-        data = await fetch_graph_sanitized(
-            faccao_id, include_co, max_pairs, use_cache=cache
-        )
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
         out = truncate_preview(data, max_nodes, max_edges)
         out = normalize_graph_labels(out)
-        embedded_block = (
-            '<script id="__KG_DATA__" type="application/json">'
-            + json.dumps(out, ensure_ascii=False)
-            + "</script>"
-        )
+        embedded_block = '<script id="__KG_DATA__" type="application/json">' + json.dumps(out, ensure_ascii=False) + '</script>'
 
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
-    html_tpl = Template(
-        """<!doctype html>
+    html_tpl = Template("""<!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="utf-8" />
@@ -382,15 +318,20 @@ async def vis_visjs(
     <style>
       html,body,#mynetwork { height:100%; margin:0 }
       .kg-toolbar { display:flex; gap:.5rem; align-items:center; padding:.5rem .75rem; border-bottom:1px solid #e5e7eb; }
-      .kg-toolbar h4 { margin:0; font-size: 14px; font-weight:600; }
+      .kg-toolbar h4 { margin:0; font-size:14px; font-weight:600; }
       .badge { padding:.15rem .45rem; border-radius:.4rem; background:#eab308; color:#111827; font-size:.75rem; }
-      button { cursor:pointer; }
+      input[type=text]{ padding:.25rem .5rem; border:1px solid #d1d5db; border-radius:.375rem; }
+      label.toggle{ display:inline-flex; gap:.3rem; align-items:center; font-size:.85rem; }
       body[data-theme="dark"] { background:$bg; color:#f3f4f6; }
     </style>
   </head>
   <body data-theme="$theme">
     <div class="kg-toolbar">
       <h4>$title</h4>
+      <input id="searchBox" type="text" placeholder="buscar nó..." />
+      <button id="btn-search">Go</button>
+      <button id="btn-clear">Clear</button>
+      <label class="toggle"><input type="checkbox" id="chk-pan"> Pan</label>
       <button id="btn-print" type="button" title="Imprimir">Print</button>
       <button id="btn-reload" type="button" title="Recarregar">Reload</button>
       <span id="badge" class="badge" style="display:__DEBUG__">debug</span>
@@ -399,7 +340,8 @@ async def vis_visjs(
          style="height:90vh;width:100%;"
          data-endpoint="/v1/graph/membros"
          data-debug="__DEBUG_BOOL__"
-         data-source="$source"></div>
+         data-source="$source"
+         data-avatar="$avatar_base"></div>
     $embedded_block
     <script src="$js_href" crossorigin="anonymous"></script>
     <script>
@@ -408,6 +350,7 @@ async def vis_visjs(
       var src = container.getAttribute('data-source') || 'server';
       var debug = container.getAttribute('data-debug') === 'true';
       var endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
+      var avatarBase = container.getAttribute('data-avatar') || '/static/avatars';
 
       var EDGE_COLORS = {
         "PERTENCE_A": "#10b981",
@@ -436,61 +379,101 @@ async def vis_visjs(
           .filter(Boolean).join(', ');
       }
       function colorForNode(n){
-        var lbl = (cleanLabel(n.label)||'').toUpperCase();
+        var label = (cleanLabel(n.label)||'').toUpperCase();
         var group = String(n.group ?? n.type ?? '');
-        if (lbl === 'CV' || group.toUpperCase() === 'CV') return '#e11d48';
-        if (lbl.indexOf('PCC') !== -1 || group.toUpperCase() === 'PCC') return '#2563eb';
+        if (label === 'CV' || group.toUpperCase() === 'CV') return '#e11d48';  // vermelho
+        if (label.indexOf('PCC') !== -1 || group.toUpperCase() === 'PCC') return '#2563eb'; // azul
         return hashColor(group || '0');
       }
+
       function degreeMap(nodes,edges){
         var d={}; nodes.forEach(function(n){ d[n.id]=0; });
         edges.forEach(function(e){ if(d.hasOwnProperty(e.from)) d[e.from]++; if(d.hasOwnProperty(e.to)) d[e.to]++; });
         return d;
       }
-      function attachToolbar(net,nc,ec){
+
+      // Toolbar handlers
+      function attachToolbar(net, dsNodes, nc, ec){
         var p=document.getElementById('btn-print'); if(p) p.onclick=function(){ window.print(); };
         var r=document.getElementById('btn-reload'); if(r) r.onclick=function(){ location.reload(); };
         var b=document.getElementById('badge');
         if(b && debug){ b.textContent='nodes: ' + nc + ' · edges: ' + ec; b.style.display='inline-block'; }
         else if(b){ b.style.display='none'; }
+
+        var pan = document.getElementById('chk-pan');
+        if(pan){ pan.onchange=function(){ net.setOptions({ interaction: { dragView: pan.checked } }); }; }
+
+        var searchBox = document.getElementById('searchBox');
+        var btnSearch = document.getElementById('btn-search');
+        var btnClear = document.getElementById('btn-clear');
+
+        function runSearch(){
+          var q = (searchBox.value||'').trim().toUpperCase();
+          if(!q) return;
+          var all = dsNodes.get();
+          var found = all.find(function(n){
+            var lbl = (n.label||'').toUpperCase();
+            var idu = String(n.id).toUpperCase();
+            return lbl.indexOf(q) !== -1 || idu.indexOf(q) !== -1;
+          });
+          if(found){
+            net.selectNodes([found.id], false);
+            net.focus(found.id, { scale: 1.2, animation:{ duration: 400 } });
+          }
+        }
+        if(btnSearch) btnSearch.onclick=runSearch;
+        if(searchBox) searchBox.addEventListener('keydown', function(e){ if(e.key==='Enter') runSearch(); });
+        if(btnClear) btnClear.onclick=function(){
+          searchBox.value='';
+          net.unselectAll();
+        };
       }
 
       function render(data){
         var nodes=(data.nodes||[]).filter(function(n){return n && n.id;}).map(function(n){
-          var v = (typeof n.size==='number') ? n.size : undefined;
           var group = String(n.group ?? n.type ?? '0');
-          return {
+          var label = cleanLabel(n.label)||String(n.id);
+          var isMembro = (String(n.type||'').toLowerCase()==='membro' || String(n.group||'').toLowerCase()==='membro');
+
+          var baseDef = {
             id: String(n.id),
-            label: cleanLabel(n.label)||String(n.id),
+            label: label,
             group: group,
-            value: v,
             color: colorForNode(n),
             shape: 'dot'
           };
+
+          // fotos para membros
+          var url = n.photo_url || (avatarBase.replace(/\\/$/,'') + '/' + String(n.id) + '.jpg');
+          var defImg = avatarBase.replace(/\\/$/,'') + '/_default.png';
+          if(isMembro){
+            baseDef.shape = 'circularImage';
+            baseDef.image = url;
+            baseDef.brokenImage = defImg;
+          }
+          return baseDef;
         });
 
         var edges=(data.edges||[]).filter(function(e){return e && e.source && e.target;}).map(function(e){
-          var w = (e.weight != null ? Number(e.weight) : 1.0);
           var rel = e.relation || '';
-          var t = rel ? (rel + ' (w=' + w + ')') : ('w=' + w);
+          var t = rel ? (rel + ' (w=' + (e.weight ?? 1) + ')') : ('w=' + (e.weight ?? 1));
           var col = EDGE_COLORS[rel] || EDGE_COLORS._default;
-          return { from:String(e.source), to:String(e.target), value:w, title:t, color:{ color: col, opacity: 0.75 } };
+          return { from:String(e.source), to:String(e.target), title:t, color:{ color: col, opacity: 0.75 } };
         });
 
         if(!nodes.length){
           container.innerHTML='<div style="display:flex;height:100%;align-items:center;justify-content:center;opacity:.85">Nenhum dado para exibir (nodes=0).</div>';
           return;
         }
-        var anySize = nodes.some(function(n){ return typeof n.value==='number'; });
-        if(!anySize){
-          var deg=degreeMap(nodes,edges);
-          nodes.forEach(function(n){ var d=deg[n.id]||0; n.value = 10 + Math.log(d+1) * 8; });
-        }
+
+        var deg=degreeMap(nodes,edges);
+        nodes.forEach(function(n){ var d=deg[n.id]||0; n.value = 10 + Math.log(d+1) * 8; });
 
         var dsNodes=new vis.DataSet(nodes);
         var dsEdges=new vis.DataSet(edges);
+
         var options={
-          interaction:{ hover:true, dragNodes:true, dragView:true, zoomView:true, multiselect:true, navigationButtons:true },
+          interaction:{ hover:true, dragNodes:true, dragView:false, zoomView:true, multiselect:true, navigationButtons:true },
           manipulation:{ enabled:false },
           physics:{
             enabled:true,
@@ -498,12 +481,17 @@ async def vis_visjs(
             barnesHut:{ gravitationalConstant:-8000, centralGravity:0.2, springLength:120, springConstant:0.04, avoidOverlap:0.2 }
           },
           nodes:{ borderWidth:1, shape:'dot' },
-          edges:{ smooth:false, arrows:{ to:{enabled:true} } }
+          edges:{ smooth:false, width:1, arrows:{ to:{enabled:true} } }
         };
+
         var net=new vis.Network(container, {nodes:dsNodes,edges:dsEdges}, options);
-        net.once('stabilizationIterationsDone', function(){ net.fit({animation:{duration:300}}); });
+        net.once('stabilizationIterationsDone', function(){
+          net.setOptions({ physics: false });
+          net.fit({animation:{duration:300}});
+        });
         net.on('doubleClick', function(){ net.fit({animation:{duration:300}}); });
-        attachToolbar(net, nodes.length, edges.length);
+
+        attachToolbar(net, dsNodes, nodes.length, edges.length);
       }
 
       function run(){
@@ -535,22 +523,13 @@ async def vis_visjs(
     })();
     </script>
   </body>
-</html>"""
-    )
+</html>""")
 
-    html = (
-        html_tpl.safe_substitute(
-            title=title,
-            css_href=css_href,
-            js_href=js_href,
-            bg=bg,
-            theme=theme,
-            source=source,
-            embedded_block=embedded_block,
-        )
-        .replace("__DEBUG__", "inline-block" if debug else "none")
-        .replace("__DEBUG_BOOL__", "true" if debug else "false")
-    )
+    html = html_tpl.safe_substitute(
+        title=title, css_href=css_href, js_href=js_href, bg=bg, theme=theme,
+        source=source, embedded_block=embedded_block, avatar_base=avatar_base
+    ).replace("__DEBUG__", "inline-block" if debug else "none"
+    ).replace("__DEBUG_BOOL__", "true" if debug else "false")
 
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
@@ -562,14 +541,9 @@ async def vis_visjs(
     return HTMLResponse(content=html, status_code=200)
 
 
-# =========================
-# VIS: PyVis (corrigido — ignora arestas órfãs e opções JSON puras)
-# =========================
-@app.get(
-    "/v1/vis/pyvis",
-    response_class=HTMLResponse,
-    summary="Visualização pyvis (server-side render)",
-)
+# -------- VIS: PyVis --------
+@app.get("/v1/vis/pyvis", response_class=HTMLResponse,
+         summary="Visualização pyvis (server-side render)")
 async def vis_pyvis(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -580,26 +554,20 @@ async def vis_pyvis(
     cache: bool = Query(default=True),
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (pyvis)",
-    # aceito/ignorado (para compatibilidade com URLs usadas no visjs)
     debug: bool = Query(default=False),
     source: str = Query(default="server"),
+    avatar_base: str = Query(default="/static/avatars")
 ):
-    data = await fetch_graph_sanitized(
-        faccao_id, include_co, max_pairs, use_cache=cache
-    )
+    data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
     data = truncate_preview(data, max_nodes, max_edges)
     data = normalize_graph_labels(data)
 
     from pyvis.network import Network
-
     net = Network(
-        height="90vh",
-        width="100%",
+        height="90vh", width="100%",
         bgcolor="#0b0f19" if theme == "dark" else "#ffffff",
         font_color="#f3f4f6" if theme == "dark" else "#111827",
-        directed=True,
-        notebook=False,
-        cdn_resources="in_line",
+        directed=True, notebook=False, cdn_resources="in_line"
     )
 
     def color_for_node(label: str, group: str) -> str:
@@ -621,12 +589,10 @@ async def vis_pyvis(
         "_default": "#9ca3af",
     }
 
-    # ---- montar estruturas seguras
     nodes_raw = data.get("nodes", [])
     edges_raw = data.get("edges", [])
 
     node_ids = {str(n.get("id")).strip() for n in nodes_raw if str(n.get("id")).strip()}
-    # manter apenas arestas que conectam nós existentes
     edges_safe = []
     deg = {nid: 0 for nid in node_ids}
     for e in edges_raw:
@@ -638,7 +604,17 @@ async def vis_pyvis(
         deg[s] += 1
         deg[t] += 1
 
-    # adicionar nós (com tamanho calculado se não vier)
+    # avatar helpers
+    def avatar_for(nid: str, label: str, group: str, node: Dict[str, Any]) -> Optional[str]:
+        if str(node.get("type", "")).lower() != "membro" and str(node.get("group", "")).lower() != "membro":
+            return None
+        if node.get("photo_url"):
+            return str(node["photo_url"])
+        # assume arquivo local /static/avatars/<id>.jpg
+        local = avatar_base.rstrip("/") + f"/{nid}.jpg"
+        # não testamos existência de arquivo para não bloquear; browser resolve 404 e usa brokenImage
+        return local
+
     for n in nodes_raw:
         nid = str(n.get("id") or "").strip()
         if nid not in node_ids:
@@ -648,69 +624,122 @@ async def vis_pyvis(
         size = n.get("size")
         if not isinstance(size, (int, float)):
             size = 10 + (0 if deg.get(nid, 0) == 0 else (8 * (deg[nid] ** 0.5)))
-        net.add_node(
-            nid,
-            label=label,
-            group=group,
-            value=float(size),
-            color=color_for_node(label, group),
-            shape="dot",
-        )
 
-    # adicionar arestas (já seguras)
+        img = avatar_for(nid, label, group, n)
+        if img:
+            net.add_node(
+                nid, label=label, group=group, value=float(size),
+                color=color_for_node(label, group),
+                shape="circularImage", image=img
+            )
+        else:
+            net.add_node(
+                nid, label=label, group=group, value=float(size),
+                color=color_for_node(label, group),
+                shape="dot"
+            )
+
     for e in edges_safe:
-        s = str(e.get("source"))
-        t = str(e.get("target"))
-        w = e.get("weight", 1)
+        s = str(e.get("source")); t = str(e.get("target"))
         rel = e.get("relation", "")
+        w = e.get("weight", 1)
         title_e = (rel + f" (w={w})") if rel else f"w={w}"
         col = EDGE_COLORS.get(rel, EDGE_COLORS["_default"])
-        net.add_edge(
-            s,
-            t,
-            value=(float(w) if isinstance(w, (int, float)) else 1.0),
-            title=title_e,
-            color=col,
-            arrows="to",
-        )
+        net.add_edge(s, t, title=title_e, color=col, arrows="to")
 
-    # PyVis espera JSON puro, não "var options = ..."
-    net.set_options(
-        """
+    net.set_options("""
     {
-      "interaction": { "hover": true, "dragNodes": true, "dragView": true, "zoomView": true, "navigationButtons": true },
+      "interaction": {
+        "hover": true, "dragNodes": true, "dragView": false, "zoomView": true, "navigationButtons": true
+      },
       "physics": {
         "enabled": true,
         "stabilization": { "enabled": true, "iterations": 500 },
         "barnesHut": { "gravitationalConstant": -8000, "centralGravity": 0.2, "springLength": 120, "springConstant": 0.04, "avoidOverlap": 0.2 }
       },
       "nodes": { "shape": "dot", "borderWidth": 1 },
-      "edges": { "smooth": false, "arrows": { "to": { "enabled": true } } }
+      "edges": { "smooth": false, "width": 1, "arrows": { "to": { "enabled": true } } }
     }
-    """
-    )
+    """)
 
     html_inner = net.generate_html(notebook=False)
-    toolbar = (
+
+    # toolbar com busca + pan toggle
+    toolbar_tpl = Template(
         '<div class="kg-toolbar" '
         'style="display:flex;gap:.5rem;align-items:center;padding:.5rem .75rem;border-bottom:1px solid #e5e7eb;">'
-        f'<h4 style="margin:0;font-size:14px;font-weight:600;">{title}</h4>'
+        '<h4 style="margin:0;font-size:14px;font-weight:600;">$title</h4>'
+        '<input id="searchBox" type="text" placeholder="buscar nó..." style="padding:.25rem .5rem;border:1px solid #d1d5db;border-radius:.375rem;" />'
+        '<button id="btn-search">Go</button>'
+        '<button id="btn-clear">Clear</button>'
+        '<label style="display:inline-flex;gap:.3rem;align-items:center;font-size:.85rem;"><input type="checkbox" id="chk-pan"> Pan</label>'
         '<button id="btn-print" type="button">Print</button>'
         '<button id="btn-reload" type="button">Reload</button>'
-        "</div>"
-        '<script>document.getElementById("btn-print").onclick=function(){window.print();};'
-        'document.getElementById("btn-reload").onclick=function(){location.reload();};</script>'
+        '</div>'
+        '<script>'
+        'document.getElementById("btn-print").onclick=function(){window.print();};'
+        'document.getElementById("btn-reload").onclick=function(){location.reload();};'
+        '</script>'
     )
-    html_final = (
-        html_inner.replace("<body>", "<body>" + toolbar, 1)
-        if "<body>" in html_inner
-        else "<!doctype html><html><head><meta charset='utf-8'><title>"
-        + title
-        + "</title></head><body>"
-        + toolbar
-        + html_inner
-        + "</body></html>"
-    )
+    toolbar = toolbar_tpl.safe_substitute(title=title)
+
+    html_with_toolbar = html_inner.replace("<body>", "<body>" + toolbar, 1) if "<body>" in html_inner else \
+        "<!doctype html><html><head><meta charset='utf-8'><title>" + title + \
+        "</title></head><body>" + toolbar + html_inner + "</body></html>"
+
+    # patches JS: congelar física, busca, pan toggle, brokenImage default
+    freeze_and_tools_js = """
+    (function(){
+      function ready(fn){ if(document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+      ready(function(){
+        if(typeof network==='undefined' || typeof nodes==='undefined') return;
+
+        // congelar após estabilizar
+        network.once('stabilizationIterationsDone', function(){
+          network.setOptions({ physics: false });
+          network.fit({animation:{duration:300}});
+        });
+
+        // pan toggle
+        var pan = document.getElementById('chk-pan');
+        if(pan){ pan.onchange=function(){ network.setOptions({ interaction: { dragView: pan.checked } }); }; }
+
+        // busca
+        function runSearch(){
+          var box = document.getElementById('searchBox');
+          var q = (box && box.value ? box.value : '').trim().toUpperCase();
+          if(!q) return;
+          var all = nodes.get();
+          var found = all.find(function(n){
+            var lbl = String(n.label||'').toUpperCase();
+            var idu = String(n.id).toUpperCase();
+            return lbl.indexOf(q)!==-1 || idu.indexOf(q)!==-1;
+          });
+          if(found){
+            network.selectNodes([found.id], false);
+            network.focus(found.id, { scale: 1.2, animation:{ duration: 400 } });
+          }
+        }
+        var btnSearch = document.getElementById('btn-search');
+        if(btnSearch) btnSearch.onclick = runSearch;
+        var box = document.getElementById('searchBox');
+        if(box) box.addEventListener('keydown', function(e){ if(e.key==='Enter') runSearch(); });
+        var btnClear = document.getElementById('btn-clear');
+        if(btnClear) btnClear.onclick=function(){ if(box) box.value=''; network.unselectAll(); };
+
+        // default avatar ao falhar imagem
+        var def = '/static/avatars/_default.png';
+        document.querySelectorAll('img').forEach(function(img){
+          img.addEventListener('error', function(){ if(img && img.src!==def) img.src = def; });
+        });
+      });
+    })();
+    """
+
+    if "</body>" in html_with_toolbar:
+        html_final = html_with_toolbar.replace("</body>", f"<script>{freeze_and_tools_js}</script></body>")
+    else:
+        html_final = html_with_toolbar + f"<script>{freeze_and_tools_js}</script>"
 
     response.headers["Content-Security-Policy"] = (
         "default-src 'self' blob: data:; "
@@ -722,10 +751,7 @@ async def vis_pyvis(
     return HTMLResponse(content=html_final, status_code=200)
 
 
-# =========================
-# Main
-# =========================
+# -------- main --------
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run("app:app", host="0.0.0.0", port=PORT, log_level=LOG_LEVEL)

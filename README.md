@@ -1,11 +1,13 @@
 
-# svc-kg (v1.7.12)
+# svc-kg (v1.7.14)
 
 svc-kg/
 ├─ db/
-│  ├─ 00_init.sql    # schema + seed + get_graph_membros
-│  ├─ 01_indexes.sql # índices
-│  └─ 02_alias.sql   # et_graph_membros -> get_graph_membros
+│  ├─ 00-roles.sql    # schema + seed + get_graph_membros
+│  ├─ 01-indexes.sql # índices
+│  ├─ 02-tables.sql # índices
+│  ├─ 03.function.sql # índices
+│  └─ 04-seed.sql   # et_graph_membros -> get_graph_membros
 ├─ docs/
 │  └─ openapi.yaml   # Swagger spec estático (usado no /docs)
 ├─ static/           # (montado no container)
@@ -50,6 +52,7 @@ Microserviço de **Knowledge Graph** com:
 ## Rodando LOCAL (Postgres + Redis)
 
 1. Crie `.env` a partir de `.env.example` e defina:
+---
 ---
 ---
 ---
