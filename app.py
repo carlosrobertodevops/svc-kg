@@ -37,6 +37,7 @@ SUPABASE_SERVICE_KEY = (
 )
 SUPABASE_RPC_FN = os.getenv("SUPABASE_RPC_FN", "get_graph_membros")
 SUPABASE_TIMEOUT = float(os.getenv("SUPABASE_TIMEOUT", "15"))
+SUPABASE_PARAM_STYLE = os.getenv("SUPABASE_PARAM_STYLE", "auto").lower()  # auto|plain|p
 
 ENABLE_REDIS_CACHE = os.getenv("ENABLE_REDIS_CACHE", "false").lower() == "true"
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
@@ -48,7 +49,7 @@ SERVICE_AKA = ["sic-kg"]
 
 app = FastAPI(
     title="svc-kg",
-    version="v1.7.14-photos",
+    version="v1.7.15-rpc-fallback",
     description="Micro serviço de Knowledge Graph com visualizações (vis.js e PyVis).",
     docs_url=None,
     redoc_url=None,
@@ -60,7 +61,7 @@ os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 if os.path.isdir("docs"):
     app.mount("/docs-static", StaticFiles(directory="docs"), name="docs-static")
-# NOVO: expõe /assets se existir (para fotos locais)
+# expõe /assets se existir (para fotos locais)
 if os.path.isdir("assets"):
     app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
@@ -157,38 +158,68 @@ def truncate_preview(data: Dict[str, Any], max_nodes: int, max_edges: int) -> Di
     return {"nodes": ns, "edges": es}
 
 
-async def supabase_rpc_get_graph(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> Dict[str, Any]:
-    if not _env_backend_ok():
-        raise RuntimeError("backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY")
-
-    url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
-    payload = {
-        "faccao_id": faccao_id,
-        "p_faccao_id": faccao_id,
-        "include_co": include_co,
-        "p_include_co": include_co,
-        "max_pairs": max_pairs,
-        "p_max_pairs": max_pairs,
-    }
-
+async def _call_rpc(url: str, payload: Dict[str, Any]) -> httpx.Response:
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-
     client = await _get_http()
-    resp = await client.post(url, json=payload, headers=headers)
-    if resp.status_code != 200:
-        raise RuntimeError(f"{resp.status_code}: Supabase RPC {SUPABASE_RPC_FN} falhou: {resp.text}")
-    data = resp.json()
-    if not isinstance(data, dict):
-        if isinstance(data, list) and data and isinstance(data[0], dict) and "nodes" in data[0]:
-            data = data[0]
-        else:
-            raise RuntimeError("Formato inesperado do RPC (esperado objeto com nodes/edges)")
-    return data
+    return await client.post(url, json=payload, headers=headers)
+
+
+async def supabase_rpc_get_graph(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> Dict[str, Any]:
+    """
+    Faz a chamada ao RPC tentando automaticamente os estilos de parâmetros:
+      - plain: faccao_id, include_co, max_pairs
+      - p:     p_faccao_id, p_include_co, p_max_pairs
+    Se SUPABASE_PARAM_STYLE for 'plain' ou 'p', respeita a ordem preferida.
+    """
+    if not _env_backend_ok():
+        raise RuntimeError("backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY")
+
+    url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
+
+    order = ["plain", "p"]
+    if SUPABASE_PARAM_STYLE == "p":
+        order = ["p", "plain"]
+    elif SUPABASE_PARAM_STYLE == "plain":
+        order = ["plain", "p"]
+
+    last_error_text = None
+
+    for style in order:
+        if style == "plain":
+            payload = {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs}
+        else:  # 'p'
+            payload = {"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs}
+
+        resp = await _call_rpc(url, payload)
+        if resp.status_code == 200:
+            data = resp.json()
+            if not isinstance(data, dict):
+                if isinstance(data, list) and data and isinstance(data[0], dict) and ("nodes" in data[0] or "edges" in data[0]):
+                    data = data[0]
+                else:
+                    raise RuntimeError("Formato inesperado do RPC (esperado objeto com nodes/edges)")
+            return data
+
+        # guarda erro e decide fallback
+        last_error_text = resp.text
+        try:
+            j = resp.json()
+        except Exception:
+            j = {}
+        code = j.get("code", "")
+        # Se for PGRST202 (função encontrada com outra assinatura), tenta o próximo estilo
+        if resp.status_code == 404 and (code == "PGRST202" or "Could not find the function" in last_error_text):
+            continue
+        # qualquer outro erro: sobe a exceção imediatamente
+        raise RuntimeError(f"{resp.status_code}: Supabase RPC {SUPABASE_RPC_FN} falhou: {last_error_text}")
+
+    # Se nenhum estilo funcionou
+    raise RuntimeError(f"404: Supabase RPC {SUPABASE_RPC_FN} não encontrado nas assinaturas testadas. Último erro: {last_error_text}")
 
 
 async def fetch_graph_sanitized(faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool = True) -> Dict[str, Any]:
@@ -245,14 +276,6 @@ def platform_info() -> Dict[str, Any]:
 
 
 def resolve_photo_url(val: Optional[str]) -> Optional[str]:
-    """
-    Regras:
-      - http/https: usa direto
-      - começa com '/': usa direto
-      - começa com 'assets/': serve em /assets/...
-      - começa com 'static/': serve em /static/...
-      - caso contrário: prefixa /assets/ (padrão)
-    """
     if not val:
         return None
     v = str(val).strip()
@@ -326,6 +349,7 @@ async def health(deep: bool = Query(default=False)):
         "url": SUPABASE_URL,
         "rpc_fn": SUPABASE_RPC_FN,
         "timeout": SUPABASE_TIMEOUT,
+        "param_style": SUPABASE_PARAM_STYLE,
         "service_key_tail": redact(SUPABASE_SERVICE_KEY),
     }
     return JSONResponse(out, status_code=200 if out.get("ok") else 503)
@@ -379,6 +403,7 @@ async def ops_status():
         "url": SUPABASE_URL,
         "rpc_fn": SUPABASE_RPC_FN,
         "timeout": SUPABASE_TIMEOUT,
+        "param_style": SUPABASE_PARAM_STYLE,
         "service_key_tail": redact(SUPABASE_SERVICE_KEY),
     }
 
@@ -534,12 +559,12 @@ async def vis_pyvis(
     for n in nodes:
         if (n or {}).get("type") == "faccao" and n.get("id") is not None:
             fid = str(n["id"])
-            faccao_name_by_id[fid] = str(n.get("label") or "").strip()
+            faccao_name_by_id[fid] = str(n.get("label") or "").strip().upper()
 
     def color_from_faccao(fid: Optional[str]) -> Optional[str]:
         if not fid:
             return None
-        name = (faccao_name_by_id.get(fid) or "").upper()
+        name = faccao_name_by_id.get(fid) or ""
         if not name:
             return None
         if "PCC" in name:
@@ -582,7 +607,6 @@ async def vis_pyvis(
         group = str(n.get("group") or n.get("faccao_id") or n.get("type") or "0")
         size = n.get("size")
 
-        # SUPORTE A FOTO: usa `photo_url` OU `foto_path`
         raw_photo = n.get("photo_url") or n.get("foto_path")
         photo = resolve_photo_url(raw_photo) if isinstance(raw_photo, str) else None
 
@@ -597,7 +621,6 @@ async def vis_pyvis(
             node_kwargs["shape"] = "circularImage"
             node_kwargs["image"] = photo
         else:
-            # Ícone padrão (SVG) — se quiser sempre “dot”, troque por shape='dot'
             node_kwargs["shape"] = "circularImage"
             node_kwargs["image"] = "/static/icons/person.svg"
 
