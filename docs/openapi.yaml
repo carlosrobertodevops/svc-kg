@@ -1,62 +1,71 @@
 openapi: 3.0.3
 info:
-    title: svc-kg API
-    version: v1.7.15-photos-docs
-    description: >
-        Micro serviço de Knowledge Graph com visualizações (vis.js e PyVis).
-servers:
-  - url: /
-paths:
-    /live:
-        get:
-            tags: [ ops ]
-            summary: Liveness probe
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        text/plain:
-                            schema: { type: string, example: ok }
+    title: svc-kg
+    version: 1.7.12
+    description: |
+        Microserviço de Knowledge Graph com viewers vis.js e PyVis.
 
+        **Status & Health**
+        - `/health` (200 ok)
+        - `/live` (200 alive)
+        - `/ready` (verifica backend e cache)
+        - `/status` (JSON detalhado de ambiente, cache e backend)
+
+        **Viewers com busca embutida (UI)**
+        - `/v1/vis/visjs`
+        - `/v1/vis/pyvis`
+
+        **Esquema YAML:** `/openapi.yaml` | **Swagger UI:** `/docs` | **Redoc:** `/redoc`
+servers:
+  - url: https://kg.mondaha.com
+paths:
     /health:
         get:
-            tags: [ ops ]
-            summary: Health probe (com checagens opcionais)
-            parameters:
-              - in: query
-                name: deep
-                schema: { type: boolean, default: false }
+            summary: Healthcheck simples
             responses:
-                "200":
-                    description: OK (ou 503 se algum requisito crítico falhar)
+                '200':
+                    description: ok
+                    content:
+                        text/plain:
+                            schema:
+                                type: string
+                                example: ok
+    /live:
+        get:
+            summary: Liveness probe
+            responses:
+                '200':
+                    description: alive
+                    content:
+                        text/plain:
+                            schema:
+                                type: string
+                                example: alive
+    /ready:
+        get:
+            summary: Readiness (backend/cache)
+            responses:
+                '200':
+                    description: pronto
                     content:
                         application/json:
                             schema:
                                 type: object
-
-    /ready:
+                '503':
+                    description: indisponível
+    /status:
         get:
-            tags: [ ops ]
-            summary: Readiness probe
+            summary: Status detalhado do microserviço
             responses:
-                "200":
-                    description: OK (ou 503 se backend/cache indisponíveis)
-
-    /ops/status:
-        get:
-            tags: [ ops ]
-            summary: Status detalhado (plataforma/redis/supabase)
-            responses:
-                "200":
-                    description: OK
+                '200':
+                    description: status json
                     content:
                         application/json:
-                            schema: { type: object }
-
+                            schema:
+                                type: object
     /v1/graph/membros:
         get:
-            tags: [ graph ]
-            summary: Retorna grafo (nodes/edges) pronto para visualização
+            summary: Grafo (JSON)
             parameters:
               - in: query
                 name: faccao_id
@@ -68,21 +77,17 @@ paths:
                 name: max_pairs
                 schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
               - in: query
+                name: cache
+                schema: { type: boolean, default: true }
+              - in: query
                 name: max_nodes
                 schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 }
               - in: query
                 name: max_edges
                 schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 }
-              - in: query
-                name: cache
-                schema: { type: boolean, default: true }
-              - in: query
-                name: enrich_photos
-                schema: { type: boolean, default: true }
-                description: "Se true, consulta a tabela membros (MEMBERS_TABLE) para preencher a foto (coluna MEMBERS_PHOTO_COL). Se foto_path for relativo, usa MEMBERS_PHOTO_BASE_URL."
             responses:
-                "200":
-                    description: OK
+                '200':
+                    description: grafo em formato {nodes, edges}
                     content:
                         application/json:
                             schema:
@@ -95,10 +100,10 @@ paths:
                                             properties:
                                                 id: { type: string }
                                                 label: { type: string }
-                                                group: { type: string }
                                                 type: { type: string }
-                                                size: { type: number }
-                                                photo_url: { type: string }
+                                                group: { type: string }
+                                                size: { type: number, nullable: true }
+                                                photo_url: { type: string, nullable: true }
                                     edges:
                                         type: array
                                         items:
@@ -106,13 +111,13 @@ paths:
                                             properties:
                                                 source: { type: string }
                                                 target: { type: string }
-                                                relation: { type: string }
                                                 weight: { type: number }
-
+                                                relation: { type: string }
+                '502':
+                    description: backend indisponível/erro no RPC (mensagem detalhada em `detail`)
     /v1/vis/visjs:
         get:
-            tags: [ viz ]
-            summary: Visualização interativa com vis-network (HTML)
+            summary: Visualização vis-network (com busca, fotos, CV/PCC)
             parameters:
               - in: query
                 name: faccao_id
@@ -144,20 +149,16 @@ paths:
               - in: query
                 name: source
                 schema: { type: string, enum: [ server, client ], default: server }
-              - in: query
-                name: enrich_photos
-                schema: { type: boolean, default: true }
             responses:
-                "200":
-                    description: HTML da visualização
+                '200':
+                    description: HTML interativo (vis.js)
                     content:
-                        text/html:
-                            schema: { type: string }
-
+                        text/html: {}
+                '200 (erro mostrado em HTML)':
+                    description: Quando backend falha, página exibe a mensagem em <pre> no topo.
     /v1/vis/pyvis:
         get:
-            tags: [ viz ]
-            summary: Visualização interativa com PyVis (HTML)
+            summary: Visualização PyVis (com busca, fotos, CV/PCC)
             parameters:
               - in: query
                 name: faccao_id
@@ -186,19 +187,10 @@ paths:
               - in: query
                 name: debug
                 schema: { type: boolean, default: false }
-              - in: query
-                name: enrich_photos
-                schema: { type: boolean, default: true }
             responses:
-                "200":
-                    description: HTML da visualização
+                '200':
+                    description: HTML interativo (PyVis)
                     content:
-                        text/html:
-                            schema: { type: string }
-tags:
-  - name: ops
-    description: Operação/Observabilidade
-  - name: graph
-    description: Dados do grafo
-  - name: viz
-    description: Visualizações
+                        text/html: {}
+                '502':
+                    description: backend indisponível (mensagem em HTML)
