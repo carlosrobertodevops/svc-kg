@@ -1,4 +1,4 @@
-/* static/vis-style.css */
+/* static/vis-style.css
 :root {
   --kg-bg: #ffffff;
   --kg-fg: #111827;
@@ -32,4 +32,28 @@ html, body {
   border: 1px solid var(--kg-border);
   border-radius: 6px;
   outline: none;
+} */
+
+/* static/vis-style.css */
+:root {
+  color-scheme: light dark;
+}
+
+body[data-theme="dark"] {
+  background: #0b0f19;
+  color: #e8eaed;
+}
+
+.kg-toolbar {
+  background: color-mix(in srgb, #fff 92%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  body[data-theme="light"] .kg-toolbar {
+    background: #fafafa;
+  }
+  body[data-theme="dark"] .kg-toolbar {
+    background: #0f1422;
+    border-bottom: 1px solid #1f2937;
+  }
 }
