@@ -1,17 +1,17 @@
 // =============================================================================
 // Arquivo: static/vis-embed.js
 // Versão: v1.7.20
-// Objetivo: Renderizador cliente para /v1/vis/visjs (vis-network)
+// Objetivo: Renderizar /v1/vis/visjs (vis-network) sem “tela branca”
 // Funções/métodos:
-// - Respeita data-source="server" (não rebaixa quando já há bloco incorporado)
-// - Dedup de nós/arestas e normalização de IDs
-// - Física desativada após estabilização; arestas finas
-// - Busca com destaque e fit; cores CV/PCC/funções; arestas de função em amarelo
+// - Espera o vis-network estar carregado (retry) e mostra erro útil se faltar
+// - Respeita data-source="server" (usa __KG_DATA__) ou "client" (fetch do endpoint)
+// - Dedup de nós/arestas; arestas e setas finas; física desativada após estabilizar
+// - Busca com destaque + fit; cores CV/PCC/FUNÇÃO; arestas de função amarelas
 // =============================================================================
 
 (function () {
   const container = document.getElementById('mynetwork');
-  if (!container || typeof vis === 'undefined') return;
+  if (!container) return;
 
   const COLOR_CV = '#d32f2f';
   const COLOR_PCC = '#0d47a1';
@@ -33,10 +33,9 @@
       .replace(/"/g, '')
       .split(',').map(x => x.trim()).filter(Boolean).join(', ');
   }
-
   function inferFactionColors(rawNodes) {
     const colors = {};
-    rawNodes.filter(n => n && n.type === 'faccao').forEach(n => {
+    (rawNodes || []).filter(n => n && n.type === 'faccao').forEach(n => {
       const name = cleanLabel(n.label || '').toUpperCase();
       const id = String(n.id);
       if (name.includes('PCC')) colors[id] = COLOR_PCC;
@@ -44,14 +43,12 @@
     });
     return colors;
   }
-
   function colorForNode(n, faccaoColorById) {
     if ((n.type || '').toLowerCase() === 'funcao') return COLOR_FUNCAO;
     const gid = String(n.group ?? n.faccao_id ?? '');
     if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
     return hashColor(gid || n.type || 'x');
   }
-
   function edgeColorFor(rel) {
     const R = (rel || '').toUpperCase();
     return (R.includes('FUNCAO')) ? COLOR_FUNCAO : COLOR_EDGE_DEFAULT;
@@ -62,7 +59,6 @@
     const rawEdges = raw.edges || [];
     const faccaoColorById = inferFactionColors(rawNodes);
 
-    // --- nós (dedup + normalização)
     const seen = new Set();
     const nodes = [];
     for (const n of rawNodes) {
@@ -80,7 +76,6 @@
       nodes.push(base);
     }
 
-    // --- arestas (dedup por from|to|rel)
     const nodeIds = new Set(nodes.map(n => n.id));
     const seenE = new Set();
     const edges = [];
@@ -95,8 +90,9 @@
       edges.push({
         from, to,
         value: (e.weight != null ? Number(e.weight) : 1.0),
-        width: 0.6,
+        width: 0.2,                        // ultrafino
         color: { color: edgeColorFor(rel) },
+        arrows: { to: { enabled: true, scaleFactor: 0.4 } },
         title: rel ? `${rel} (w=${e.weight ?? 1})` : `w=${e.weight ?? 1}`
       });
     }
@@ -147,8 +143,7 @@
       manipulation: { enabled: false },
       physics: {
         enabled: true,
-        stabilization: { enabled: true, iterations: 300 },
-        barnesHut: { gravitationalConstant: -12000, centralGravity: 0.15, springLength: 140, springConstant: 0.03, avoidOverlap: 0.3 }
+        stabilization: { enabled: true, iterations: 420 }
       },
       nodes: { shape: 'dot', borderWidth: 1 },
       edges: { smooth: false }
@@ -159,15 +154,29 @@
     attachToolbar(net, dsNodes);
   }
 
-  // ---------------- run ----------------
+  // Espera 'vis' ficar disponível (evita tela branca se o bundle atrasar)
+  function waitForVisAndRun(dataOrFn, tries = 20) {
+    const go = () => {
+      try {
+        if (typeof vis === 'undefined') throw new Error('vis-network ainda não carregou');
+        if (typeof dataOrFn === 'function') { dataOrFn(); } else { render(dataOrFn); }
+      } catch (e) {
+        if (tries <= 0) { container.innerHTML = '<pre>'+String(e).replace(/</g,'&lt;')+'</pre>'; return; }
+        setTimeout(() => waitForVisAndRun(dataOrFn, tries-1), 150);
+      }
+    };
+    go();
+  }
+
   const source = container.getAttribute('data-source') || 'server';
   if (source === 'server') {
     const tag = document.getElementById('__KG_DATA__');
-    if (!tag) { container.innerHTML = '<div style="padding:12px">Bloco de dados ausente.</div>'; return; }
-    try { render(JSON.parse(tag.textContent || '{}')); }
-    catch (e) { console.error(e); container.innerHTML = '<pre>' + String(e).replace(/</g,'&lt;') + '</pre>'; }
+    if (!tag) { container.innerHTML = '<div style="padding:12px">Bloco de dados ausente (source=server).</div>'; return; }
+    let data = {};
+    try { data = JSON.parse(tag.textContent || '{}'); }
+    catch (e) { container.innerHTML = '<pre>'+String(e).replace(/</g,'&lt;')+'</pre>'; return; }
+    waitForVisAndRun(data);
   } else {
-    // fallback: buscar do endpoint
     const params = new URLSearchParams(window.location.search);
     const qs = new URLSearchParams();
     const fac = params.get('faccao_id'); if (fac && fac.trim() !== '') qs.set('faccao_id', fac.trim());
@@ -179,7 +188,7 @@
     const endpoint = (container.getAttribute('data-endpoint') || '/v1/graph/membros') + '?' + qs.toString();
     fetch(endpoint, { headers: { 'Accept': 'application/json' } })
       .then(async r => { if (!r.ok) throw new Error(r.status + ': ' + await r.text()); return r.json(); })
-      .then(render)
-      .catch(err => { console.error(err); container.innerHTML = '<pre>' + String(err).replace(/</g,'&lt;') + '</pre>'; });
+      .then(data => waitForVisAndRun(data))
+      .catch(err => { container.innerHTML = '<pre>' + String(err).replace(/</g,'&lt;') + '</pre>'; });
   }
 })();
