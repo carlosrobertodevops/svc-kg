@@ -194,24 +194,26 @@ def truncate_preview(
     return {"nodes": ns, "edges": es}
 
 
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# RPC com FALLBACK de assinatura (p_* primeiro; depois plain)
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 async def supabase_rpc_get_graph(
     faccao_id: Optional[int], include_co: bool, max_pairs: int
 ) -> Dict[str, Any]:
+    """
+    Chama o RPC no PostgREST tentando assinaturas conhecidas:
+
+    1) get_graph_membros(p_faccao_id, p_include_co, p_max_pairs)
+    2) get_graph_membros(faccao_id, include_co, max_pairs)
+
+    Retorna dicionário {"nodes": [...], "edges": [...]} ou lança RuntimeError.
+    """
     if not _env_backend_ok():
         raise RuntimeError(
             "backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY"
         )
 
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
-    payload = {
-        "faccao_id": faccao_id,
-        "p_faccao_id": faccao_id,
-        "include_co": include_co,
-        "p_include_co": include_co,
-        "max_pairs": max_pairs,
-        "p_max_pairs": max_pairs,
-    }
-
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
@@ -219,55 +221,59 @@ async def supabase_rpc_get_graph(
         "Accept": "application/json",
     }
 
+    attempts = [
+        {
+            "p_faccao_id": faccao_id,
+            "p_include_co": include_co,
+            "p_max_pairs": max_pairs,
+        },  # assinatura mais comum no seu Supabase
+        {
+            "faccao_id": faccao_id,
+            "include_co": include_co,
+            "max_pairs": max_pairs,
+        },  # fallback
+    ]
+
+    last_status = None
+    last_body = None
     client = await _get_http()
-    resp = await client.post(url, json=payload, headers=headers)
-    if resp.status_code != 200:
-        raise RuntimeError(
-            f"{resp.status_code}: Supabase RPC {SUPABASE_RPC_FN} falhou: {resp.text}"
-        )
-    data = resp.json()
-    if not isinstance(data, dict):
-        if (
-            isinstance(data, list)
-            and data
-            and isinstance(data[0], dict)
-            and "nodes" in data[0]
-        ):
-            data = data[0]
-        else:
-            raise RuntimeError(
-                "Formato inesperado do RPC (esperado objeto com nodes/edges)"
-            )
-    return data
 
+    for idx, payload in enumerate(attempts, start=1):
+        resp = await client.post(url, json=payload, headers=headers)
+        last_status, last_body = resp.status_code, resp.text
+        if resp.status_code == 200:
+            data = resp.json()
+            if not isinstance(data, dict):
+                if (
+                    isinstance(data, list)
+                    and data
+                    and isinstance(data[0], dict)
+                    and "nodes" in data[0]
+                ):
+                    data = data[0]
+                else:
+                    raise RuntimeError(
+                        "Formato inesperado do RPC (esperado objeto com nodes/edges)"
+                    )
+            # sucesso
+            if idx > 1:
+                log.info(
+                    "RPC %s respondeu após fallback de assinatura (%s)",
+                    SUPABASE_RPC_FN,
+                    list(payload.keys()),
+                )
+            return data
 
-async def fetch_graph_sanitized(
-    faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool = True
-) -> Dict[str, Any]:
-    cache_key = _cache_key(
-        "graph",
-        {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs},
+        # Se 404 + PGRST202, tenta a próxima forma. Se outro erro, interrompe.
+        if resp.status_code != 404 or "PGRST202" not in resp.text:
+            break
+
+    raise RuntimeError(
+        f"{last_status}: Supabase RPC {SUPABASE_RPC_FN} falhou: {last_body}"
     )
-    if use_cache:
-        r = await _get_redis()
-        if r:
-            cached = await r.get(cache_key)
-            if cached:
-                try:
-                    return json.loads(cached)
-                except Exception:
-                    pass
 
-    raw = await supabase_rpc_get_graph(faccao_id, include_co, max_pairs)
-    fixed = normalize_graph_labels(raw)
 
-    if use_cache:
-        r = await _get_redis()
-        if r:
-            await r.set(
-                cache_key, json.dumps(fixed, ensure_ascii=False), ex=CACHE_API_TTL
-            )
-    return fixed
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
 def redact(token: Optional[str], keep: int = 4) -> Optional[str]:
@@ -481,7 +487,7 @@ async def graph_membros(
 
 
 # -----------------------------------------------------------------------------
-# vis.js (usa static/vis-embed.js) — sem alterações nesta rodada
+# vis.js
 # -----------------------------------------------------------------------------
 @app.get(
     "/v1/vis/visjs",
@@ -575,7 +581,7 @@ async def vis_visjs(
 
 
 # -----------------------------------------------------------------------------
-# PyVis — ALTERADO (arestas finas, repulsão forte, busca com destaque/pull, cores)
+# PyVis (arestas finas, repulsão forte, busca com destaque/pull, cores)
 # -----------------------------------------------------------------------------
 @app.get(
     "/v1/vis/pyvis",
@@ -608,7 +614,6 @@ async def vis_pyvis(
     if not nodes:
         return HTMLResponse("<h3>Sem dados para exibir (nodes=0)</h3>", status_code=200)
 
-    # Mapear facções por id -> nome
     faccao_name_by_id: Dict[str, str] = {}
     for n in nodes:
         if (n or {}).get("type") == "faccao" and n.get("id") is not None:
@@ -648,7 +653,7 @@ async def vis_pyvis(
         cdn_resources="in_line",
     )
 
-    # Construir nós
+    # Nós
     seen = set()
     for n in nodes:
         if not n or n.get("id") is None:
@@ -668,7 +673,6 @@ async def vis_pyvis(
             else None
         )
 
-        # Cores por regra
         fixed_color = color_from_faccao(group)
         if n.get("type") == "funcao":
             fixed_color = "#fdd835"  # amarelo função
@@ -689,7 +693,7 @@ async def vis_pyvis(
 
     valid_nodes = set(net.get_nodes())
 
-    # Construir arestas (fazer finas e colorir funções de amarelo)
+    # Arestas (finas; funções amarelas)
     for e in edges:
         if not e:
             continue
@@ -701,16 +705,14 @@ async def vis_pyvis(
                 w = float(e.get("weight") or 1.0)
             except Exception:
                 w = 1.0
-
             edge_color = "#bdbdbd"
             if rel in ("EXERCE", "FUNCAO_DA_FACCAO"):
-                edge_color = "#fdd835"  # amarelo para arestas de função
-
+                edge_color = "#fdd835"
             net.add_edge(
                 a, b, value=w, width=1, color=edge_color, title=f"{rel} (w={w})"
             )
 
-    # Degree-based size se não veio
+    # Tamanho por grau se necessário
     if not any(isinstance(n.get("value"), (int, float)) for n in net.nodes):
         deg = {nid: 0 for nid in valid_nodes}
         for e in net.edges:
@@ -720,7 +722,7 @@ async def vis_pyvis(
             val = 8 + (d**0.65) * 4
             net.get_node(nid)["value"] = val
 
-    # Opções (JSON VÁLIDO) — repulsão forte + arestas finas
+    # Opções JSON (repulsão forte + arestas finas)
     net.set_options(
         """
     {
@@ -752,9 +754,9 @@ async def vis_pyvis(
     """
     )
 
-    html = net.generate_html()  # (não usar title=...)
+    html = net.generate_html()
 
-    # Toolbar + busca com destaque/pull e desligar física após estabilização
+    # Toolbar + busca destacando e “puxando” o nó
     toolbar_css = """
     <style>
       .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
@@ -797,25 +799,18 @@ async def vis_pyvis(
           var hit = all.find(function(n){ return (String(n.label||'').toLowerCase().includes(q)) || (String(n.id)===q); });
           if (!hit) { alert('Nenhum nó encontrado.'); return; }
 
-          // reset opacidade
           all.forEach(function(n){ ds.update({ id: n.id, color: colorObj(n.color, 0.35), borderWidth: 1, shadow: false, font: { size: 12 } }); });
 
-          // destaque no encontrado
           var cur = ds.get(hit.id);
           ds.update({ id: hit.id, color: colorObj(cur.color, 1), borderWidth: 3, shadow: { enabled: true, size: 18, x:2, y:2 }, font: { size: 16 } });
 
-          // "puxar" levemente para fora e focar
           var pos = network.getPositions([hit.id])[hit.id] || {x:0,y:0};
           ds.update({ id: hit.id, x: pos.x + 150, y: pos.y - 70, fixed: {x:false, y:false} });
           network.focus(hit.id, { scale: 1.2, animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
         }
 
         runAfterNetworkReady(function(){
-          // desligar física após estabilização
-          network.once('stabilizationIterationsDone', function(){
-            network.setOptions({ physics: { enabled: false } });
-          });
-
+          network.once('stabilizationIterationsDone', function(){ network.setOptions({ physics: { enabled: false } }); });
           var p = document.getElementById('btn-print');
           var r = document.getElementById('btn-reload');
           var s = document.getElementById('kg-search');
@@ -833,7 +828,7 @@ async def vis_pyvis(
 
 
 # -----------------------------------------------------------------------------
-# /docs (Swagger custom) — sem alterações nesta rodada
+# /docs (Swagger custom)
 # -----------------------------------------------------------------------------
 @app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
 async def custom_docs():
