@@ -1,114 +1,120 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
-  title: svc-kg
-  version: "1.7.6"
-  description: |
-    Microserviço de Knowledge Graph (membros, facções, funções).
-    - Backend: Supabase RPC (`get_graph_membros`) ou Postgres direto.
-    - Cache: Redis (fallback em memória).
-    - Visualização:
-      - `/v1/vis/pyvis` (inline JS; pode exigir CSP relaxada)
-      - `/v1/vis/visjs` (sem inline JS; assets locais)
+    title: svc-kg
+    version: v1.7.13
+    description: |
+        Micro serviço de Knowledge Graph (vis.js / PyVis).
+        - **svc-kg** (também referido como **“sic-kg”**)
+        - Endpoints de visualização: `/v1/vis/visjs`, `/v1/vis/pyvis`
+        - Endpoints operacionais (Ops): `/live`, `/health`, `/ready`, `/ops/status`
+
 servers:
   - url: /
+
 tags:
-  - name: Health
-  - name: Debug
-  - name: Graph
-  - name: Visualization
+  - name: graph
+    description: Endpoints de dados brutos do grafo.
+  - name: viz
+    description: Visualizações do grafo (vis.js / PyVis).
+  - name: ops
+    description: Operação & saúde do micro-serviço (Coolify, Supabase, Redis).
 
 paths:
-  /live:
-    get: { tags: [Health], summary: Liveness, responses: { "200": { description: ok } } }
-  /ready:
-    get: { tags: [Health], summary: Readiness, responses: { "200": { description: pronto }, "503": { description: dependências indisponíveis } } }
-  /health:
-    get: { tags: [Health], summary: Health (estático), responses: { "200": { description: ok } } }
-  /debug/config:
-    get: { tags: [Debug], summary: Config (sanitizada), responses: { "200": { description: ok } } }
+    /v1/graph/membros:
+        get:
+            tags: [ graph ]
+            summary: Retorna grafo (nodes/edges)
+            parameters:
+              - in: query
+                name: faccao_id
+                schema: { type: integer, nullable: true }
+              - in: query
+                name: include_co
+                schema: { type: boolean, default: true }
+              - in: query
+                name: max_pairs
+                schema: { type: integer, default: 8000 }
+              - in: query
+                name: max_nodes
+                schema: { type: integer, default: 2000 }
+              - in: query
+                name: max_edges
+                schema: { type: integer, default: 4000 }
+              - in: query
+                name: cache
+                schema: { type: boolean, default: true }
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    nodes: { type: array, items: { type: object } }
+                                    edges: { type: array, items: { type: object } }
 
-  /v1/graph/membros:
-    get:
-      tags: [Graph]
-      summary: Grafo (via função et_graph_membros/get_graph_membros)
-      parameters:
-        - $ref: '#/components/parameters/faccao_id'
-        - $ref: '#/components/parameters/include_co'
-        - $ref: '#/components/parameters/max_pairs'
-        - $ref: '#/components/parameters/max_nodes'
-        - $ref: '#/components/parameters/max_edges'
-        - $ref: '#/components/parameters/cache'
-      responses: { "200": { description: ok } }
+    /v1/vis/visjs:
+        get:
+            tags: [ viz ]
+            summary: Visualização vis-network
+            responses: { "200": { description: HTML } }
 
-  /graph/members:
-    get:
-      tags: [Graph]
-      summary: (Compat) /v1/graph/membros com p_*
-      parameters:
-        - name: p_faccao_id; in: query; schema: { type: integer, format: int64, nullable: true }
-        - name: p_include_co; in: query; schema: { type: boolean, default: true }
-        - name: p_max_pairs;  in: query; schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
-        - $ref: '#/components/parameters/max_nodes'
-        - $ref: '#/components/parameters/max_edges'
-        - $ref: '#/components/parameters/cache'
-      responses: { "200": { description: ok } }
+    /v1/vis/pyvis:
+        get:
+            tags: [ viz ]
+            summary: Visualização PyVis
+            responses: { "200": { description: HTML } }
 
-  /v1/nodes/{node_id}/neighbors:
-    get:
-      tags: [Graph]
-      summary: Subgrafo (raio=1)
-      parameters:
-        - name: node_id; in: path; required: true; schema: { type: string }
-        - $ref: '#/components/parameters/include_co'
-        - name: max_pairs; in: query; schema: { type: integer, default: 3000, minimum: 1, maximum: 200000 }
-      responses: { "200": { description: ok } }
+    /live:
+        get:
+            tags: [ ops ]
+            summary: Liveness
+            description: Retorna "ok" se o processo está vivo.
+            responses: { "200": { description: OK, content: { text/plain: {} } } }
 
-  /v1/vis/pyvis:
-    get:
-      tags: [Visualization]
-      summary: Visualização PyVis (inline JS)
-      parameters:
-        - $ref: '#/components/parameters/faccao_id'
-        - $ref: '#/components/parameters/include_co'
-        - $ref: '#/components/parameters/max_pairs'
-        - $ref: '#/components/parameters/max_nodes'
-        - $ref: '#/components/parameters/max_edges'
-        - $ref: '#/components/parameters/cache'
-        - name: theme; in: query; schema: { type: string, enum: [light, dark], default: light }
-        - name: arrows; in: query; schema: { type: boolean, default: true }
-        - name: hierarchical; in: query; schema: { type: boolean, default: false }
-        - name: physics; in: query; schema: { type: boolean, default: true }
-        - name: barnes_hut; in: query; schema: { type: boolean, default: true }
-        - name: show_buttons; in: query; schema: { type: boolean, default: true }
-        - name: title; in: query; schema: { type: string, default: "Knowledge Graph" }
-        - name: toolbar; in: query; schema: { type: boolean, default: true }
-        - name: allow_inline; in: query; schema: { type: boolean, default: true }
-        - name: meta_csp; in: query; schema: { type: boolean, default: true }
-        - name: min_height; in: query; schema: { type: string, default: "90vh" }
-        - name: debug; in: query; schema: { type: boolean, default: false }
-      responses: { "200": { description: HTML PyVis } }
+    /health:
+        get:
+            tags: [ ops ]
+            summary: Health check
+            description: |
+                Verifica Redis (ping) e backend (Supabase) configurado.  
+                Use `?deep=true` para executar um RPC real no Supabase e validar conectividade ativa.
+            parameters:
+              - in: query
+                name: deep
+                schema: { type: boolean, default: false }
+                description: "Se true, executa RPC no Supabase e ping no Redis."
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                "503":
+                    description: Serviço degradado
 
-  /v1/vis/visjs:
-    get:
-      tags: [Visualization]
-      summary: Visualização vis-network (sem inline; assets locais)
-      parameters:
-        - $ref: '#/components/parameters/faccao_id'
-        - $ref: '#/components/parameters/include_co'
-        - $ref: '#/components/parameters/max_pairs'
-        - $ref: '#/components/parameters/max_nodes'
-        - $ref: '#/components/parameters/max_edges'
-        - $ref: '#/components/parameters/cache'
-        - name: theme; in: query; schema: { type: string, enum: [light, dark], default: light }
-        - name: title; in: query; schema: { type: string, default: "Knowledge Graph (vis.js)" }
-        - name: debug; in: query; schema: { type: boolean, default: false }
-      responses: { "200": { description: HTML vis-network } }
+    /ready:
+        get:
+            tags: [ ops ]
+            summary: Readiness
+            description: Teste ativo de Redis e RPC curto no Supabase (pronto para tráfego).
+            responses:
+                "200": { description: OK }
+                "503": { description: Não pronto }
 
-components:
-  parameters:
-    faccao_id:   { name: faccao_id, in: query, schema: { type: integer, format: int64, nullable: true } }
-    include_co:  { name: include_co, in: query, schema: { type: boolean, default: true } }
-    max_pairs:   { name: max_pairs,  in: query, schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 } }
-    max_nodes:   { name: max_nodes,  in: query, schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 } }
-    max_edges:   { name: max_edges,  in: query, schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 } }
-    cache:       { name: cache,      in: query, schema: { type: boolean, default: true } }
+    /ops/status:
+        get:
+            tags: [ ops ]
+            summary: Status operacional (humano/automação)
+            description: |
+                Retorna informações do ambiente (Coolify/container), Redis, Supabase (sem expor segredos),
+                versão, hostname e parâmetros principais de CORS.
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                type: object
