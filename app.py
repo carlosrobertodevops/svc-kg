@@ -4,18 +4,17 @@
 # Objetivo: API FastAPI do micro-serviço svc-kg (graph + visualizações + ops)
 # Funções/métodos:
 # - live/health/ready/ops_status: sondas e status operacional
-# - graph_membros: retorna grafo (nós/arestas) via Supabase RPC
-# - vis_visjs: página HTML com vis-network (dados embutidos + static/vis-embed.js)
-# - vis_pyvis: página HTML com PyVis (arestas ultrafinas + busca + física off)
-# - Utilidades: normalização, cache Redis, truncamento seguro
-# NOTA DA CORREÇÃO: supabase_rpc_get_graph() agora tenta primeiro o formato p_*
-#   e faz fallback para o formato sem p_* quando o PostgREST retorna PGRST202.
+# - graph_membros (/v1/graph/membros e alias /membros): retorna grafo via Supabase RPC
+# - vis_visjs (/v1/vis/visjs): HTML + dados embutidos para vis-network (JS em static/vis-embed.js)
+# - vis_pyvis  (/v1/vis/pyvis): PyVis com arestas ultrafinas, busca, física desligada pós-estabilização
+# - Utilidades: normalização de labels PG, cache Redis, truncamento, RPC com fallback p_* (corrige PGRST202)
 # =============================================================================
 import os
 import json
 import logging
 import socket
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+from string import Template
 
 import httpx
 from fastapi import FastAPI, Query, Response, HTTPException
@@ -35,7 +34,6 @@ except Exception:  # pragma: no cover
 APP_ENV = os.getenv("APP_ENV", "production")
 PORT = int(os.getenv("PORT", "8080"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info").upper()
-
 logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
 log = logging.getLogger("svc-kg")
 
@@ -185,7 +183,7 @@ def truncate_preview(data: Dict[str, Any], max_nodes: int, max_edges: int) -> Di
 
 
 # -----------------------------------------------------------------------------
-# RPC Supabase com fallback de parâmetros
+# RPC Supabase com fallback de parâmetros (corrige PGRST202)
 # -----------------------------------------------------------------------------
 async def supabase_rpc_get_graph(
     faccao_id: Optional[int],
@@ -193,10 +191,9 @@ async def supabase_rpc_get_graph(
     max_pairs: int
 ) -> Dict[str, Any]:
     """
-    Tenta chamar o RPC em duas variantes de parâmetros:
-      1) p_faccao_id, p_include_co, p_max_pairs   (preferida, conforme hint PGRST202)
-      2) faccao_id, include_co, max_pairs         (fallback)
-    Retorna JSON {nodes, edges}.
+    Tenta duas variantes:
+      1) p_faccao_id, p_include_co, p_max_pairs
+      2) faccao_id, include_co, max_pairs
     """
     if not _env_backend_ok():
         raise RuntimeError("backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY")
@@ -210,12 +207,11 @@ async def supabase_rpc_get_graph(
     }
 
     client = await _get_http()
-
     attempts = [
         {"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs},
         {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs},
     ]
-    errors = []
+    errors: List[str] = []
 
     for payload in attempts:
         resp = await client.post(url, json=payload, headers=headers)
@@ -228,21 +224,14 @@ async def supabase_rpc_get_graph(
                     raise RuntimeError("Formato inesperado do RPC (esperado objeto com nodes/edges)")
             return data
 
-        # coletamos erro e decidimos se tentamos a próxima assinatura
         txt = resp.text
         errors.append(f"{resp.status_code}: {txt[:300]}")
         try:
             j = resp.json()
         except Exception:
             j = None
-
-        # Se for o erro clássico de assinatura (PGRST202), tentamos a próxima
         if isinstance(j, dict) and j.get("code") == "PGRST202":
             continue
-
-        # Outros erros não valem tentar outra forma? Mesmo assim seguimos tentando fallback.
-        # (mantém comportamento robusto para proxies estritos)
-        continue
 
     raise RuntimeError(f"Supabase RPC {SUPABASE_RPC_FN} falhou em todas as tentativas: {' | '.join(errors)}")
 
@@ -344,7 +333,6 @@ async def health(deep: bool = Query(default=False)):
     out = platform_info()
     out.update({"status": "ok", "redis": False, "backend": "supabase" if _env_backend_ok() else "none", "backend_ok": _env_backend_ok()})
 
-    # Redis
     r_ok = True
     r = await _get_redis()
     if r:
@@ -355,7 +343,6 @@ async def health(deep: bool = Query(default=False)):
             r_ok = False
             out["redis_error"] = str(e)
 
-    # Deep check (RPC real)
     if deep:
         b_ok = False
         if _env_backend_ok():
@@ -442,9 +429,10 @@ async def ops_status():
 
 
 # -----------------------------------------------------------------------------
-# API: dados brutos
+# API de dados (com alias compatível /membros)
 # -----------------------------------------------------------------------------
-@app.get("/v1/graph/membros", response_class=JSONResponse, summary="Retorna grafo (nodes/edges)", tags=["graph"])
+@app.get("/v1/graph/membros", response_class=JSONResponse, tags=["graph"], summary="Retorna grafo (nodes/edges)")
+@app.get("/membros", response_class=JSONResponse, include_in_schema=False)  # alias legado
 async def graph_membros(
     faccao_id: Optional[int] = Query(default=None),
     include_co: bool = Query(default=True),
@@ -459,7 +447,7 @@ async def graph_membros(
 
 
 # -----------------------------------------------------------------------------
-# VIS.JS (vis-network) – HTML simples (dados embutidos) + static/vis-embed.js
+# VIS.JS (vis-network) – usa Template (sem chaves escapadas) + dados embutidos
 # -----------------------------------------------------------------------------
 @app.get("/v1/vis/visjs", response_class=HTMLResponse, tags=["viz"], summary="Visualização vis-network (dados embutidos)")
 async def vis_visjs(
@@ -472,52 +460,50 @@ async def vis_visjs(
     cache: bool = Query(default=True),
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (vis.js)",
-    debug: bool = Query(default=False),
-    source: str = Query(default="server", pattern="^(server|client)$"),
 ):
-    # dados embutidos (evita fetch e CORS)
     data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
     data = truncate_preview(data, max_nodes, max_edges)
     json_str = json.dumps(data, ensure_ascii=False)
-    embedded_block = '<script id="__KG_DATA__" type="application/json">' + json_str + "</script>"
 
-    local_js = "/static/vendor/vis-network.min.js"
-    local_css = "/static/vendor/vis-network.min.css"
-    bg = "#0b0f19" if theme == "dark" else "#ffffff"
-
-    html = f"""
+    tpl = Template("""
 <!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title}</title>
-    <link rel="stylesheet" href="{local_css}">
+    <title>$TITLE</title>
+    <link rel="stylesheet" href="/static/vendor/vis-network.min.css">
     <link rel="stylesheet" href="/static/vis-style.css">
-    <meta name="theme-color" content="{bg}">
-    <style>html,body,#mynetwork{{height:100%;margin:0;}}</style>
+    <style>html,body,#mynetwork{height:100%;margin:0;}</style>
   </head>
-  <body data-theme="{theme}">
+  <body data-theme="$THEME">
     <div class="kg-toolbar">
-      <h4 style="margin:0">{title}</h4>
+      <h4 style="margin:0">$TITLE</h4>
       <input id="kg-search" type="search" placeholder="Buscar nó por rótulo ou ID…" />
       <button id="btn-print" type="button" title="Imprimir">Print</button>
       <button id="btn-reload" type="button" title="Recarregar">Reload</button>
     </div>
     <div id="mynetwork" style="height:90vh;width:100%;" data-endpoint="/v1/graph/membros" data-source="server"></div>
-    {embedded_block}
-    <script src="{local_js}"></script>
+    <script id="__KG_DATA__" type="application/json">$DATA</script>
+    <script src="/static/vendor/vis-network.min.js"></script>
     <script src="/static/vis-embed.js" defer></script>
   </body>
 </html>
-"""
-    response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:;"
+""")
+    html = tpl.safe_substitute(TITLE=title, THEME=theme, DATA=json_str)
+
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; font-src 'self' data:;"
+    )
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
 
 
 # -----------------------------------------------------------------------------
-# PYVIS – arestas ultrafinas + busca + física off
+# PYVIS – arestas ultrafinas + busca + física off (pós-estabilização)
 # -----------------------------------------------------------------------------
 @app.get("/v1/vis/pyvis", response_class=HTMLResponse, tags=["viz"], summary="Visualização PyVis (arestas ultrafinas + busca)")
 async def vis_pyvis(
@@ -529,7 +515,6 @@ async def vis_pyvis(
     cache: bool = Query(default=True),
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (PyVis)",
-    debug: bool = Query(default=False),
 ):
     try:
         data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
@@ -543,24 +528,29 @@ async def vis_pyvis(
     if not nodes:
         return HTMLResponse("<h3>Sem dados para exibir (nodes=0)</h3>", status_code=200)
 
+    # Grau para escalar nós
+    deg = {str(n["id"]): 0 for n in nodes if n and n.get("id") is not None}
+    for e in edges:
+        a = str(e.get("source")); b = str(e.get("target"))
+        if a in deg: deg[a] += 1
+        if b in deg: deg[b] += 1
+
     faccao_name_by_id: Dict[str, str] = {}
     for n in nodes:
         if (n or {}).get("type") == "faccao" and n.get("id") is not None:
             faccao_name_by_id[str(n["id"])] = str(n.get("label") or "").strip()
 
-    def color_from_faccao(fid: Optional[str], n: Dict[str, Any]) -> Optional[str]:
+    def color_from(n: Dict[str, Any]) -> str:
         if (n.get("type") or "").lower() == "funcao" or str(n.get("group") or "") == "6":
             return "#c8a600"  # amarelo para funções
-        if not fid:
-            return None
-        name = (faccao_name_by_id.get(fid) or "").upper()
+        gid = str(n.get("group") or n.get("faccao_id") or "")
+        name = (faccao_name_by_id.get(gid) or "").upper()
         if "PCC" in name:
             return "#0d47a1"
         if name == "CV" or "COMANDO VERMELHO" in name:
             return "#d32f2f"
-        return None
-
-    def hash_color(s: str) -> str:
+        # fallback estável
+        s = gid or (n.get("type") or "x")
         h = 0
         for ch in s:
             h = (h << 5) - h + ord(ch)
@@ -592,21 +582,17 @@ async def vis_pyvis(
 
         label = str(n.get("label") or nid)
         group = str(n.get("group") or n.get("faccao_id") or n.get("type") or "0")
-        size = n.get("size")
+        base_size = n.get("size")
+        degree = deg.get(nid, 0)
+        value = float(base_size) if isinstance(base_size, (int, float)) else 10.0 + (degree ** 0.6) * 8.0
+
         photo = n.get("photo_url") if isinstance(n.get("photo_url"), str) and n["photo_url"].startswith(("http://", "https://")) else None
+        color = color_from(n)
 
-        fixed_color = color_from_faccao(group, n)
-        color = fixed_color or hash_color(group)
-
-        node_kwargs = dict(title=label, color=color, borderWidth=1)
-        if isinstance(size, (int, float)):
-            node_kwargs["value"] = float(size)
-
+        node_kwargs = dict(title=label, color=color, borderWidth=1, value=value)
+        node_kwargs["shape"] = "circularImage" if photo else "dot"
         if photo:
-            node_kwargs["shape"] = "circularImage"
             node_kwargs["image"] = photo
-        else:
-            node_kwargs["shape"] = "dot"
 
         net.add_node(nid, label=label, **node_kwargs)
 
@@ -614,24 +600,24 @@ async def vis_pyvis(
     EDGE_COLORS = {
         "PERTENCE_A": "#9e9e9e",
         "EXERCE": "#00796b",
-        "FUNCAO_DA_FACCAO": "#ef6c00",
+        "FUNCAO_DA_FACCAO": "#ef6c00",  # amarelo
         "CO_FACCAO": "#8e24aa",
         "CO_FUNCAO": "#546e7a",
     }
     for e in edges:
         if not e:
             continue
-        a = str(e.get("source"))
-        b = str(e.get("target"))
+        a = str(e.get("source")); b = str(e.get("target"))
         if a in valid_nodes and b in valid_nodes:
-            rel = e.get("relation") or ""
+            rel = (e.get("relation") or "").upper()
             try:
                 w = float(e.get("weight") or 1.0)
             except Exception:
                 w = 1.0
-            color = EDGE_COLORS.get(rel, "#9e9e9e")
+            color = "#ef6c00" if "FUNCAO" in rel else EDGE_COLORS.get(rel, "#9e9e9e")
             net.add_edge(a, b, value=w, width=0.2, color=color, title=f"{rel} (w={w})", arrows="to", smooth=False)
 
+    # Opções (JSON válido) — física só na estabilização; arestas ultrafinas
     net.set_options(
         """
 {
@@ -646,21 +632,21 @@ async def vis_pyvis(
   "manipulation": { "enabled": false },
   "physics": {
     "enabled": true,
-    "stabilization": { "enabled": true, "iterations": 300 },
+    "stabilization": { "enabled": true, "iterations": 600 },
     "barnesHut": {
-      "gravitationalConstant": -8000,
+      "gravitationalConstant": -18000,
       "centralGravity": 0.2,
-      "springLength": 120,
+      "springLength": 180,
       "springConstant": 0.04,
-      "avoidOverlap": 0.2
+      "avoidOverlap": 1.2
     }
   },
   "layout": { "improvedLayout": true, "randomSeed": 42 },
-  "nodes": { "shape": "dot", "borderWidth": 1 },
+  "nodes": { "shape": "dot", "borderWidth": 1, "scaling": { "min": 8, "max": 42 } },
   "edges": {
     "smooth": false,
     "width": 0.2,
-    "color": { "opacity": 0.65 },
+    "color": { "opacity": 0.55 },
     "arrows": { "to": { "enabled": true, "scaleFactor": 0.3 } }
   }
 }
@@ -669,6 +655,7 @@ async def vis_pyvis(
 
     html = net.generate_html()
 
+    # Barra + busca + física OFF após estabilizar
     toolbar_css = """
     <style>
       .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
@@ -705,22 +692,12 @@ async def vis_pyvis(
             var all = ds.get();
             var t = (txt||'').trim().toLowerCase();
             if (!t){ return; }
-
             var hits = all.filter(function(n){ return (String(n.label||'').toLowerCase().includes(t)) || (String(n.id).toLowerCase()===t); });
             if (!hits.length) return;
-
             all.forEach(function(n){ ds.update({ id: n.id, color: colorObj(n.color, 0.15), borderWidth: 1 }); });
-            hits.forEach(function(h){ ds.update({ id: h.id, color: colorObj(h.color, 1), borderWidth: 4 }); });
-            network.focus(hits[0].id, { scale: 1.2, animation: { duration: 400 } });
+            hits.forEach(function(h){ ds.update({ id: h.id, color: colorObj(h.color, 1), borderWidth: 4, value: (h.value||12)+6 }); });
+            network.focus(hits[0].id, { scale: 1.25, animation: { duration: 400 } });
           }catch(e){ console.error(e); }
-        }
-        var q = document.getElementById('kg-search');
-        var p = document.getElementById('btn-print');
-        var r = document.getElementById('btn-reload');
-        if (p) p.onclick = function(){ window.print(); };
-        if (r) r.onclick = function(){ location.reload(); };
-        if (q){
-          q.addEventListener('keydown', function(e){ if(e.key==='Enter') runSearch(q.value); });
         }
         if (typeof network !== 'undefined') {
           network.once('stabilizationIterationsDone', function(){
@@ -728,6 +705,12 @@ async def vis_pyvis(
             network.setOptions({ physics: false });
           });
         }
+        var q = document.getElementById('kg-search');
+        var p = document.getElementById('btn-print');
+        var r = document.getElementById('btn-reload');
+        if (p) p.onclick = function(){ window.print(); };
+        if (r) r.onclick = function(){ location.reload(); };
+        if (q) q.addEventListener('keydown', function(e){ if(e.key==='Enter') runSearch(q.value); });
       })();
     </script>
     """
@@ -735,3 +718,7 @@ async def vis_pyvis(
     html = html.replace("<body>", "<body>\n" + toolbar_html + "\n")
     html = html.replace("</body>", toolbar_js + "\n</body>")
     return HTMLResponse(content=html, status_code=200)
+
+# =============================================================================
+# Fim de app.py
+# =============================================================================
