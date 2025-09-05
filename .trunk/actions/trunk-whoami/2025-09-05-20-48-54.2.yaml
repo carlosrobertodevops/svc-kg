@@ -1,0 +1,14 @@
+action_id: trunk-whoami
+date: 2025-09-05 20:48:54
+run: trunk whoami
+run_from: ""
+trigger: schedule 24h+1h
+result:
+  exit_code: 1
+  out: "\x1b[1m\x1b[31m✖ Please run 'trunk init' to setup trunk in this repository.\x1b[0m\n"
+  err: ""
+timestamp: 1757105334
+full_timestamp:
+  nanos: 2428000
+  seconds: 1757105334
+trunk_version: 1.25.0
