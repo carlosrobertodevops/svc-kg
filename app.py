@@ -12,7 +12,6 @@
 
 import os
 import json
-import asyncio
 import logging
 import socket
 from typing import Optional, Dict, Any
@@ -198,13 +197,12 @@ def truncate_preview(
 async def supabase_rpc_get_graph(
     faccao_id: Optional[int], include_co: bool, max_pairs: int
 ) -> Dict[str, Any]:
-    if not _env_backend_ok():
+    if not __env_backend_ok():
         raise RuntimeError(
             "backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY"
         )
 
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
-    # Chaves compatíveis com diferentes assinaturas RPC
     payload = {
         "faccao_id": faccao_id,
         "include_co": include_co,
@@ -488,17 +486,15 @@ async def graph_membros(
 
 
 # -----------------------------------------------------------------------------
-# VIS.JS (vis-network) — HTML via Template (sem conflitos de {})
+# VIS.JS (vis-network): server/client exclusivos + CSP liberal para imagens
 # -----------------------------------------------------------------------------
 @app.get(
     "/v1/vis/visjs",
     response_class=HTMLResponse,
-    summary="Visualização vis-network (busca, drag só de nó, arestas finas, fotos, cores CV/PCC/função)",
+    summary="Visualização vis-network (busca, drag só de nó, arestas finas, fotos)",
     tags=["viz"],
 )
-@app.get(
-    "/v1/vis/vispj", response_class=HTMLResponse, include_in_schema=False
-)  # alias solicitado
+@app.get("/v1/vis/vispj", response_class=HTMLResponse, include_in_schema=False)
 async def vis_visjs(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -518,9 +514,10 @@ async def vis_visjs(
     if has_local:
         js_href = "/static/vendor/vis-network.min.js"
         css_href = "/static/vendor/vis-network.min.css"
+        # ⚠️ imagens externas liberadas para fotos de membros
         csp = (
             "default-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "script-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+            "script-src 'self' 'unsafe-inline'; img-src * data:; "
             "font-src 'self' data:; connect-src 'self';"
         )
     else:
@@ -529,11 +526,15 @@ async def vis_visjs(
         csp = (
             "default-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; "
             "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-            "img-src 'self' data:; font-src 'self' data:; connect-src 'self';"
+            "img-src * data:; font-src 'self' data:; connect-src 'self';"
         )
 
     embedded_block = ""
+    inline_script = ""
+    client_loader_tag = ""
+
     if source == "server":
+        # 1) Modo SERVER: embute dados e usa script inline. NÃO inclui vis-embed.js.
         data = await fetch_graph_sanitized(
             faccao_id, include_co, max_pairs, use_cache=cache
         )
@@ -543,6 +544,149 @@ async def vis_visjs(
         embedded_block = (
             '<script id="__KG_DATA__" type="application/json">' + json_str + "</script>"
         )
+
+        inline_script = r"""
+<script>
+(function(){
+  const COLOR_CV  = '#d32f2f';
+  const COLOR_PCC = '#0d47a1';
+  const COLOR_ROLE= '#fbc02d';
+  const EDGE_COLORS = {
+    'PERTENCE_A': '#9e9e9e',
+    'EXERCE': '#00796b',
+    'FUNCAO_DA_FACCAO': '#ef6c00',
+    'CO_FACCAO': '#8e24aa',
+    'CO_FUNCAO': '#546e7a'
+  };
+
+  const container = document.getElementById('mynetwork');
+  const q = document.getElementById('kg-search');
+  const btnPrint = document.getElementById('btn-print');
+  const btnReload = document.getElementById('btn-reload');
+  const badge = document.getElementById('badge');
+
+  function hashColor(s){ s=String(s||''); let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h+s.charCodeAt(i); h|=0; } const hue=Math.abs(h)%360; return `hsl(${hue},70%,50%)`; }
+  function isPgTextArray(s){ s=(s||'').trim(); return s.length>=2 && s[0]=='{' && s[s.length-1]=='}'; }
+  function cleanLabel(raw){
+    if(!raw) return '';
+    const s=String(raw).trim(); if(!isPgTextArray(s)) return s;
+    const inner=s.slice(1,-1); if(!inner) return '';
+    return inner.replace(/(^|,)\s*"?null"?\s*(?=,|$)/gi,'').replace(/"/g,'').split(',').map(x=>x.trim()).filter(Boolean).join(', ');
+  }
+  function degreeMap(nodes,edges){
+    const d={}; nodes.forEach(n=>d[n.id]=0);
+    edges.forEach(e=>{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; });
+    return d;
+  }
+  function inferFaccaoColors(rawNodes){
+    const map={};
+    rawNodes.filter(n=>n && n.type==='faccao').forEach(n=>{
+      const name = cleanLabel(n.label||'').toUpperCase();
+      const id = String(n.id);
+      if(!name) return;
+      if (name.includes('PCC')) map[id] = COLOR_PCC;
+      else if (name === 'CV' || name.includes('COMANDO VERMELHO')) map[id] = COLOR_CV;
+    });
+    return map;
+  }
+  function isRoleNode(n){
+    const t=(n.type||'').toString().toLowerCase();
+    return ['funcao','função','funcao_da_faccao','role','cargo'].includes(t);
+  }
+  function colorForNode(n, faccaoColorById){
+    if (isRoleNode(n)) return COLOR_ROLE;
+    const gid = String(n.group ?? n.faccao_id ?? '');
+    if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
+    return hashColor(gid || (n.type||'x'));
+  }
+
+  function selectByQuery(net, dsNodes, text){
+    const t=(text||'').trim().toLowerCase();
+    if(!t) return;
+    const all = dsNodes.get();
+    const hit = all.find(n => (n.label||'').toLowerCase().includes(t) || String(n.id)===t);
+    if(!hit) return;
+    dsNodes.update(all.map(n => Object.assign({}, n, { color: Object.assign({}, n.color, { opacity: 0.25 }) })));
+    const cur = dsNodes.get(hit.id);
+    const hi  = Object.assign({}, cur.color||{}, { opacity: 1 });
+    dsNodes.update({ id: hit.id, color: hi });
+    const view = net.getViewPosition();
+    net.moveNode(hit.id, view.x, view.y);
+    net.selectNodes([hit.id], false);
+    net.focus(hit.id, { animation: { duration: 300 } });
+  }
+
+  function run(){
+    if(typeof vis==='undefined'){ container.innerHTML='<div style="padding:12px">vis-network não carregou.</div>'; return; }
+    const tag=document.getElementById('__KG_DATA__');
+    if(!tag){ container.innerHTML='<div style="padding:12px">Bloco de dados ausente.</div>'; return; }
+    let data={}; try{ data=JSON.parse(tag.textContent||'{}'); }catch(e){ container.innerHTML='<pre>'+String(e)+'</pre>'; return; }
+
+    const rawNodes = data.nodes || [];
+    const rawEdges = data.edges || [];
+    const faccaoColorById = inferFaccaoColors(rawNodes);
+
+    const nodes = rawNodes.filter(n=>n&&n.id!=null).map(n=>{
+      const id    = String(n.id);
+      const label = cleanLabel(n.label)||id;
+      const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
+      const value = (typeof n.size==='number') ? n.size : undefined;
+      const photo = n.photo_url && /^https?:\/\//i.test(n.photo_url) ? n.photo_url : null;
+      const color = colorForNode({group, type:n.type}, faccaoColorById);
+      const base  = { id, label, group, value, color, borderWidth: 1 };
+      if (photo) { base.shape='circularImage'; base.image=photo; } else { base.shape='dot'; }
+      return base;
+    });
+
+    const nodeIds = new Set(nodes.map(n=>n.id));
+    const edges = rawEdges
+      .filter(e=>e&&e.source!=null&&e.target!=null && nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)))
+      .map(e=>({ from:String(e.source), to:String(e.target), title:(e.relation||''), width:1, color:'#90a4ae', arrows:{to:{enabled:true, scaleFactor:0.6}} }));
+
+    if(!nodes.length){ container.innerHTML='<div style="display:flex;height:100%;align-items:center;justify-content:center;opacity:.85">Nenhum dado para exibir (nodes=0).</div>'; return; }
+
+    const hasSize = nodes.some(n=>typeof n.value==='number');
+    if(!hasSize){
+      const deg=degreeMap(nodes,edges);
+      nodes.forEach(n=>{ const d=deg[n.id]||0; n.value=10+Math.log(d+1)*8; });
+    }
+
+    const dsNodes = new vis.DataSet(nodes);
+    const dsEdges = new vis.DataSet(edges);
+
+    const options = {
+      interaction: { hover:true, dragNodes:true, dragView:false, zoomView:true, multiselect:true, navigationButtons:true },
+      manipulation:{ enabled:false },
+      physics: {
+        enabled:true,
+        stabilization:{ enabled:true, iterations:250 },
+        barnesHut:{ gravitationalConstant:-8000, centralGravity:0.2, springLength:120, springConstant:0.04, avoidOverlap:0.2 }
+      },
+      nodes:{ shape:'dot', borderWidth:1 },
+      edges:{ smooth:false, width:1, scaling:{ min:1, max:1 } }
+    };
+
+    const net = new vis.Network(container, {nodes:dsNodes, edges:dsEdges}, options);
+    net.once('stabilizationIterationsDone', ()=>{ net.setOptions({ physics:false }); net.fit({ animation:{ duration:300 } }); });
+    net.on('doubleClick',()=> net.fit({ animation:{ duration:300 } }));
+
+    // toolbar
+    if (btnPrint) btnPrint.onclick = ()=>window.print();
+    if (btnReload) btnReload.onclick = ()=>location.reload();
+    if (badge) badge.textContent = `nodes: ${dsNodes.getIds().length}`;
+    if (q){
+      const runSearch = ()=> selectByQuery(net, dsNodes, q.value);
+      q.addEventListener('change', runSearch);
+      q.addEventListener('keyup', e=>{ if(e.key==='Enter') runSearch(); });
+    }
+  }
+  if(document.readyState!=='loading') run(); else document.addEventListener('DOMContentLoaded', run);
+})();
+</script>
+"""
+    else:
+        # 2) Modo CLIENT: sem dados embutidos; apenas carrega vis-embed.js
+        client_loader_tag = '<script src="/static/vis-embed.js" defer></script>'
 
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
@@ -582,209 +726,8 @@ async def vis_visjs(
 
     $embedded_block
     <script src="$js_href" crossorigin="anonymous"></script>
-
-    <script>
-    (function(){
-      const COLOR_CV  = '#d32f2f';
-      const COLOR_PCC = '#0d47a1';
-      const COLOR_ROLE = '#fbc02d'; // amarelo para funções
-      const EDGE_COLORS = {
-        'PERTENCE_A':      '#9e9e9e',
-        'EXERCE':          '#00796b',
-        'FUNCAO_DA_FACCAO':'#ef6c00',
-        'CO_FACCAO':       '#8e24aa',
-        'CO_FUNCAO':       '#546e7a'
-      };
-
-      const container = document.getElementById('mynetwork');
-      const source = container.getAttribute('data-source') || 'server';
-      const debug = container.getAttribute('data-debug') === 'true';
-      const endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
-
-      const q = document.getElementById('kg-search');
-      const btnPrint = document.getElementById('btn-print');
-      const btnReload = document.getElementById('btn-reload');
-      const badge = document.getElementById('badge');
-
-      function hashColor(s) {
-        s = String(s||''); let h=0; for (let i=0;i<s.length;i++) { h=(h<<5)-h+s.charCodeAt(i); h|=0; }
-        const hue=Math.abs(h)%360; return `hsl(${hue},70%,50%)`;
-      }
-      function isPgTextArray(s) { s=(s||'').trim(); return s.length>=2 && s[0]=='{' && s[s.length-1]=='}'; }
-      function cleanLabel(raw) {
-        if(!raw) return '';
-        const s=String(raw).trim();
-        if(!isPgTextArray(s)) return s;
-        const inner=s.slice(1,-1);
-        if(!inner) return '';
-        return inner.replace(/(^|,)\s*"?null"?\s*(?=,|$)/gi,'')
-                    .replace(/"/g,'')
-                    .split(',').map(x=>x.trim()).filter(Boolean).join(', ');
-      }
-      function degreeMap(nodes,edges) {
-        const d={}; nodes.forEach(n=>d[n.id]=0);
-        edges.forEach(e=>{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; });
-        return d;
-      }
-      function inferFaccaoColors(rawNodes) {
-        const map={};
-        rawNodes.filter(n=>n && n.type==='faccao').forEach(n=>{
-          const name = cleanLabel(n.label||'').toUpperCase();
-          const id = String(n.id);
-          if(!name) return;
-          if (name.includes('PCC')) map[id] = COLOR_PCC;
-          else if (name === 'CV' || name.includes('COMANDO VERMELHO')) map[id] = COLOR_CV;
-        });
-        return map;
-      }
-      function isRoleNode(n){
-        const t=(n.type||'').toString().toLowerCase();
-        return ['funcao','função','funcao_da_faccao','role','cargo'].includes(t);
-      }
-      function colorForNode(n, faccaoColorById) {
-        if (isRoleNode(n)) return COLOR_ROLE;
-        const gid = String(n.group ?? n.faccao_id ?? '');
-        if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
-        return hashColor(gid || (n.type||'x'));
-      }
-      function edgeStyleFor(relation) {
-        const base = EDGE_COLORS[relation] || '#90a4ae';
-        return { color: base, width: 1 };
-      }
-      function attachToolbar(net, dsNodes) {
-        if (btnPrint) btnPrint.onclick = ()=>window.print();
-        if (btnReload) btnReload.onclick = ()=>location.reload();
-        if (badge && debug) {
-          const n = dsNodes.getIds().length;
-          badge.textContent = `nodes: ${n}`;
-        }
-        function centerAndHighlight(nodeId){
-          try{
-            const view = net.getViewPosition();
-            const scale = net.getScale();
-            const canvasCenter = { x: view.x, y: view.y };
-            net.moveNode(nodeId, canvasCenter.x, canvasCenter.y);
-
-            // desbota os demais
-            const all = dsNodes.get();
-            dsNodes.update(all.map(n => ({ id: n.id, color: Object.assign({}, n.color||{}, { opacity: 0.25 }) })));
-            const cur = dsNodes.get(nodeId);
-            const hi = Object.assign({}, cur.color||{}, { opacity: 1 });
-            dsNodes.update({ id: nodeId, color: hi });
-
-            net.selectNodes([nodeId], false);
-            net.focus(nodeId, { animation: { duration: 300 } });
-          }catch(e){ console.error(e); }
-        }
-        function runSearch(text){
-          const t = (text||'').trim().toLowerCase();
-          if(!t) return;
-          const all = dsNodes.get();
-          const hit = all.find(n => (n.label||'').toLowerCase().includes(t) || String(n.id)===t);
-          if (hit) centerAndHighlight(hit.id);
-        }
-        if (q){
-          q.addEventListener('change', ()=>runSearch(q.value));
-          q.addEventListener('keyup', (e)=>{ if(e.key==='Enter') runSearch(q.value); });
-        }
-      }
-
-      function render(data) {
-        const rawNodes = data.nodes || [];
-        const rawEdges = data.edges || [];
-        const faccaoColorById = inferFaccaoColors(rawNodes);
-
-        const nodes = rawNodes
-          .filter(n=>n&&n.id!=null)
-          .map(n=>{
-            const id = String(n.id);
-            const label = cleanLabel(n.label)||id;
-            const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
-            const value = (typeof n.size==='number') ? n.size : undefined;
-            const photo = n.photo_url && /^https?:\/\//i.test(n.photo_url) ? n.photo_url : null;
-            const color = colorForNode({group, type:n.type}, faccaoColorById);
-            const base = { id, label, group, value, color, borderWidth: 1 };
-            if (photo) { base.shape = 'circularImage'; base.image = photo; } else { base.shape = 'dot'; }
-            return base;
-          });
-
-        const nodeIds = new Set(nodes.map(n=>n.id));
-        const edges = rawEdges
-          .filter(e=>e&&e.source!=null&&e.target!=null && nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)))
-          .map(e=>{
-            const rel = e.relation || '';
-            const style = edgeStyleFor(rel);
-            return {
-              from:String(e.source), to:String(e.target),
-              title: rel || '',
-              width: 1, color: style.color, arrows: {to:{enabled:true, scaleFactor:0.6}}
-            };
-          });
-
-        if (!nodes.length) {
-          container.innerHTML='<div style="display:flex;height:100%;align-items:center;justify-content:center;opacity:.85">Nenhum dado para exibir (nodes=0).</div>';
-          return;
-        }
-
-        // tamanho por grau (se não houver size)
-        const hasSize = nodes.some(n=>typeof n.value==='number');
-        if(!hasSize) {
-          const deg=degreeMap(nodes,edges);
-          nodes.forEach(n=>{ const d=deg[n.id]||0; n.value=10+Math.log(d+1)*8; });
-        }
-
-        const dsNodes = new vis.DataSet(nodes);
-        const dsEdges = new vis.DataSet(edges);
-
-        const options = {
-          interaction: { hover: true, dragNodes: true, dragView: false, zoomView: true, multiselect: true, navigationButtons: true },
-          manipulation: { enabled: false },
-          physics: {
-            enabled: true,
-            stabilization: { enabled: true, iterations: 250 },
-            barnesHut: { gravitationalConstant: -8000, centralGravity: 0.2, springLength: 120, springConstant: 0.04, avoidOverlap: 0.2 }
-          },
-          nodes: { shape: 'dot', borderWidth: 1 },
-          edges: { smooth: false, width: 1, scaling: { min: 1, max: 1 } }
-        };
-
-        const net = new vis.Network(container, {nodes: dsNodes, edges: dsEdges}, options);
-        // Após estabilizar, desliga física para congelar posições
-        net.once('stabilizationIterationsDone', ()=>{ net.setOptions({ physics: false }); net.fit({ animation: { duration: 300 } }); });
-        net.on('doubleClick',()=> net.fit({ animation: { duration: 300 } }));
-        attachToolbar(net, dsNodes);
-      }
-
-      function run() {
-        if(typeof vis==='undefined') {
-          container.innerHTML='<div style="padding:12px">vis-network não carregou. Verifique CSP/CDN.</div>';
-          return;
-        }
-        if(source==='server') {
-          const tag=document.getElementById('__KG_DATA__');
-          if(!tag) { container.innerHTML='<div style="padding:12px">Bloco de dados ausente.</div>'; return; }
-          try { render(JSON.parse(tag.textContent||'{}')); }
-          catch(e){ console.error(e); container.innerHTML='<pre>'+String(e)+'</pre>'; }
-        } else {
-          const params=new URLSearchParams(window.location.search);
-          const qs=new URLSearchParams();
-          const fac=params.get('faccao_id'); if(fac && fac.trim()!=='') qs.set('faccao_id',fac.trim());
-          qs.set('include_co', params.get('include_co') ?? 'true');
-          qs.set('max_pairs',  params.get('max_pairs')  ?? '8000');
-          qs.set('max_nodes',  params.get('max_nodes')  ?? '2000');
-          qs.set('max_edges',  params.get('max_edges')  ?? '4000');
-          qs.set('cache',      params.get('cache')      ?? 'false');
-          const url=endpoint+'?'+qs.toString();
-          fetch(url,{headers:{'Accept':'application/json'}})
-            .then(async r=>{ if(!r.ok) throw new Error(r.status+': '+await r.text()); return r.json(); })
-            .then(render)
-            .catch(err=>{ console.error(err); container.innerHTML='<pre>'+String(err).replace(/</g,'&lt;')+'</pre>'; });
-        }
-      }
-      if(document.readyState!=='loading') run(); else document.addEventListener('DOMContentLoaded', run);
-    })();
-    </script>
-    <script src="/static/vis-embed.js" defer></script>
+    $inline_script
+    $client_loader_tag
   </body>
 </html>
 """
@@ -800,6 +743,8 @@ async def vis_visjs(
         source=source,
         js_href=js_href,
         embedded_block=embedded_block,
+        inline_script=inline_script,
+        client_loader_tag=client_loader_tag,
     )
 
     response.headers["Content-Security-Policy"] = csp
@@ -808,7 +753,7 @@ async def vis_visjs(
 
 
 # -----------------------------------------------------------------------------
-# PYVIS (set_options com JSON válido + generate_html() sem title)
+# PYVIS (set_options JSON + generate_html() sem title)
 # -----------------------------------------------------------------------------
 @app.get(
     "/v1/vis/pyvis",
@@ -853,7 +798,7 @@ async def vis_pyvis(
     ) -> Optional[str]:
         t = (node_type or "").lower()
         if t in ("funcao", "função", "funcao_da_faccao", "role", "cargo"):
-            return "#fbc02d"  # amarelo p/ funções
+            return "#fbc02d"  # funções em amarelo
         if not fid:
             return None
         name = faccao_name_by_id.get(fid, "")
@@ -936,7 +881,6 @@ async def vis_pyvis(
             color = EDGE_COLORS.get(rel, "#90a4ae")
             net.add_edge(a, b, width=1, color=color, title=rel, arrows="to")
 
-    # JSON válido para options
     import json as _json
 
     options = {
@@ -965,8 +909,7 @@ async def vis_pyvis(
     }
     net.set_options(_json.dumps(options))
 
-    # Gera HTML e injeta toolbar + script de busca + congelamento pós-estabilização
-    html = net.generate_html()  # NÃO passar title (pyvis 0.3.2 não aceita)
+    html = net.generate_html()
     toolbar_css = """
     <style>
       .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
@@ -988,8 +931,6 @@ async def vis_pyvis(
       <button id="btn-reload" type="button" title="Recarregar">Reload</button>
     </div>
     """
-
-    # Script: congela física após estabilização, arestas finas constantes, busca + "puxar" nó ao centro
     toolbar_js = """
     <script>
       (function(){
@@ -1013,18 +954,15 @@ async def vis_pyvis(
             var hit = all.find(function(n){ return (String(n.label||'').toLowerCase().indexOf(t) >= 0) || (String(n.id)===t); });
             if (!hit) return;
 
-            // opacidade
             all.forEach(function(n){ ds.update({ id: n.id, color: colorObj(n.color, 0.25) }); });
             var cur = ds.get(hit.id); ds.update({ id: hit.id, color: colorObj(cur.color, 1) });
 
-            // puxa para o centro
             var view = network.getViewPosition();
             network.moveNode(hit.id, view.x, view.y);
             network.selectNodes([hit.id], false);
             network.focus(hit.id, { animation: { duration: 300 } });
           }catch(e){ console.error(e); }
         }
-        // toolbar
         var q = document.getElementById('kg-search');
         var p = document.getElementById('btn-print');
         var r = document.getElementById('btn-reload');
@@ -1034,8 +972,6 @@ async def vis_pyvis(
           q.addEventListener('change', function(){ runSearch(q.value); });
           q.addEventListener('keyup', function(e){ if(e.key==='Enter') runSearch(q.value); });
         }
-
-        // congela física após estabilização
         if (typeof network !== 'undefined'){
           network.once('stabilizationIterationsDone', function(){
             network.setOptions({ physics: false });
@@ -1046,7 +982,6 @@ async def vis_pyvis(
     </script>
     """
 
-    # Injeta título e toolbar
     html = html.replace("<title>PyVis</title>", f"<title>{title}</title>")
     html = html.replace("</head>", toolbar_css + "\n</head>")
     html = html.replace("<body>", "<body>\n" + toolbar_html + "\n")

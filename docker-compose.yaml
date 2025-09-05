@@ -1,13 +1,10 @@
 # =============================================================================
 # Arquivo: docker-compose.yaml
 # Versão: v1.7.20
-# Objetivo: Orquestração no ambiente Coolify
+# Objetivo: Orquestração (Coolify) — INALTERADO
 # Funções/métodos:
-# - Sobe Redis
-# - Sobe svc-kg com variáveis .env
-# - Configura healthcheck baseado em /live
+# - Serviço redis e svc-kg com healthcheck /live
 # =============================================================================
-
 services:
   redis:
     image: redis:7-alpine

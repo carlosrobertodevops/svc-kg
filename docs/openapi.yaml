@@ -1,24 +1,22 @@
 # =============================================================================
 # Arquivo: docs/openapi.yaml
 # Versão: v1.7.20
-# Objetivo: Especificação OpenAPI 3.1 do svc-kg
+# Objetivo: Especificação OpenAPI do svc-kg (vis.js / PyVis / Ops)
 # Funções/métodos:
-# - Documenta endpoints de dados (graph), visualização (viz) e operações (ops)
+# - paths: /v1/graph/membros, /v1/vis/visjs, /v1/vis/vispj (alias), /v1/vis/pyvis
+# - ops: /live, /health, /ready, /ops/status
 # =============================================================================
-
 openapi: 3.1.0
 info:
-    title: svc-kg
-    version: v1.7.20
-    description: |
-        Micro serviço de Knowledge Graph (vis.js / PyVis).
-        - **svc-kg** (também referido como **“sic-kg”**)
-        - Visualizações: `/v1/vis/visjs`, `/v1/vis/pyvis`
-        - Operações (Ops): `/live`, `/health`, `/ready`, `/ops/status`
-
+  title: svc-kg
+  version: v1.7.20
+  description: |
+    Micro serviço de Knowledge Graph (vis.js / PyVis).
+    - **svc-kg** (também referido como **“sic-kg”**)
+    - Visualizações: `/v1/vis/visjs`, `/v1/vis/vispj` (alias), `/v1/vis/pyvis`
+    - Ops: `/live`, `/health`, `/ready`, `/ops/status`
 servers:
   - url: /
-
 tags:
   - name: graph
     description: Endpoints de dados brutos do grafo.
@@ -26,115 +24,143 @@ tags:
     description: Visualizações do grafo (vis.js / PyVis).
   - name: ops
     description: Operação & saúde do micro-serviço (Coolify, Supabase, Redis).
-
 paths:
-    /v1/graph/membros:
-        get:
-            tags: [ graph ]
-            summary: Retorna grafo (nodes/edges)
-            parameters:
-              - in: query
-                name: faccao_id
-                schema: { type: integer, nullable: true }
-              - in: query
-                name: include_co
-                schema: { type: boolean, default: true }
-              - in: query
-                name: max_pairs
-                schema: { type: integer, default: 8000 }
-              - in: query
-                name: max_nodes
-                schema: { type: integer, default: 2000 }
-              - in: query
-                name: max_edges
-                schema: { type: integer, default: 4000 }
-              - in: query
-                name: cache
-                schema: { type: boolean, default: true }
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                type: object
-                                properties:
-                                    nodes: { type: array, items: { type: object } }
-                                    edges: { type: array, items: { type: object } }
+  /v1/graph/membros:
+    get:
+      tags: [graph]
+      summary: Retorna grafo (nodes/edges)
+      parameters:
+        - in: query
+          name: faccao_id
+          schema: { type: integer, nullable: true }
+        - in: query
+          name: include_co
+          schema: { type: boolean, default: true }
+        - in: query
+          name: max_pairs
+          schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
+        - in: query
+          name: max_nodes
+          schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 }
+        - in: query
+          name: max_edges
+          schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 }
+        - in: query
+          name: cache
+          schema: { type: boolean, default: true }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodes: { type: array, items: { type: object } }
+                  edges: { type: array, items: { type: object } }
 
-    /v1/vis/visjs:
-        get:
-            tags: [ viz ]
-            summary: Visualização vis-network
-            description: |
-                Gera uma página HTML que carrega o **vis-network** e consome `/v1/graph/membros`.
-                - Busca por rótulo/ID
-                - Arraste apenas nó (dragNodes ON, dragView OFF)
-                - Arestas finas
-                - Fotos para nós de pessoas (circularImage)
-            responses: { "200": { description: HTML } }
+  /v1/vis/visjs:
+    get:
+      tags: [viz]
+      summary: Visualização vis-network (HTML)
+      parameters:
+        - in: query
+          name: faccao_id
+          schema: { type: integer, nullable: true }
+        - in: query
+          name: include_co
+          schema: { type: boolean, default: true }
+        - in: query
+          name: max_pairs
+          schema: { type: integer, default: 8000 }
+        - in: query
+          name: max_nodes
+          schema: { type: integer, default: 2000 }
+        - in: query
+          name: max_edges
+          schema: { type: integer, default: 4000 }
+        - in: query
+          name: cache
+          schema: { type: boolean, default: true }
+        - in: query
+          name: theme
+          schema: { type: string, enum: [light, dark], default: light }
+        - in: query
+          name: source
+          schema: { type: string, enum: [server, client], default: server }
+      responses: { "200": { description: HTML } }
 
-    /v1/vis/pyvis:
-        get:
-            tags: [ viz ]
-            summary: Visualização PyVis
-            description: |
-                Gera uma página HTML com base no **pyvis**.
-                - Busca por rótulo/ID embutida
-                - Arraste apenas nó (dragNodes ON, dragView OFF)
-                - Arestas finas
-                - Fotos para nós de pessoas (circularImage)
-            responses: { "200": { description: HTML } }
+  /v1/vis/vispj:
+    get:
+      tags: [viz]
+      summary: Alias de /v1/vis/visjs (HTML)
+      responses: { "200": { description: HTML } }
 
-    /live:
-        get:
-            tags: [ ops ]
-            summary: Liveness
-            description: Retorna "ok" se o processo está vivo.
-            responses: { "200": { description: OK, content: { text/plain: {} } } }
+  /v1/vis/pyvis:
+    get:
+      tags: [viz]
+      summary: Visualização PyVis (HTML)
+      parameters:
+        - in: query
+          name: faccao_id
+          schema: { type: integer, nullable: true }
+        - in: query
+          name: include_co
+          schema: { type: boolean, default: true }
+        - in: query
+          name: max_pairs
+          schema: { type: integer, default: 8000 }
+        - in: query
+          name: max_nodes
+          schema: { type: integer, default: 2000 }
+        - in: query
+          name: max_edges
+          schema: { type: integer, default: 4000 }
+        - in: query
+          name: cache
+          schema: { type: boolean, default: true }
+        - in: query
+          name: theme
+          schema: { type: string, enum: [light, dark], default: light }
+      responses: { "200": { description: HTML } }
 
-    /health:
-        get:
-            tags: [ ops ]
-            summary: Health check
-            description: |
-                Verifica Redis (ping) e backend (Supabase) configurado.
-                Use `?deep=true` para executar um RPC real no Supabase e validar conectividade ativa.
-            parameters:
-              - in: query
-                name: deep
-                schema: { type: boolean, default: false }
-                description: "Se true, executa RPC no Supabase e ping no Redis."
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                type: object
-                "503":
-                    description: Serviço degradado
+  /live:
+    get:
+      tags: [ops]
+      summary: Liveness
+      responses: { "200": { description: OK, content: { text/plain: {} } } }
 
-    /ready:
-        get:
-            tags: [ ops ]
-            summary: Readiness
-            description: Teste ativo de Redis e RPC curto no Supabase (pronto para tráfego).
-            responses:
-                "200": { description: OK }
-                "503": { description: Não pronto }
+  /health:
+    get:
+      tags: [ops]
+      summary: Health check
+      parameters:
+        - in: query
+          name: deep
+          schema: { type: boolean, default: false }
+          description: Executa RPC curto no Supabase e ping no Redis.
+      responses:
+        "200": { description: OK }
+        "503": { description: Serviço degradado }
 
-    /ops/status:
-        get:
-            tags: [ ops ]
-            summary: Status operacional (humano/automação)
-            description: |
-                Retorna informações do ambiente (Coolify/container), Redis, Supabase (sem expor segredos),
-                versão, hostname e parâmetros principais de CORS.
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                type: object
+  /ready:
+    get:
+      tags: [ops]
+      summary: Readiness
+      responses:
+        "200": { description: OK }
+        "503": { description: Não pronto }
+
+  /ops/status:
+    get:
+      tags: [ops]
+      summary: Status operacional (Coolify/Redis/Supabase)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+servers:
+  - url: /

@@ -1,13 +1,11 @@
 # =============================================================================
 # Arquivo: docker-compose.local.yaml
 # Versão: v1.7.20
-# Objetivo: Orquestração local com Postgres, PostgREST e Redis
+# Objetivo: Orquestração local (Postgres/PostgREST/Redis + svc-kg) — INALTERADO
 # Funções/métodos:
-# - db: PostgreSQL local
-# - postgrest: API PostgREST conectada ao db
-# - redis: cache
-# - svc-kg: micro-serviço conectado ao stack local
+# - Pilha local para emular Supabase via PostgREST
 # =============================================================================
+version: "3.9"
 
 services:
   db:
@@ -39,7 +37,6 @@ services:
       PGRST_DB_URI: postgres://kg:kg@db:5432/kgdb
       PGRST_DB_SCHEMAS: public
       PGRST_DB_ANON_ROLE: anon
-      # chave para validar JWT em Authorization: Bearer <token>
       PGRST_JWT_SECRET: devsecret
       PGRST_DB_PREPARED_STATEMENTS: "false"
     ports:
@@ -77,7 +74,7 @@ services:
 
       # 👇 aponta para o PostgREST local (emula Supabase)
       SUPABASE_URL: http://postgrest:3000
-      SUPABASE_KEY: ${SUPABASE_KEY}   # JWT (veja .env.local.example)
+      SUPABASE_KEY: ${SUPABASE_KEY}
       SUPABASE_RPC_FN: get_graph_membros
       SUPABASE_TIMEOUT: 15
     depends_on:
