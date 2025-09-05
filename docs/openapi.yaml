@@ -1,89 +1,138 @@
 # =============================================================================
 # Arquivo: docs/openapi.yaml
 # Versão: v1.7.20
-# Objetivo: Descrever a API pública do svc-kg
-# Funções/métodos:
-# - /v1/graph/membros: grafo normalizado
-# - /visjs: HTML com vis-network
-# - /pyvis: HTML com PyVis
-# - /live, /health, /ready, /ops/status: sondas/status
+# Objetivo: Descrever a API pública do micro-serviço svc-kg
+# Seções/recursos:
+# - ops:      /live, /health, /ready, /ops/status
+# - graph:    /v1/graph/membros
+# - viz:      /visjs, /pyvis  (e aliases legados /v1/vis/visjs, /v1/vis/pyvis)
 # =============================================================================
 openapi: 3.0.3
 info:
   title: svc-kg
   version: "v1.7.20"
   description: |
-    Serviço de Knowledge Graph com visualização em vis.js e PyVis.
+    Serviço de Knowledge Graph com visualização em **vis.js** e **PyVis**.
+
+    Padrões visuais:
+    - **CV** (facção e membros): vermelho
+    - **PCC** (facção e membros): azul-escuro
+    - **funções** (nós e arestas `EXERCE` / `FUNCAO_DA_FACCAO`): amarelo
+    - Arestas são **muito finas**, com opacidade reduzida
+    - Física é usada para estabilização e depois desativada
+
 servers:
   - url: /
+
+tags:
+  - name: ops
+    description: Sondas e status operacional (liveness/readiness/health)
+  - name: graph
+    description: Dados do grafo (nós/arestas) prontos para consumo em vis.js/PyVis
+  - name: viz
+    description: Visualizações HTML (vis.js e PyVis). Inclui aliases legados sob /v1/vis/*
+
 paths:
   /live:
     get:
+      tags: [ops]
       summary: Liveness probe
-      responses: { '200': { description: OK } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: live }
+
   /health:
     get:
-      summary: Health probe
-      responses: { '200': { description: OK } }
+      tags: [ops]
+      summary: Health probe (checagem rápida)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  backend: { type: string, example: supabase }
+                  backend_ok: { type: boolean, example: true }
+
   /ready:
     get:
+      tags: [ops]
       summary: Readiness probe
-      responses: { '200': { description: OK } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ready }
+                  backend: { type: string, example: supabase }
+                  backend_ok: { type: boolean, example: true }
+
   /ops/status:
     get:
-      summary: Status operacional
-      responses: { '200': { description: OK } }
+      tags: [ops]
+      summary: Status operacional (humano/automação)
+      description: Informações gerais do serviço, versão, backend configurado etc.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
   /v1/graph/membros:
     get:
-      summary: Grafo (nós e arestas) de membros/facções/funções
+      tags: [graph]
+      summary: Retorna grafo normalizado (nós/arestas)
       description: |
-        Retorna grafo normalizado para consumo por vis-network/PyVis.
-        Cores aplicadas no cliente: **CV** vermelho, **PCC** azul escuro, **funções** amarelo.
+        Retorna um objeto com `nodes` e `edges` já normalizados para consumo direto
+        por **vis-network** e **PyVis**. Os tamanhos de nós são ajustados por grau
+        (log2), para “explodir” os nós mais conectados.
       parameters:
         - in: query
           name: faccao_id
           schema: { type: integer, nullable: true }
+          description: Filtrar por facção (opcional)
         - in: query
           name: include_co
           schema: { type: boolean, default: true }
+          description: Incluir co-ocorrências/associações
         - in: query
           name: max_pairs
           schema: { type: integer, default: 5000, minimum: 1, maximum: 100000 }
+          description: Limite de pares (controle de volume vindo do backend)
       responses:
         '200':
           description: Grafo normalizado
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  nodes:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id: { type: string }
-                        label: { type: string }
-                        type: { type: string, enum: [membro, faccao, funcao] }
-                        size: { type: number }
-                        group: { nullable: true }
-                  edges:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        from: { type: string }
-                        to: { type: string }
-                        relation: { type: string }
-                        value: { type: number }
-                        arrows: { type: string }
-        '404': { description: Backend não encontrou RPC }
+                $ref: '#/components/schemas/GraphPayload'
+        '404': { description: Backend não encontrou o RPC informado }
         '500': { description: Erro inesperado }
+
   /visjs:
     get:
-      summary: HTML – vis-network
+      tags: [viz]
+      summary: Visualização HTML (vis.js)
       description: |
-        Renderiza a rede no navegador (arestas bem finas, física desligada após estabilizar, busca com destaque).
+        Renderiza a rede no navegador usando **vis-network**.
+        - Arestas muito finas; física desativada após estabilização
+        - Busca com destaque e foco (pressione Enter)
+        - Cores: CV (vermelho), PCC (azul-escuro), funções (amarelo)
       parameters:
         - in: query
           name: faccao_id
@@ -97,15 +146,23 @@ paths:
         - in: query
           name: search
           schema: { type: string, nullable: true }
+          description: Texto inicial para focar/destacar nó
       responses:
         '200':
-          description: HTML
-          content: { text/html: { schema: { type: string } } }
+          description: HTML com a visualização
+          content:
+            text/html:
+              schema: { type: string }
+
   /pyvis:
     get:
-      summary: HTML – PyVis
+      tags: [viz]
+      summary: Visualização HTML (PyVis)
       description: |
-        Usa PyVis para gerar a visualização. Arestas **muito finas**; física desligada após estabilização; busca com destaque.
+        Usa **PyVis** para gerar a visualização:
+        - Arestas muito finas; física desativada após estabilização
+        - Busca com destaque e foco
+        - Cores: CV (vermelho), PCC (azul-escuro), funções (amarelo)
       parameters:
         - in: query
           name: faccao_id
@@ -119,8 +176,102 @@ paths:
         - in: query
           name: search
           schema: { type: string, nullable: true }
+          description: Texto inicial para focar/destacar nó
       responses:
         '200':
-          description: HTML
-          content: { text/html: { schema: { type: string } } }
+          description: HTML com a visualização
+          content:
+            text/html:
+              schema: { type: string }
         '500': { description: Erro inesperado }
+
+  # ----------------------------
+  # Aliases legados sob /v1/vis/*
+  # ----------------------------
+  /v1/vis/visjs:
+    get:
+      tags: [viz]
+      summary: (Alias) Visualização HTML (vis.js)
+      description: Alias de **/visjs** mantido para compatibilidade.
+      parameters:
+        - $ref: '#/components/parameters/faccao_id'
+        - $ref: '#/components/parameters/include_co'
+        - $ref: '#/components/parameters/max_pairs'
+        - in: query
+          name: search
+          schema: { type: string, nullable: true }
+      responses:
+        '200':
+          description: HTML (equivalente a /visjs)
+          content:
+            text/html:
+              schema: { type: string }
+
+  /v1/vis/pyvis:
+    get:
+      tags: [viz]
+      summary: (Alias) Visualização HTML (PyVis)
+      description: Alias de **/pyvis** mantido para compatibilidade.
+      parameters:
+        - $ref: '#/components/parameters/faccao_id'
+        - $ref: '#/components/parameters/include_co'
+        - $ref: '#/components/parameters/max_pairs'
+        - in: query
+          name: search
+          schema: { type: string, nullable: true }
+      responses:
+        '200':
+          description: HTML (equivalente a /pyvis)
+          content:
+            text/html:
+              schema: { type: string }
+
+components:
+  parameters:
+    faccao_id:
+      in: query
+      name: faccao_id
+      schema: { type: integer, nullable: true }
+      description: Filtrar por facção (opcional)
+    include_co:
+      in: query
+      name: include_co
+      schema: { type: boolean, default: true }
+      description: Incluir co-ocorrências/associações
+    max_pairs:
+      in: query
+      name: max_pairs
+      schema: { type: integer, default: 5000, minimum: 1, maximum: 100000 }
+      description: Limite de pares do backend
+
+  schemas:
+    GraphNode:
+      type: object
+      properties:
+        id: { type: string, example: "m1" }
+        label: { type: string, example: "JOÃO SILVA" }
+        type:
+          type: string
+          enum: [membro, faccao, funcao]
+          example: membro
+        size: { type: number, example: 14.0 }
+        group:
+          nullable: true
+          description: Campo auxiliar de agrupamento, quando existir
+    GraphEdge:
+      type: object
+      properties:
+        from: { type: string, example: "m1" }
+        to: { type: string, example: "6" }
+        relation: { type: string, example: "PERTENCE_A" }
+        value: { type: number, example: 1.0 }
+        arrows: { type: string, example: "to" }
+    GraphPayload:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items: { $ref: '#/components/schemas/GraphNode' }
+        edges:
+          type: array
+          items: { $ref: '#/components/schemas/GraphEdge' }
