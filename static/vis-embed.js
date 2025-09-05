@@ -1,20 +1,20 @@
 // =============================================================================
 // Arquivo: static/vis-embed.js
 // Versão: v1.7.20
-// Objetivo: Montagem do vis-network consumindo /v1/graph/membros
+// Objetivo: Helper para vis-network quando usado em modo "client-side"
 // Funções/métodos:
-// - cleanLabel: normaliza rótulos {a,b,c} -> "a, b, c"
-// - inferFaccaoColors: colore CV (vermelho) e PCC (azul-escuro)
-// - selectByQuery: busca e destaca nós por 'label' ou ID
-// - Render: constroi nodes/edges, arestas finas, fotos em circularImage
+// - Renderização client-side, busca com destaque + bring-to-center, arestas finas
+// - Congelar física após estabilização (só nó arrastado se move)
+// - Cores: CV (vermelho), PCC (azul), funções (amarelo), fotos para membros
 // =============================================================================
-
 (function () {
+  if (!document.currentScript) return;
   const container = document.getElementById('mynetwork');
   if (!container) return;
 
   const COLOR_CV = '#d32f2f';
   const COLOR_PCC = '#0d47a1';
+  const COLOR_ROLE = '#fbc02d';
   const EDGE_COLORS = {
     'PERTENCE_A': '#9e9e9e',
     'EXERCE': '#00796b',
@@ -28,9 +28,7 @@
     for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; }
     const hue = Math.abs(h) % 360; return `hsl(${hue},70%,50%)`;
   }
-
   function isPgTextArray(s) { s = (s || '').trim(); return s.length >= 2 && s[0] == '{' && s[s.length - 1] == '}'; }
-
   function cleanLabel(raw) {
     if (!raw) return '';
     const s = String(raw).trim();
@@ -41,13 +39,11 @@
       .replace(/"/g, '')
       .split(',').map(x => x.trim()).filter(Boolean).join(', ');
   }
-
   function degreeMap(nodes, edges) {
     const d = {}; nodes.forEach(n => d[n.id] = 0);
     edges.forEach(e => { if (e.from in d) d[e.from]++; if (e.to in d) d[e.to]++; });
     return d;
   }
-
   function inferFaccaoColors(rawNodes) {
     const map = {};
     rawNodes.filter(n => n && n.type === 'faccao').forEach(n => {
@@ -59,48 +55,41 @@
     });
     return map;
   }
-
+  function isRoleNode(n){
+    const t=(n.type||'').toString().toLowerCase();
+    return ['funcao','função','funcao_da_faccao','role','cargo'].includes(t);
+  }
   function colorForNode(n, faccaoColorById) {
+    if (isRoleNode(n)) return COLOR_ROLE;
     const gid = String(n.group ?? n.faccao_id ?? '');
     if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
     return hashColor(gid || (n.type || 'x'));
   }
-
   function edgeStyleFor(relation) {
     const base = EDGE_COLORS[relation] || '#90a4ae';
-    return { color: base };
-  }
-
-  function attachToolbar(net, nc, ec, dsNodes) {
-    const q = document.getElementById('kg-search');
-    const btnPrint = document.getElementById('btn-print');
-    const btnReload = document.getElementById('btn-reload');
-    if (btnPrint) btnPrint.onclick = () => window.print();
-    if (btnReload) btnReload.onclick = () => location.reload();
-    if (q) {
-      const run = () => selectByQuery(net, dsNodes, q.value);
-      q.addEventListener('change', run);
-      q.addEventListener('keyup', (e) => { if (e.key === 'Enter') run(); });
-    }
+    return { color: base, width: 1 };
   }
 
   function selectByQuery(net, dsNodes, query) {
     const text = (query || '').trim().toLowerCase();
     if (!text) return;
     const all = dsNodes.get();
-    const hits = all.filter(n => (n.label || '').toLowerCase().includes(text) || String(n.id) === text);
-    if (!hits.length) return;
-    dsNodes.update(all.map(n => Object.assign(n, { color: Object.assign({}, n.color, { opacity: 0.25 }) })));
-    const ids = hits.map(h => h.id);
-    ids.forEach(id => {
-      const cur = dsNodes.get(id);
-      const hi = Object.assign({}, cur.color || {}, { opacity: 1 });
-      dsNodes.update({ id, color: hi });
-    });
-    net.fit({ nodes: ids, animation: { duration: 300 } });
+    const hit = all.find(n => (n.label || '').toLowerCase().includes(text) || String(n.id) === text);
+    if (!hit) return;
+
+    // opacidade
+    dsNodes.update(all.map(n => Object.assign({}, n, { color: Object.assign({}, n.color, { opacity: 0.25 }) })));
+    const cur = dsNodes.get(hit.id);
+    const hi = Object.assign({}, cur.color || {}, { opacity: 1 });
+    dsNodes.update({ id: hit.id, color: hi });
+
+    // traz para o centro
+    const view = net.getViewPosition();
+    net.moveNode(hit.id, view.x, view.y);
+    net.selectNodes([hit.id], false);
+    net.focus(hit.id, { animation: { duration: 300 } });
   }
 
-  // Carrega dados do endpoint de grafo
   const params = new URLSearchParams(window.location.search);
   const qs = new URLSearchParams();
   const fac = params.get('faccao_id'); if (fac && fac.trim() !== '') qs.set('faccao_id', fac.trim());
@@ -110,14 +99,12 @@
   qs.set('max_edges', params.get('max_edges') ?? '4000');
   qs.set('cache', params.get('cache') ?? 'false');
 
-  const endpoint = '/v1/graph/membros?' + qs.toString();
-
+  const endpoint = (container.getAttribute('data-endpoint') || '/v1/graph/membros') + '?' + qs.toString();
   fetch(endpoint, { headers: { 'Accept': 'application/json' } })
     .then(async r => { if (!r.ok) throw new Error(r.status + ': ' + await r.text()); return r.json(); })
     .then(function render(data) {
       const rawNodes = data.nodes || [];
       const rawEdges = data.edges || [];
-
       const faccaoColorById = inferFaccaoColors(rawNodes);
 
       const nodes = rawNodes
@@ -144,10 +131,10 @@
           return {
             from: String(e.source),
             to: String(e.target),
-            value: (e.weight != null ? Number(e.weight) : 1.0),
-            title: rel ? `${rel} (w=${e.weight ?? 1})` : `w=${e.weight ?? 1}`,
+            title: rel,
             width: 1,
-            color: style
+            color: style.color,
+            arrows: { to: { enabled: true, scaleFactor: 0.6 } }
           };
         });
 
@@ -166,34 +153,32 @@
       const dsEdges = new vis.DataSet(edges);
 
       const options = {
-        interaction: {
-          hover: true,
-          dragNodes: true,   // arrasta somente nó
-          dragView: false,   // não move o canvas
-          zoomView: true,
-          multiselect: true,
-          navigationButtons: true
-        },
+        interaction: { hover: true, dragNodes: true, dragView: false, zoomView: true, multiselect: true, navigationButtons: true },
         manipulation: { enabled: false },
         physics: {
           enabled: true,
-          stabilization: { enabled: true, iterations: 300 },
-          barnesHut: {
-            gravitationalConstant: -8000,
-            centralGravity: 0.2,
-            springLength: 120,
-            springConstant: 0.04,
-            avoidOverlap: 0.2
-          }
+          stabilization: { enabled: true, iterations: 250 },
+          barnesHut: { gravitationalConstant: -8000, centralGravity: 0.2, springLength: 120, springConstant: 0.04, avoidOverlap: 0.2 }
         },
         nodes: { shape: 'dot', borderWidth: 1 },
-        edges: { smooth: false }
+        edges: { smooth: false, width: 1, scaling: { min: 1, max: 1 } }
       };
 
       const net = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
-      net.once('stabilizationIterationsDone', () => net.fit({ animation: { duration: 300 } }));
+      net.once('stabilizationIterationsDone', () => { net.setOptions({ physics: false }); net.fit({ animation: { duration: 300 } }); });
       net.on('doubleClick', () => net.fit({ animation: { duration: 300 } }));
-      attachToolbar(net, nodes.length, edges.length, dsNodes);
+
+      // toolbar (se existir)
+      const q = document.getElementById('kg-search');
+      const p = document.getElementById('btn-print');
+      const r = document.getElementById('btn-reload');
+      if (p) p.onclick = () => window.print();
+      if (r) r.onclick = () => location.reload();
+      if (q) {
+        const run = () => selectByQuery(net, dsNodes, q.value);
+        q.addEventListener('change', run);
+        q.addEventListener('keyup', (e) => { if (e.key === 'Enter') run(); });
+      }
     })
     .catch(err => { console.error(err); container.innerHTML = '<pre>' + String(err).replace(/</g, '&lt;') + '</pre>'; });
 })();
