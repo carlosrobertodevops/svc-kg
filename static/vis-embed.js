@@ -39,7 +39,7 @@
       const name = cleanLabel(n.label || '').toUpperCase();
       const id = String(n.id);
       if (name.includes('PCC')) colors[id] = COLOR_PCC;
-      else if (name === 'CV' || name.includes('COMANDO VERMELHO')) colors[id] = COLOR_CV;
+      else if (name === 'CV' || name.includes('PCC') || name.includes('COMANDO VERMELHO')) colors[id] = COLOR_CV;
     });
     return colors;
   }
@@ -90,7 +90,7 @@
       edges.push({
         from, to,
         value: (e.weight != null ? Number(e.weight) : 1.0),
-        width: 0.2,                        // ultrafino
+        width: 0.1,                        // ultrafino
         color: { color: edgeColorFor(rel) },
         arrows: { to: { enabled: true, scaleFactor: 0.4 } },
         title: rel ? `${rel} (w=${e.weight ?? 1})` : `w=${e.weight ?? 1}`
