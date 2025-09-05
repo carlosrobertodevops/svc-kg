@@ -1,148 +1,305 @@
-// static/vis-embed.js
-(function () {
-  if (!document.currentScript) return;
-  const container = document.getElementById('mynetwork');
-  if (!container) return;
+// =============================================================================
+// Arquivo: static/vis-embed.js
+// Versão: v1.7.20
+// Objetivo: Script de incorporação do grafo (vis-network) para o endpoint /visjs
+// Funções/métodos:
+// - boot(): inicializa rede lendo dados (embedado ou da API) e monta o grafo
+// - transformRawToVis(raw): saneia o payload (IDs únicos por tipo + mapeia cores)
+// - buildOptions(): opções visuais (arestas finas, física, interação)
+// - wireUi(network, nodesDs, edgesDs): busca, imprimir, recarregar e destaque
+// - highlightAndPull(network, nodesDs, nodeId): destaca e "puxa" o nó encontrado
+// =============================================================================
 
-  const COLOR_CV = '#d32f2f';
-  const COLOR_PCC = '#0d47a1';
-  const COLOR_FUNCAO = '#c8a600';
-  const EDGE_COLORS = {
-    'PERTENCE_A': '#9e9e9e',
-    'EXERCE': '#00796b',
-    'FUNCAO_DA_FACCAO': '#ef6c00',
-    'CO_FACCAO': '#8e24aa',
-    'CO_FUNCAO': '#546e7a'
+(() => {
+  'use strict';
+
+  const COLORS = {
+    cv: '#e53935',        // CV = vermelho
+    pcc: '#1e88e5',       // PCC = azul
+    funcao: '#fdd835',    // função = amarelo
+    memberDefault: '#90a4ae',
+    factionDefault: '#9e9e9e',
+    edge: '#bdbdbd',
+    edgeHighlight: '#424242'
   };
 
-  function hashColor(s) {
-    s = String(s || ''); let h = 0;
-    for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; }
-    const hue = Math.abs(h) % 360; return `hsl(${hue},70%,50%)`;
+  function log(...args) {
+    try {
+      const badge = document.getElementById('badge');
+      const debug = (document.getElementById('mynetwork')?.dataset?.debug || 'false') === 'true';
+      if (badge) badge.style.display = debug ? 'inline-block' : 'none';
+      if (debug) console.debug('[vis-embed]', ...args);
+    } catch (_) {}
   }
-  function isPgTextArray(s) { s = (s || '').trim(); return s.length >= 2 && s[0] == '{' && s[s.length - 1] == '}'; }
-  function cleanLabel(raw) {
-    if (!raw) return '';
-    const s = String(raw).trim();
-    if (!isPgTextArray(s)) return s;
-    const inner = s.slice(1, -1);
-    if (!inner) return '';
-    return inner.replace(/(^|,)\s*"?null"?\s*(?=,|$)/gi, '')
-      .replace(/"/g, '')
-      .split(',').map(x => x.trim()).filter(Boolean).join(', ');
-  }
-  function degreeMap(nodes, edges) {
-    const d = {}; nodes.forEach(n => d[n.id] = 0);
-    edges.forEach(e => { if (e.from in d) d[e.from]++; if (e.to in d) d[e.to]++; });
-    return d;
-  }
-  function inferFaccaoColors(rawNodes) {
-    const map = {};
-    rawNodes.filter(n => n && n.type === 'faccao').forEach(n => {
-      const name = cleanLabel(n.label || '').toUpperCase();
-      const id = String(n.id);
-      if (!name) return;
-      if (name.includes('PCC')) map[id] = COLOR_PCC;
-      else if (name === 'CV' || name.includes('COMANDO VERMELHO')) map[id] = COLOR_CV;
-    });
-    return map;
-  }
-  function colorForNode(n, faccaoColorById) {
-    if ((n.type || '').toLowerCase().startsWith('funcao')) return COLOR_FUNCAO;
-    const gid = String(n.group ?? n.faccao_id ?? '');
-    if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
-    return hashColor(gid || (n.type || 'x'));
-  }
-  function edgeStyleFor(relation) {
-    const base = EDGE_COLORS[relation] || '#90a4ae';
-    return { color: base };
-  }
-  function attachToolbar(net, dsNodes) {
-    const q = document.getElementById('kg-search');
-    const btnPrint = document.getElementById('btn-print');
-    const btnReload = document.getElementById('btn-reload');
-    if (btnPrint) btnPrint.onclick = () => window.print();
-    if (btnReload) btnReload.onclick = () => location.reload();
-    if (q) {
-      const run = () => selectByQuery(net, dsNodes, q.value);
-      q.addEventListener('change', run);
-      q.addEventListener('keyup', (e) => { if (e.key === 'Enter') run(); });
+
+  function readEmbeddedData() {
+    const script = document.getElementById('__KG_DATA__');
+    if (!script) return null;
+    try {
+      return JSON.parse(script.textContent || '{}');
+    } catch (e) {
+      console.error('Falha ao parsear __KG_DATA__:', e);
+      return null;
     }
   }
-  function selectByQuery(net, dsNodes, query) {
-    const text = (query || '').trim().toLowerCase();
-    if (!text) return;
-    const all = dsNodes.get();
-    const hits = all.filter(n => (n.label || '').toLowerCase().includes(text) || String(n.id) === text);
-    if (!hits.length) return;
 
-    dsNodes.update(all.map(n => Object.assign(n, { color: Object.assign({}, n.color, { opacity: 0.2 }), borderWidth: 1 })));
-
-    const id = hits[0].id;
-    const cur = dsNodes.get(id);
-    const hi = Object.assign({}, cur.color || {}, { opacity: 1 });
-    dsNodes.update({ id, color: hi, borderWidth: 3, value: (cur.value || 12) * 1.2 });
-
-    net.focus(id, { nodes: [id], animation: { duration: 300 }, scale: 1.0 });
-    const pos = net.getPositions([id])[id];
-    if (pos) { net.moveNode(id, pos.x + 80, pos.y - 60); }
+  async function fetchFromApi(endpoint) {
+    const url = endpoint || '/v1/graph/membros?include_co=true';
+    const res = await fetch(url, { headers: { 'accept': 'application/json' } });
+    if (!res.ok) throw new Error(`Falha ao buscar dados (${res.status})`);
+    return res.json();
   }
 
-  const params = new URLSearchParams(window.location.search);
-  const qs = new URLSearchParams();
-  const fac = params.get('faccao_id'); if (fac && fac.trim() !== '') qs.set('faccao_id', fac.trim());
-  qs.set('include_co', params.get('include_co') ?? 'true');
-  qs.set('max_pairs', params.get('max_pairs') ?? '8000');
-  qs.set('max_nodes', params.get('max_nodes') ?? '2000');
-  qs.set('max_edges', params.get('max_edges') ?? '4000');
-  qs.set('cache', params.get('cache') ?? 'false');
+  function transformRawToVis(raw) {
+    // --- 1) Prefixos para IDs únicos por tipo (elimina colisões como "6")
+    const key = {
+      membro: (id) => `m:${id}`,
+      faccao: (id) => `f:${id}`,
+      funcao: (id) => `r:${id}`
+    };
 
-  const endpoint = (container.getAttribute('data-endpoint') || '/v1/graph/membros') + '?' + qs.toString();
-  fetch(endpoint, { headers: { 'Accept': 'application/json' } })
-    .then(async r => { if (!r.ok) throw new Error(r.status + ': ' + await r.text()); return r.json(); })
-    .then(function render(data) {
-      const rawNodes = data.nodes || [];
-      const rawEdges = data.edges || [];
+    // Mapas auxiliares
+    const factionsById = new Map();  // id -> {label, colorHex}
+    const memberToFaction = new Map(); // membroIdRaw -> faccaoIdRaw (via PERTENCE_A)
 
-      const faccaoColorById = inferFaccaoColors(rawNodes);
+    // --- 2) Registrar facções + cores
+    for (const n of raw.nodes || []) {
+      if (n.type === 'faccao') {
+        const label = (n.label || '').trim();
+        const up = label.toUpperCase();
+        let color = COLORS.factionDefault;
+        if (up === 'CV') color = COLORS.cv;
+        else if (up.includes('PCC')) color = COLORS.pcc;
+        factionsById.set(String(n.id), { label, color });
+      }
+    }
 
-      const nodes = rawNodes
-        .filter(n => n && n.id != null)
-        .map(n => {
-          const id = String(n.id);
-          const label = cleanLabel(n.label) || id;
-          const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
-          const value = (typeof n.size === 'number') ? n.size : undefined;
-          const photo = n.photo_url && /^https?:\/\//i.test(n.photo_url) ? n.photo_url : null;
-          const color = colorForNode(n, faccaoColorById);
-          const base = { id, label, group, value, color, borderWidth: 1 };
-          if (photo) { base.shape = 'circularImage'; base.image = photo; } else { base.shape = 'dot'; }
-          return base;
-        });
+    // --- 3) Descobrir a facção de cada membro via arestas PERTENCE_A
+    for (const e of raw.edges || []) {
+      if (e.relation === 'PERTENCE_A') {
+        // source: membro.id | target: faccao.id (ids crús do backend)
+        memberToFaction.set(String(e.source), String(e.target));
+      }
+    }
 
-      const nodeIds = new Set(nodes.map(n => n.id));
-      const edges = rawEdges
-        .filter(e => e && e.source != null && e.target != null && nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)))
-        .map(e => {
-          const rel = e.relation || '';
-          const style = edgeStyleFor(rel);
-          return { from: String(e.source), to: String(e.target), value: (e.weight != null ? Number(e.weight) : 1.0), title: rel ? `${rel} (w=${e.weight ?? 1})` : `w=${e.weight ?? 1}`, width: 1, color: style };
-        });
-
-      const dsNodes = new vis.DataSet(nodes);
-      const dsEdges = new vis.DataSet(edges);
-
-      const options = {
-        interaction: { hover: true, dragNodes: true, dragView: false, zoomView: true, multiselect: true, navigationButtons: true },
-        manipulation: { enabled: false },
-        physics: { enabled: false },
-        layout: { improvedLayout: true, randomSeed: 42 },
-        nodes: { shape: 'dot', borderWidth: 1 },
-        edges: { smooth: false, width: 1 }
+    // --- 4) Montar nós Vis (com IDs únicos)
+    const nodesMap = new Map(); // idVis -> node
+    for (const n of raw.nodes || []) {
+      const base = {
+        id: null,
+        label: (n.label || '').trim() || `${n.type} ${n.id}`,
+        value: n.size ? Math.max(6, Math.min(40, Math.round(n.size / 3))) : undefined, // escala suave
+        // guardamos metadados úteis
+        raw_id: String(n.id),
+        kind: n.type // 'membro' | 'faccao' | 'funcao'
       };
 
-      const net = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
-      attachToolbar(net, dsNodes);
-    })
-    .catch(err => { console.error(err); container.innerHTML = '<pre>' + String(err).replace(/</g, '&lt;') + '</pre>'; });
+      if (n.type === 'membro') {
+        base.id = key.membro(n.id);
+        // cor herdada da facção (quando houver)
+        const facId = memberToFaction.get(String(n.id));
+        const fac = facId ? factionsById.get(facId) : null;
+        base.color = { background: fac ? fac.color : COLORS.memberDefault, border: '#263238' };
+        base.shape = 'dot';
+      } else if (n.type === 'faccao') {
+        base.id = key.faccao(n.id);
+        const meta = factionsById.get(String(n.id));
+        const color = meta?.color || COLORS.factionDefault;
+        base.color = { background: color, border: '#263238' };
+        base.shape = 'diamond';
+        base.font = { bold: { color: '#212121' } };
+        base.value = base.value ? base.value + 6 : 18;
+      } else if (n.type === 'funcao') {
+        base.id = key.funcao(n.id);
+        base.color = { background: COLORS.funcao, border: '#5d4037' };
+        base.shape = 'hexagon';
+        base.value = base.value ? base.value : 14;
+      } else {
+        // fallback
+        base.id = `${n.type || 'n'}:${n.id}`;
+        base.color = { background: COLORS.memberDefault, border: '#263238' };
+        base.shape = 'dot';
+      }
+
+      if (!nodesMap.has(base.id)) nodesMap.set(base.id, base);
+      // se houver colisão no mesmo tipo, mantém o primeiro (dados sujos não quebram a rede)
+    }
+
+    // --- 5) Montar arestas Vis
+    const edges = [];
+    for (const e of raw.edges || []) {
+      let from, to;
+      if (e.relation === 'PERTENCE_A') {
+        from = key.membro(e.source);
+        to   = key.faccao(e.target);
+      } else if (e.relation === 'EXERCE') {
+        from = key.membro(e.source);
+        to   = key.funcao(e.target);
+      } else if (e.relation === 'CO_FACCAO') {
+        from = key.membro(e.source);
+        to   = key.membro(e.target);
+      } else {
+        // relação desconhecida -> tentar membro->membro
+        from = key.membro(e.source);
+        to   = key.membro(e.target);
+      }
+
+      edges.push({
+        id: `${from}~${to}~${e.relation || ''}`,
+        from, to,
+        title: e.relation || '',
+        width: Math.max(1, Math.min(2, (e.weight || 1) * 0.6)), // arestas finas
+        color: { color: COLORS.edge, highlight: COLORS.edgeHighlight, opacity: 0.55 },
+        smooth: { enabled: false }
+      });
+    }
+
+    return { nodes: Array.from(nodesMap.values()), edges };
+  }
+
+  function buildOptions() {
+    return {
+      autoResize: true,
+      nodes: {
+        shape: 'dot',
+        borderWidth: 1,
+        shadow: false,
+        font: {
+          size: 12,
+          color: '#212121',
+          face: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial'
+        }
+      },
+      edges: {
+        width: 1,
+        selectionWidth: 0,
+        hoverWidth: 0,
+        smooth: false,
+        color: { color: COLORS.edge, highlight: COLORS.edgeHighlight, opacity: 0.55 }
+      },
+      interaction: {
+        hover: true,
+        tooltipDelay: 200,
+        zoomView: true,
+        dragView: true,
+        dragNodes: true, // você pode “puxar” um nó
+        navigationButtons: false,
+        keyboard: { enabled: false }
+      },
+      physics: {
+        enabled: true,                      // liga só para estabilizar…
+        solver: 'forceAtlas2Based',
+        timestep: 0.35,
+        minVelocity: 0.5,
+        stabilization: { iterations: 150, updateInterval: 10 } // …e depois desliga
+      }
+    };
+  }
+
+  function wireUi(network, nodesDs, edgesDs) {
+    // Após estabilizar, desligar física -> arrastar 1 nó não move os demais
+    network.once('stabilizationIterationsDone', () => {
+      log('stabilizado -> physics OFF');
+      network.setOptions({ physics: { enabled: false } });
+    });
+
+    // Botões
+    document.getElementById('btn-print')?.addEventListener('click', () => window.print());
+    document.getElementById('btn-reload')?.addEventListener('click', () => window.location.reload());
+
+    // Busca
+    const search = document.getElementById('kg-search');
+    let lastHighlighted = null;
+
+    function clearHighlight() {
+      if (!lastHighlighted) return;
+      const current = nodesDs.get(lastHighlighted);
+      if (current) {
+        nodesDs.update({
+          id: current.id,
+          borderWidth: 1,
+          shadow: false
+        });
+      }
+      lastHighlighted = null;
+    }
+
+    async function doSearch() {
+      clearHighlight();
+      const q = (search.value || '').trim().toLowerCase();
+      if (!q) return;
+
+      // match por label contém ou por raw_id exato
+      const all = nodesDs.get();
+      let match = all.find(n => (n.label || '').toLowerCase().includes(q));
+      if (!match) match = all.find(n => (n.raw_id || '').toLowerCase() === q);
+
+      if (!match) {
+        alert('Nenhum nó encontrado.');
+        return;
+      }
+
+      highlightAndPull(network, nodesDs, match.id);
+      lastHighlighted = match.id;
+    }
+
+    search?.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') doSearch();
+    });
+  }
+
+  function highlightAndPull(network, nodesDs, nodeId) {
+    // Destaque visual
+    const node = nodesDs.get(nodeId);
+    if (!node) return;
+
+    nodesDs.update({
+      id: nodeId,
+      borderWidth: 3,
+      shadow: { enabled: true, size: 18, x: 2, y: 2 }
+    });
+
+    // "Puxar" o nó: move um pouco para fora do centro e foca a câmera
+    const pos = network.getPositions([nodeId])[nodeId] || { x: 0, y: 0 };
+    const pulled = { id: nodeId, x: pos.x + 160, y: pos.y - 60, fixed: { x: false, y: false } };
+    nodesDs.update(pulled);
+
+    network.focus(nodeId, { scale: 1.2, animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+  }
+
+  async function boot() {
+    const container = document.getElementById('mynetwork');
+    if (!container) return;
+
+    let raw = null;
+    const source = container.dataset.source || 'server';
+    const endpoint = container.dataset.endpoint;
+
+    try {
+      raw = source === 'server' ? readEmbeddedData() : null;
+      if (!raw) raw = await fetchFromApi(endpoint);
+    } catch (e) {
+      console.error('Erro ao obter dados do grafo:', e);
+      container.innerHTML = `<pre style="color:#b71c1c">Erro ao carregar dados do grafo: ${String(e?.message || e)}</pre>`;
+      return;
+    }
+
+    const visData = transformRawToVis(raw);
+    log('visData', visData);
+
+    const nodesDs = new vis.DataSet(visData.nodes);
+    const edgesDs = new vis.DataSet(visData.edges);
+
+    const options = buildOptions();
+    const network = new vis.Network(container, { nodes: nodesDs, edges: edgesDs }, options);
+
+    wireUi(network, nodesDs, edgesDs);
+  }
+
+  // init
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
 })();
