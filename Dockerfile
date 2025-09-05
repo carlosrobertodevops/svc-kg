@@ -1,3 +1,15 @@
+# =============================================================================
+# Arquivo: Dockerfile
+# Versão: v1.7.20
+# Objetivo: Construir a imagem do micro-serviço svc-kg com dependências
+# Funções/métodos:
+# - Configura ambiente Python 3.11 slim
+# - Instala dependências do serviço (FastAPI, Gunicorn, PyVis, etc.)
+# - Copia app.py, static e docs para o container
+# - Baixa vendor local do vis-network (JS + CSS)
+# - Define entrypoint com Gunicorn/Uvicorn
+# =============================================================================
+
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

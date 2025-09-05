@@ -1,12 +1,20 @@
+# =============================================================================
+# Arquivo: docs/openapi.yaml
+# Versão: v1.7.20
+# Objetivo: Especificação OpenAPI 3.1 do svc-kg
+# Funções/métodos:
+# - Documenta endpoints de dados (graph), visualização (viz) e operações (ops)
+# =============================================================================
+
 openapi: 3.1.0
 info:
     title: svc-kg
-    version: v1.7.19
+    version: v1.7.20
     description: |
         Micro serviço de Knowledge Graph (vis.js / PyVis).
         - **svc-kg** (também referido como **“sic-kg”**)
-        - Endpoints de visualização: `/v1/vis/visjs`, `/v1/vis/pyvis`
-        - Endpoints operacionais (Ops): `/live`, `/health`, `/ready`, `/ops/status`
+        - Visualizações: `/v1/vis/visjs`, `/v1/vis/pyvis`
+        - Operações (Ops): `/live`, `/health`, `/ready`, `/ops/status`
 
 servers:
   - url: /
@@ -58,12 +66,24 @@ paths:
         get:
             tags: [ viz ]
             summary: Visualização vis-network
+            description: |
+                Gera uma página HTML que carrega o **vis-network** e consome `/v1/graph/membros`.
+                - Busca por rótulo/ID
+                - Arraste apenas nó (dragNodes ON, dragView OFF)
+                - Arestas finas
+                - Fotos para nós de pessoas (circularImage)
             responses: { "200": { description: HTML } }
 
     /v1/vis/pyvis:
         get:
             tags: [ viz ]
             summary: Visualização PyVis
+            description: |
+                Gera uma página HTML com base no **pyvis**.
+                - Busca por rótulo/ID embutida
+                - Arraste apenas nó (dragNodes ON, dragView OFF)
+                - Arestas finas
+                - Fotos para nós de pessoas (circularImage)
             responses: { "200": { description: HTML } }
 
     /live:
