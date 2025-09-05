@@ -1,15 +1,3 @@
-# =============================================================================
-# Arquivo: app.py
-# Versão: v1.7.20
-# Objetivo: API FastAPI do micro-serviço svc-kg (graph + visualizações + ops)
-# Funções/métodos:
-# - live/health/ready/ops_status: sondas e status operacional
-# - graph_membros: retorna grafo (nós/arestas) via Supabase RPC
-# - vis_visjs: página HTML com vis-network (busca, drag de nó, arestas finas, fotos)
-# - vis_pyvis: página HTML com PyVis (corrigido set_options JSON + generate_html())
-# - Utilidades: normalização de labels de array PG, cache Redis, truncamento seguro
-# =============================================================================
-
 import os
 import json
 import logging
@@ -21,12 +9,11 @@ from fastapi import FastAPI, Query, Response, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from string import Template
 from pyvis.network import Network
 
 try:
-    from redis import asyncio as aioredis  # redis==5
-except Exception:
+    from redis import asyncio as aioredis
+except Exception:  # pragma: no cover
     aioredis = None
 
 # -----------------------------------------------------------------------------
@@ -35,7 +22,6 @@ except Exception:
 APP_ENV = os.getenv("APP_ENV", "production")
 PORT = int(os.getenv("PORT", "8080"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info").upper()
-
 logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
 log = logging.getLogger("svc-kg")
 
@@ -45,7 +31,7 @@ CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() ==
 CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type")
 CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS")
 
-# Backend: Supabase
+# Backend: Supabase/PostgREST
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_SERVICE_KEY = (
     os.getenv("SUPABASE_SERVICE_KEY", "").strip()
@@ -61,12 +47,12 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 CACHE_API_TTL = int(os.getenv("CACHE_API_TTL", "60"))
 CACHE_STATIC_MAX_AGE = int(os.getenv("CACHE_STATIC_MAX_AGE", "86400"))
 
-# Metadata
+# Identidade
 SERVICE_ID = "svc-kg"
 SERVICE_AKA = ["sic-kg"]
 
 # -----------------------------------------------------------------------------
-# FastAPI app
+# App
 # -----------------------------------------------------------------------------
 app = FastAPI(
     title="svc-kg",
@@ -77,13 +63,13 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-# Static
+# Static mounts
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 if os.path.isdir("docs"):
     app.mount("/docs-static", StaticFiles(directory="docs"), name="docs-static")
 
-# CORS
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=(
@@ -96,15 +82,13 @@ app.add_middleware(
     allow_headers=[h.strip() for h in CORS_ALLOW_HEADERS.split(",")],
 )
 
-# -----------------------------------------------------------------------------
 # Globals
-# -----------------------------------------------------------------------------
 _http: Optional[httpx.AsyncClient] = None
 _redis = None  # type: ignore
 
 
 # -----------------------------------------------------------------------------
-# Utils
+# Helpers
 # -----------------------------------------------------------------------------
 def _env_backend_ok() -> bool:
     return bool(SUPABASE_URL and SUPABASE_SERVICE_KEY and SUPABASE_RPC_FN)
@@ -197,28 +181,25 @@ def truncate_preview(
 async def supabase_rpc_get_graph(
     faccao_id: Optional[int], include_co: bool, max_pairs: int
 ) -> Dict[str, Any]:
-    if not __env_backend_ok():
+    # ---- FIX: NameError (typo) -> usar _env_backend_ok()
+    if not _env_backend_ok():
         raise RuntimeError(
             "backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY"
         )
 
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
+    # PostgREST/Supabase: função espera p_* somente
     payload = {
-        "faccao_id": faccao_id,
-        "include_co": include_co,
-        "max_pairs": max_pairs,
         "p_faccao_id": faccao_id,
         "p_include_co": include_co,
         "p_max_pairs": max_pairs,
     }
-
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-
     client = await _get_http()
     resp = await client.post(url, json=payload, headers=headers)
     if resp.status_code != 200:
@@ -226,18 +207,17 @@ async def supabase_rpc_get_graph(
             f"{resp.status_code}: Supabase RPC {SUPABASE_RPC_FN} falhou: {resp.text}"
         )
     data = resp.json()
+    if (
+        isinstance(data, list)
+        and data
+        and isinstance(data[0], dict)
+        and "nodes" in data[0]
+    ):
+        data = data[0]
     if not isinstance(data, dict):
-        if (
-            isinstance(data, list)
-            and data
-            and isinstance(data[0], dict)
-            and "nodes" in data[0]
-        ):
-            data = data[0]
-        else:
-            raise RuntimeError(
-                "Formato inesperado do RPC (esperado objeto com nodes/edges)"
-            )
+        raise RuntimeError(
+            "Formato inesperado do RPC (esperado objeto com nodes/edges)"
+        )
     return data
 
 
@@ -283,8 +263,8 @@ def running_in_container() -> bool:
         return True
     try:
         with open("/proc/1/cgroup", "rt") as fh:
-            content = fh.read()
-            return "docker" in content or "kubepods" in content
+            data = fh.read()
+            return "docker" in data or "kubepods" in data
     except Exception:
         return False
 
@@ -328,21 +308,15 @@ async def _shutdown():
 
 
 # -----------------------------------------------------------------------------
-# Health / Live / Ready / Ops
+# Ops endpoints
 # -----------------------------------------------------------------------------
-@app.get(
-    "/live", response_class=PlainTextResponse, include_in_schema=True, tags=["ops"]
-)
+@app.get("/live", response_class=PlainTextResponse, tags=["ops"])
 async def live():
     return PlainTextResponse("ok", status_code=200)
 
 
-@app.get("/health", response_class=JSONResponse, include_in_schema=True, tags=["ops"])
-async def health(
-    deep: bool = Query(
-        default=False, description="Se true, executa RPC no Supabase e ping no Redis"
-    )
-):
+@app.get("/health", response_class=JSONResponse, tags=["ops"])
+async def health(deep: bool = Query(False)):
     out = platform_info()
     out.update(
         {
@@ -357,8 +331,7 @@ async def health(
     r = await _get_redis()
     if r:
         try:
-            pong = await r.ping()
-            out["redis"] = bool(pong)
+            out["redis"] = bool(await r.ping())
         except Exception as e:
             r_ok = False
             out["redis_error"] = str(e)
@@ -367,9 +340,7 @@ async def health(
         b_ok = False
         if _env_backend_ok():
             try:
-                _ = await supabase_rpc_get_graph(
-                    faccao_id=None, include_co=False, max_pairs=1
-                )
+                _ = await supabase_rpc_get_graph(None, False, 1)
                 b_ok = True
             except Exception as e:
                 out["backend_error"] = str(e)
@@ -384,11 +355,10 @@ async def health(
         "timeout": SUPABASE_TIMEOUT,
         "service_key_tail": redact(SUPABASE_SERVICE_KEY),
     }
-
     return JSONResponse(out, status_code=200 if out.get("ok") else 503)
 
 
-@app.get("/ready", response_class=JSONResponse, include_in_schema=True, tags=["ops"])
+@app.get("/ready", response_class=JSONResponse, tags=["ops"])
 async def ready():
     r_ok = True
     out = platform_info()
@@ -399,12 +369,10 @@ async def ready():
             "backend_ok": False,
         }
     )
-
     r = await _get_redis()
     if r:
         try:
-            pong = await r.ping()
-            out["redis"] = bool(pong)
+            out["redis"] = bool(await r.ping())
         except Exception as e:
             r_ok = False
             out["redis_error"] = str(e)
@@ -412,14 +380,11 @@ async def ready():
     b_ok = False
     if _env_backend_ok():
         try:
-            _ = await supabase_rpc_get_graph(
-                faccao_id=None, include_co=False, max_pairs=1
-            )
+            _ = await supabase_rpc_get_graph(None, False, 1)
             b_ok = True
         except Exception as e:
             out["backend_error"] = str(e)
     out["backend_ok"] = b_ok
-
     ok = (not ENABLE_REDIS_CACHE or r_ok) and b_ok
     out["ok"] = ok
     return JSONResponse(out, status_code=200 if ok else 503)
@@ -428,14 +393,12 @@ async def ready():
 @app.get("/ops/status", response_class=JSONResponse, tags=["ops"])
 async def ops_status():
     info = platform_info()
-
     redis_cfg = {"enabled": ENABLE_REDIS_CACHE, "url": REDIS_URL}
     if ENABLE_REDIS_CACHE and aioredis:
         try:
             r = await _get_redis()
             if r:
-                pong = await r.ping()
-                redis_cfg["ping"] = bool(pong)
+                redis_cfg["ping"] = bool(await r.ping())
         except Exception as e:
             redis_cfg["error"] = str(e)
 
@@ -464,12 +427,7 @@ async def ops_status():
 # -----------------------------------------------------------------------------
 # API: dados brutos
 # -----------------------------------------------------------------------------
-@app.get(
-    "/v1/graph/membros",
-    response_class=JSONResponse,
-    summary="Retorna grafo (nodes/edges)",
-    tags=["graph"],
-)
+@app.get("/v1/graph/membros", response_class=JSONResponse, tags=["graph"])
 async def graph_membros(
     faccao_id: Optional[int] = Query(default=None),
     include_co: bool = Query(default=True),
@@ -486,15 +444,9 @@ async def graph_membros(
 
 
 # -----------------------------------------------------------------------------
-# VIS.JS (vis-network): server/client exclusivos + CSP liberal para imagens
+# VIS.JS (vis-network) – busca, cores CV/PCC, fotos, arestas finas; physics off
 # -----------------------------------------------------------------------------
-@app.get(
-    "/v1/vis/visjs",
-    response_class=HTMLResponse,
-    summary="Visualização vis-network (busca, drag só de nó, arestas finas, fotos)",
-    tags=["viz"],
-)
-@app.get("/v1/vis/vispj", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/v1/vis/visjs", response_class=HTMLResponse, tags=["viz"])
 async def vis_visjs(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -508,33 +460,22 @@ async def vis_visjs(
     debug: bool = Query(default=False),
     source: str = Query(default="server", pattern="^(server|client)$"),
 ):
+    # CSP e assets
     local_js = "static/vendor/vis-network.min.js"
     local_css = "static/vendor/vis-network.min.css"
     has_local = os.path.exists(local_js) and os.path.exists(local_css)
     if has_local:
         js_href = "/static/vendor/vis-network.min.js"
         css_href = "/static/vendor/vis-network.min.css"
-        # ⚠️ imagens externas liberadas para fotos de membros
-        csp = (
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "script-src 'self' 'unsafe-inline'; img-src * data:; "
-            "font-src 'self' data:; connect-src 'self';"
-        )
+        csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';"
     else:
         js_href = "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"
         css_href = "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
-        csp = (
-            "default-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; "
-            "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-            "img-src * data:; font-src 'self' data:; connect-src 'self';"
-        )
+        csp = "default-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:; font-src 'self' data:; connect-src 'self';"
 
+    # Embed opcional
     embedded_block = ""
-    inline_script = ""
-    client_loader_tag = ""
-
     if source == "server":
-        # 1) Modo SERVER: embute dados e usa script inline. NÃO inclui vis-embed.js.
         data = await fetch_graph_sanitized(
             faccao_id, include_co, max_pairs, use_cache=cache
         )
@@ -545,206 +486,227 @@ async def vis_visjs(
             '<script id="__KG_DATA__" type="application/json">' + json_str + "</script>"
         )
 
-        inline_script = r"""
-<script>
-(function(){
-  const COLOR_CV  = '#d32f2f';
-  const COLOR_PCC = '#0d47a1';
-  const COLOR_ROLE= '#fbc02d';
-  const EDGE_COLORS = {
-    'PERTENCE_A': '#9e9e9e',
-    'EXERCE': '#00796b',
-    'FUNCAO_DA_FACCAO': '#ef6c00',
-    'CO_FACCAO': '#8e24aa',
-    'CO_FUNCAO': '#546e7a'
-  };
-
-  const container = document.getElementById('mynetwork');
-  const q = document.getElementById('kg-search');
-  const btnPrint = document.getElementById('btn-print');
-  const btnReload = document.getElementById('btn-reload');
-  const badge = document.getElementById('badge');
-
-  function hashColor(s){ s=String(s||''); let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h+s.charCodeAt(i); h|=0; } const hue=Math.abs(h)%360; return `hsl(${hue},70%,50%)`; }
-  function isPgTextArray(s){ s=(s||'').trim(); return s.length>=2 && s[0]=='{' && s[s.length-1]=='}'; }
-  function cleanLabel(raw){
-    if(!raw) return '';
-    const s=String(raw).trim(); if(!isPgTextArray(s)) return s;
-    const inner=s.slice(1,-1); if(!inner) return '';
-    return inner.replace(/(^|,)\s*"?null"?\s*(?=,|$)/gi,'').replace(/"/g,'').split(',').map(x=>x.trim()).filter(Boolean).join(', ');
-  }
-  function degreeMap(nodes,edges){
-    const d={}; nodes.forEach(n=>d[n.id]=0);
-    edges.forEach(e=>{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; });
-    return d;
-  }
-  function inferFaccaoColors(rawNodes){
-    const map={};
-    rawNodes.filter(n=>n && n.type==='faccao').forEach(n=>{
-      const name = cleanLabel(n.label||'').toUpperCase();
-      const id = String(n.id);
-      if(!name) return;
-      if (name.includes('PCC')) map[id] = COLOR_PCC;
-      else if (name === 'CV' || name.includes('COMANDO VERMELHO')) map[id] = COLOR_CV;
-    });
-    return map;
-  }
-  function isRoleNode(n){
-    const t=(n.type||'').toString().toLowerCase();
-    return ['funcao','função','funcao_da_faccao','role','cargo'].includes(t);
-  }
-  function colorForNode(n, faccaoColorById){
-    if (isRoleNode(n)) return COLOR_ROLE;
-    const gid = String(n.group ?? n.faccao_id ?? '');
-    if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
-    return hashColor(gid || (n.type||'x'));
-  }
-
-  function selectByQuery(net, dsNodes, text){
-    const t=(text||'').trim().toLowerCase();
-    if(!t) return;
-    const all = dsNodes.get();
-    const hit = all.find(n => (n.label||'').toLowerCase().includes(t) || String(n.id)===t);
-    if(!hit) return;
-    dsNodes.update(all.map(n => Object.assign({}, n, { color: Object.assign({}, n.color, { opacity: 0.25 }) })));
-    const cur = dsNodes.get(hit.id);
-    const hi  = Object.assign({}, cur.color||{}, { opacity: 1 });
-    dsNodes.update({ id: hit.id, color: hi });
-    const view = net.getViewPosition();
-    net.moveNode(hit.id, view.x, view.y);
-    net.selectNodes([hit.id], false);
-    net.focus(hit.id, { animation: { duration: 300 } });
-  }
-
-  function run(){
-    if(typeof vis==='undefined'){ container.innerHTML='<div style="padding:12px">vis-network não carregou.</div>'; return; }
-    const tag=document.getElementById('__KG_DATA__');
-    if(!tag){ container.innerHTML='<div style="padding:12px">Bloco de dados ausente.</div>'; return; }
-    let data={}; try{ data=JSON.parse(tag.textContent||'{}'); }catch(e){ container.innerHTML='<pre>'+String(e)+'</pre>'; return; }
-
-    const rawNodes = data.nodes || [];
-    const rawEdges = data.edges || [];
-    const faccaoColorById = inferFaccaoColors(rawNodes);
-
-    const nodes = rawNodes.filter(n=>n&&n.id!=null).map(n=>{
-      const id    = String(n.id);
-      const label = cleanLabel(n.label)||id;
-      const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
-      const value = (typeof n.size==='number') ? n.size : undefined;
-      const photo = n.photo_url && /^https?:\/\//i.test(n.photo_url) ? n.photo_url : null;
-      const color = colorForNode({group, type:n.type}, faccaoColorById);
-      const base  = { id, label, group, value, color, borderWidth: 1 };
-      if (photo) { base.shape='circularImage'; base.image=photo; } else { base.shape='dot'; }
-      return base;
-    });
-
-    const nodeIds = new Set(nodes.map(n=>n.id));
-    const edges = rawEdges
-      .filter(e=>e&&e.source!=null&&e.target!=null && nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)))
-      .map(e=>({ from:String(e.source), to:String(e.target), title:(e.relation||''), width:1, color:'#90a4ae', arrows:{to:{enabled:true, scaleFactor:0.6}} }));
-
-    if(!nodes.length){ container.innerHTML='<div style="display:flex;height:100%;align-items:center;justify-content:center;opacity:.85">Nenhum dado para exibir (nodes=0).</div>'; return; }
-
-    const hasSize = nodes.some(n=>typeof n.value==='number');
-    if(!hasSize){
-      const deg=degreeMap(nodes,edges);
-      nodes.forEach(n=>{ const d=deg[n.id]||0; n.value=10+Math.log(d+1)*8; });
-    }
-
-    const dsNodes = new vis.DataSet(nodes);
-    const dsEdges = new vis.DataSet(edges);
-
-    const options = {
-      interaction: { hover:true, dragNodes:true, dragView:false, zoomView:true, multiselect:true, navigationButtons:true },
-      manipulation:{ enabled:false },
-      physics: {
-        enabled:true,
-        stabilization:{ enabled:true, iterations:250 },
-        barnesHut:{ gravitationalConstant:-8000, centralGravity:0.2, springLength:120, springConstant:0.04, avoidOverlap:0.2 }
-      },
-      nodes:{ shape:'dot', borderWidth:1 },
-      edges:{ smooth:false, width:1, scaling:{ min:1, max:1 } }
-    };
-
-    const net = new vis.Network(container, {nodes:dsNodes, edges:dsEdges}, options);
-    net.once('stabilizationIterationsDone', ()=>{ net.setOptions({ physics:false }); net.fit({ animation:{ duration:300 } }); });
-    net.on('doubleClick',()=> net.fit({ animation:{ duration:300 } }));
-
-    // toolbar
-    if (btnPrint) btnPrint.onclick = ()=>window.print();
-    if (btnReload) btnReload.onclick = ()=>location.reload();
-    if (badge) badge.textContent = `nodes: ${dsNodes.getIds().length}`;
-    if (q){
-      const runSearch = ()=> selectByQuery(net, dsNodes, q.value);
-      q.addEventListener('change', runSearch);
-      q.addEventListener('keyup', e=>{ if(e.key==='Enter') runSearch(); });
-    }
-  }
-  if(document.readyState!=='loading') run(); else document.addEventListener('DOMContentLoaded', run);
-})();
-</script>
-"""
-    else:
-        # 2) Modo CLIENT: sem dados embutidos; apenas carrega vis-embed.js
-        client_loader_tag = '<script src="/static/vis-embed.js" defer></script>'
-
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
-    tpl = Template(
-        r"""
+    # HTML base com marcadores (evita .format em strings com ${})
+    html_base = """
 <!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="x-ua-compatible" content="ie=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>$title</title>
-    <link rel="stylesheet" href="$css_href">
+    <title>Knowledge Graph (vis.js)</title>
+    <link rel="stylesheet" href="__CSS__">
     <link rel="stylesheet" href="/static/vis-style.css">
-    <meta name="theme-color" content="$bg">
+    <meta name="theme-color" content="__BG__">
     <style>
-      html,body,#mynetwork { height:100%; margin:0; }
-      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
-      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; }
-      .badge { background:#eee; border-radius:6px; padding:2px 8px; font-size:12px; }
+      html,body,#mynetwork {{ height:100%; margin:0; }}
+      .kg-toolbar {{ display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }}
+      .kg-toolbar input[type="search"] {{ flex: 1; min-width: 220px; padding:6px 10px; }}
+      .badge {{ background:#eee; border-radius:6px; padding:2px 8px; font-size:12px; }}
     </style>
   </head>
-  <body data-theme="$theme">
+  <body data-theme="__THEME__">
     <div class="kg-toolbar">
-      <h4 style="margin:0">$title</h4>
+      <h4 style="margin:0">Knowledge Graph (vis.js)</h4>
       <input id="kg-search" type="search" placeholder="Buscar nó por rótulo ou ID…" />
       <button id="btn-print" type="button" title="Imprimir">Print</button>
       <button id="btn-reload" type="button" title="Recarregar">Reload</button>
-      <span id="badge" class="badge" style="display:$debug_display">debug</span>
+      <span id="badge" class="badge" style="display:__DEBUG_DISPLAY__">debug</span>
     </div>
 
     <div id="mynetwork"
          style="height:90vh;width:100%;"
          data-endpoint="/v1/graph/membros"
-         data-debug="$debug_bool"
-         data-source="$source"></div>
+         data-debug="__DEBUG_BOOL__"
+         data-source="__SOURCE__"></div>
 
-    $embedded_block
-    <script src="$js_href" crossorigin="anonymous"></script>
-    $inline_script
-    $client_loader_tag
+    __EMBED__
+    <script src="__JS__" crossorigin="anonymous"></script>
+
+    <script>
+    (function(){{
+      const COLOR_CV  = '#d32f2f';     // CV vermelho
+      const COLOR_PCC = '#0d47a1';     // PCC azul escuro
+      const COLOR_FUNCAO = '#c8a600';  // funções amarelo
+      const EDGE_COLORS = {{
+        'PERTENCE_A':      '#9e9e9e',
+        'EXERCE':          '#00796b',
+        'FUNCAO_DA_FACCAO':'#ef6c00',
+        'CO_FACCAO':       '#8e24aa',
+        'CO_FUNCAO':       '#546e7a'
+      }};
+
+      const container = document.getElementById('mynetwork');
+      const source = container.getAttribute('data-source') || 'server';
+      const debug = container.getAttribute('data-debug') === 'true';
+      const endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
+
+      const q = document.getElementById('kg-search');
+      const btnPrint = document.getElementById('btn-print');
+      const btnReload = document.getElementById('btn-reload');
+      const badge = document.getElementById('badge');
+
+      function hashColor(s) {{
+        s = String(s||''); let h=0; for (let i=0;i<s.length;i++) {{ h=(h<<5)-h+s.charCodeAt(i); h|=0; }}
+        const hue=Math.abs(h)%360; return 'hsl(' + hue + ',70%,50%)';
+      }}
+      function isPgTextArray(s) {{ s=(s||'').trim(); return s.length>=2 && s[0]=='{{' && s[s.length-1]=='}'; }}
+      function cleanLabel(raw) {{
+        if(!raw) return '';
+        const s=String(raw).trim();
+        if(!isPgTextArray(s)) return s;
+        const inner=s.slice(1,-1);
+        if(!inner) return '';
+        return inner.replace(/(^|,)\\s*\"?null\"?\\s*(?=,|$)/gi,'')
+                    .replace(/\"/g,'')
+                    .split(',').map(x=>x.trim()).filter(Boolean).join(', ');
+      }}
+      function degreeMap(nodes,edges) {{
+        const d={{}}; nodes.forEach(n=>d[n.id]=0);
+        edges.forEach(e=>{{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; }});
+        return d;
+      }}
+      function inferFaccaoColors(rawNodes) {{
+        const map={{}};
+        rawNodes.filter(n=>n && n.type==='faccao').forEach(n=>{{
+          const name = cleanLabel(n.label||'').toUpperCase();
+          const id = String(n.id);
+          if(!name) return;
+          if (name.includes('PCC')) map[id] = COLOR_PCC;
+          else if (name === 'CV' || name.includes('COMANDO VERMELHO')) map[id] = COLOR_CV;
+        }});
+        return map;
+      }}
+      function colorForNode(n, faccaoColorById) {{
+        if ((n.type||'').toLowerCase().startsWith('funcao')) return COLOR_FUNCAO;
+        const gid = String(n.group ?? n.faccao_id ?? '');
+        if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
+        return hashColor(gid || (n.type||'x'));
+      }}
+      function edgeStyleFor(relation) {{
+        const base = EDGE_COLORS[relation] || '#90a4ae';
+        return {{ color: base }};
+      }}
+      function attachToolbar(net,dsNodes) {{
+        if (btnPrint) btnPrint.onclick = ()=>window.print();
+        if (btnReload) btnReload.onclick = ()=>location.reload();
+        if (q) {{
+          const run = () => selectByQuery(net, dsNodes, q.value);
+          q.addEventListener('change', run);
+          q.addEventListener('keyup', (e)=>{{ if(e.key==='Enter') run(); }});
+        }}
+      }}
+      function selectByQuery(net, dsNodes, query) {{
+        const text = (query||'').trim().toLowerCase();
+        if (!text) return;
+        const all = dsNodes.get();
+        const hits = all.filter(n => (String(n.label||'').toLowerCase().includes(text)) || (String(n.id)===text));
+        if (!hits.length) return;
+
+        // esmaece demais nós
+        dsNodes.update(all.map(n => Object.assign(n, {{ color: Object.assign({{}}, n.color, {{ opacity: 0.2 }}) }})));
+
+        // destaca e move levemente o primeiro hit
+        const id = hits[0].id;
+        const cur = dsNodes.get(id);
+        const hi = Object.assign({{}}, cur.color || {{}}, {{ opacity: 1 }});
+        dsNodes.update({{ id, color: hi, borderWidth: 3, value: (cur.value||12)*1.2 }});
+
+        // foca e puxa para fora do "bolo"
+        net.focus(id, {{ scale: 1.0, animation: {{ duration: 300 }} }});
+        const pos = net.getPositions([id])[id];
+        if (pos) {{ net.moveNode(id, pos.x + 80, pos.y - 60); }}
+      }}
+
+      function render(data) {{
+        const rawNodes = data.nodes || [];
+        const rawEdges = data.edges || [];
+        const faccaoColorById = inferFaccaoColors(rawNodes);
+
+        const nodes = rawNodes
+          .filter(n=>n&&n.id!=null)
+          .map(n=>{{
+            const id = String(n.id);
+            const label = cleanLabel(n.label)||id;
+            const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
+            const value = (typeof n.size==='number') ? n.size : undefined;
+            const photo = n.photo_url && /^https?:\\/\\//i.test(n.photo_url) ? n.photo_url : null;
+            const color = colorForNode(n, faccaoColorById);
+            const base = {{ id, label, group, value, color, borderWidth: 1 }};
+            if (photo) {{ base.shape = 'circularImage'; base.image = photo; }} else {{ base.shape = 'dot'; }}
+            return base;
+          }});
+
+        const nodeIds = new Set(nodes.map(n=>n.id));
+        const edges = rawEdges
+          .filter(e=>e&&e.source!=null&&e.target!=null && nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)))
+          .map(e=>{{
+            const rel = e.relation || '';
+            const style = edgeStyleFor(rel);
+            return {{ from:String(e.source), to:String(e.target), value:(e.weight!=null? Number(e.weight):1.0), title: rel ? (rel + ' (w='+(e.weight??1)+')') : ('w='+(e.weight??1)), width:1, color: style }};
+          }});
+
+        const dsNodes = new vis.DataSet(nodes);
+        const dsEdges = new vis.DataSet(edges);
+
+        const options = {{
+          interaction: {{ hover: true, dragNodes: true, dragView: false, zoomView: true, multiselect: true, navigationButtons: true }},
+          manipulation: {{ enabled: false }},
+          physics: {{ enabled: false }},
+          layout: {{ improvedLayout: true, randomSeed: 42 }},
+          nodes: {{ shape: 'dot', borderWidth: 1 }},
+          edges: {{ smooth: false, width: 1 }}
+        }};
+
+        const net = new vis.Network(container, {{nodes: dsNodes, edges: dsEdges}}, options);
+        attachToolbar(net, dsNodes);
+      }}
+
+      function run() {{
+        if(typeof vis==='undefined') {{
+          container.innerHTML='<div style="padding:12px">vis-network não carregou. Verifique CSP/CDN.</div>';
+          return;
+        }}
+        if(source==='server') {{
+          const tag=document.getElementById('__KG_DATA__');
+          if(!tag) {{ container.innerHTML='<div style="padding:12px">Bloco de dados ausente.</div>'; return; }}
+          try {{ render(JSON.parse(tag.textContent||'{{}}')); }}
+          catch(e){{ console.error(e); container.innerHTML='<pre>'+String(e)+'</pre>'; }}
+        }} else {{
+          const params=new URLSearchParams(window.location.search);
+          const qs=new URLSearchParams();
+          const fac=params.get('faccao_id'); if(fac && fac.trim()!=='') qs.set('faccao_id',fac.trim());
+          qs.set('include_co', params.get('include_co') ?? 'true');
+          qs.set('max_pairs',  params.get('max_pairs')  ?? '8000');
+          qs.set('max_nodes',  params.get('max_nodes')  ?? '2000');
+          qs.set('max_edges',  params.get('max_edges')  ?? '4000');
+          qs.set('cache',      params.get('cache')      ?? 'false');
+          const url=endpoint+'?'+qs.toString();
+          fetch(url,{{headers:{{'Accept':'application/json'}}}})
+            .then(async r=>{{ if(!r.ok) throw new Error(r.status+': '+await r.text()); return r.json(); }})
+            .then(render)
+            .catch(err=>{{ console.error(err); container.innerHTML='<pre>'+String(err).replace(/</g,'&lt;')+'</pre>'; }});
+        }}
+      }}
+      if(document.readyState!=='loading') run(); else document.addEventListener('DOMContentLoaded', run);
+    }})();
+    </script>
+
+    <script src="/static/vis-embed.js" defer></script>
   </body>
 </html>
 """
-    )
-
-    html = tpl.safe_substitute(
-        title=title,
-        css_href=css_href,
-        bg=bg,
-        theme=theme,
-        debug_display="inline-block" if debug else "none",
-        debug_bool=str(debug).lower(),
-        source=source,
-        js_href=js_href,
-        embedded_block=embedded_block,
-        inline_script=inline_script,
-        client_loader_tag=client_loader_tag,
+    html = (
+        html_base.replace("__CSS__", css_href)
+        .replace("__JS__", js_href)
+        .replace("__THEME__", theme)
+        .replace("__DEBUG_DISPLAY__", "inline-block" if debug else "none")
+        .replace("__DEBUG_BOOL__", "true" if debug else "false")
+        .replace("__SOURCE__", source)
+        .replace("__EMBED__", embedded_block)
+        .replace("__BG__", bg)
     )
 
     response.headers["Content-Security-Policy"] = csp
@@ -753,14 +715,9 @@ async def vis_visjs(
 
 
 # -----------------------------------------------------------------------------
-# PYVIS (set_options JSON + generate_html() sem title)
+# PYVIS – physics off, arestas finas; busca e realce
 # -----------------------------------------------------------------------------
-@app.get(
-    "/v1/vis/pyvis",
-    response_class=HTMLResponse,
-    summary="Visualização com PyVis (busca, arestas finas, drag só de nó, fotos, cores CV/PCC/função)",
-    tags=["viz"],
-)
+@app.get("/v1/vis/pyvis", response_class=HTMLResponse, tags=["viz"])
 async def vis_pyvis(
     faccao_id: Optional[int] = Query(default=None),
     include_co: bool = Query(default=True),
@@ -791,17 +748,16 @@ async def vis_pyvis(
     for n in nodes:
         if (n or {}).get("type") == "faccao" and n.get("id") is not None:
             fid = str(n["id"])
-            faccao_name_by_id[fid] = str(n.get("label") or "").strip().upper()
+            faccao_name_by_id[fid] = str(n.get("label") or "").strip()
 
-    def color_from_faccao(
-        fid: Optional[str], node_type: Optional[str]
-    ) -> Optional[str]:
-        t = (node_type or "").lower()
-        if t in ("funcao", "função", "funcao_da_faccao", "role", "cargo"):
-            return "#fbc02d"  # funções em amarelo
+    def color_from_faccao(fid: Optional[str], ntype: str) -> Optional[str]:
+        if ntype.lower().startswith("funcao"):
+            return "#c8a600"
         if not fid:
             return None
-        name = faccao_name_by_id.get(fid, "")
+        name = (faccao_name_by_id.get(fid) or "").upper()
+        if not name:
+            return None
         if "PCC" in name:
             return "#0d47a1"
         if name == "CV" or "COMANDO VERMELHO" in name:
@@ -840,6 +796,7 @@ async def vis_pyvis(
 
         label = str(n.get("label") or nid)
         group = str(n.get("group") or n.get("faccao_id") or n.get("type") or "0")
+        ntype = str(n.get("type") or "")
         size = n.get("size")
         photo = (
             n.get("photo_url")
@@ -848,7 +805,7 @@ async def vis_pyvis(
             else None
         )
 
-        fixed_color = color_from_faccao(group, n.get("type"))
+        fixed_color = color_from_faccao(group, ntype)
         color = fixed_color or hash_color(group)
 
         node_kwargs = dict(title=label, color=color, borderWidth=1)
@@ -878,11 +835,14 @@ async def vis_pyvis(
         b = str(e.get("target"))
         if a in valid_nodes and b in valid_nodes:
             rel = e.get("relation") or ""
+            try:
+                w = float(e.get("weight") or 1.0)
+            except Exception:
+                w = 1.0
             color = EDGE_COLORS.get(rel, "#90a4ae")
-            net.add_edge(a, b, width=1, color=color, title=rel, arrows="to")
+            net.add_edge(a, b, value=w, width=1, color=color, title=f"{rel} (w={w})")
 
-    import json as _json
-
+    # PyVis espera JSON puro em set_options
     options = {
         "interaction": {
             "hover": True,
@@ -893,36 +853,25 @@ async def vis_pyvis(
             "navigationButtons": True,
         },
         "manipulation": {"enabled": False},
-        "physics": {
-            "enabled": True,
-            "stabilization": {"enabled": True, "iterations": 250},
-            "barnesHut": {
-                "gravitationalConstant": -8000,
-                "centralGravity": 0.2,
-                "springLength": 120,
-                "springConstant": 0.04,
-                "avoidOverlap": 0.2,
-            },
-        },
+        "physics": {"enabled": False},
+        "layout": {"improvedLayout": True, "randomSeed": 42},
         "nodes": {"shape": "dot", "borderWidth": 1},
-        "edges": {"smooth": False, "width": 1, "scaling": {"min": 1, "max": 1}},
+        "edges": {"smooth": False, "width": 1},
     }
-    net.set_options(_json.dumps(options))
+    net.set_options(json.dumps(options))
 
+    # Gera HTML e injeta toolbar + busca sem usar argumento 'title'
     html = net.generate_html()
+    html = html.replace("<title>PyVis Network</title>", f"<title>{title}</title>")
+
     toolbar_css = """
     <style>
       .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
       .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; }
       .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:6px; cursor:pointer; }
       .kg-toolbar button:hover { background: rgba(0,0,0,.04); }
-      body { background: %s; color: %s; }
     </style>
-    """ % (
-        bgcolor,
-        fontcolor,
-    )
-
+    """
     toolbar_html = f"""
     <div class="kg-toolbar">
       <h4 style="margin:0">{title}</h4>
@@ -947,20 +896,25 @@ async def vis_pyvis(
         function runSearch(txt){
           try{
             var ds = (typeof nodes !== 'undefined') ? nodes : (network && network.body && network.body.data && network.body.data.nodes);
-            if (!ds || !network) return;
+            if (!ds) return;
             var all = ds.get();
             var t = (txt||'').trim().toLowerCase();
             if (!t){ return; }
-            var hit = all.find(function(n){ return (String(n.label||'').toLowerCase().indexOf(t) >= 0) || (String(n.id)===t); });
-            if (!hit) return;
+            var hits = all.filter(function(n){ return (String(n.label||'').toLowerCase().indexOf(t) >= 0) || (String(n.id)===t); });
+            if (!hits.length) return;
 
-            all.forEach(function(n){ ds.update({ id: n.id, color: colorObj(n.color, 0.25) }); });
-            var cur = ds.get(hit.id); ds.update({ id: hit.id, color: colorObj(cur.color, 1) });
+            all.forEach(function(n){ ds.update({ id: n.id, color: colorObj(n.color, 0.2), borderWidth: 1 }); });
 
-            var view = network.getViewPosition();
-            network.moveNode(hit.id, view.x, view.y);
-            network.selectNodes([hit.id], false);
-            network.focus(hit.id, { animation: { duration: 300 } });
+            var id = hits[0].id;
+            var cur = ds.get(id);
+            ds.update({ id: id, color: colorObj(cur.color, 1), borderWidth: 3, value: (cur.value||12)*1.2 });
+
+            // foca e desloca um pouco
+            if (typeof network !== 'undefined'){
+              network.focus(id, { animation: { duration: 300 }, scale: 1.0 });
+              var pos = network.getPositions([id])[id];
+              if (pos) { network.moveNode(id, pos.x + 80, pos.y - 60); }
+            }
           }catch(e){ console.error(e); }
         }
         var q = document.getElementById('kg-search');
@@ -972,17 +926,9 @@ async def vis_pyvis(
           q.addEventListener('change', function(){ runSearch(q.value); });
           q.addEventListener('keyup', function(e){ if(e.key==='Enter') runSearch(q.value); });
         }
-        if (typeof network !== 'undefined'){
-          network.once('stabilizationIterationsDone', function(){
-            network.setOptions({ physics: false });
-            network.fit({ animation: { duration: 300 } });
-          });
-        }
       })();
     </script>
     """
-
-    html = html.replace("<title>PyVis</title>", f"<title>{title}</title>")
     html = html.replace("</head>", toolbar_css + "\n</head>")
     html = html.replace("<body>", "<body>\n" + toolbar_html + "\n")
     html = html.replace("</body>", toolbar_js + "\n</body>")
@@ -1010,11 +956,7 @@ async def custom_docs():
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist/swagger-ui.css">
     <style>
       body { margin:0; }
-      .ops-bar {
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-        padding: 12px 16px; border-bottom: 1px solid #eee; background:#fafafa;
-        display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
-      }
+      .ops-bar { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; padding: 12px 16px; border-bottom: 1px solid #eee; background:#fafafa; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
       .ops-right { display:flex; gap:8px; align-items:center; }
       .ops-pill { padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #e0e0e0; background:#fff; }
       .ops-pill.ok { border-color:#c8e6c9; background:#e8f5e9; }
@@ -1072,13 +1014,7 @@ async def custom_docs():
       }
 
       window.onload = function(){
-        SwaggerUIBundle({
-          url: '/openapi.json',
-          dom_id: '#swagger-ui',
-          deepLinking: true,
-          docExpansion: 'none',
-          defaultModelsExpandDepth: -1
-        });
+        SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui', deepLinking: true, docExpansion: 'none', defaultModelsExpandDepth: -1 });
         refresh();
       };
     </script>
