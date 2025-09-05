@@ -4,17 +4,18 @@
 # Objetivo: API FastAPI do micro-serviço svc-kg (graph + visualizações + ops)
 # Funções/métodos:
 # - live/health/ready/ops_status: sondas e status operacional
-# - graph_membros: retorna grafo (nós/arestas) via Supabase RPC (com dedupe)
-# - vis_visjs: HTML com vis-network (busca, física controlada, arestas finas, fotos)
-# - vis_pyvis: HTML com PyVis (arestas finas, repulsão forte, busca com destaque)
-# - Utilidades: normalização de labels de array PG, cache Redis, truncamento seguro
+# - graph_membros: retorna grafo (nós/arestas) via Supabase RPC
+# - vis_visjs: página HTML com vis-network (busca, drag de nó, arestas finas, fotos)
+# - vis_pyvis: página HTML com PyVis (física desativada pós-estabilização, arestas finas)
+# - Utilidades: normalização array PG, cache Redis, truncamento seguro, dedup
 # =============================================================================
 
 import os
 import json
+import asyncio
 import logging
 import socket
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 
 import httpx
 from fastapi import FastAPI, Query, Response, HTTPException
@@ -28,9 +29,13 @@ try:
 except Exception:
     aioredis = None
 
-# --------------------------- Configuração básica ------------------------------
+# -----------------------------------------------------------------------------
+# Config & logger
+# -----------------------------------------------------------------------------
 APP_ENV = os.getenv("APP_ENV", "production")
+PORT = int(os.getenv("PORT", "8080"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info").upper()
+
 logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
 log = logging.getLogger("svc-kg")
 
@@ -40,7 +45,7 @@ CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() ==
 CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type")
 CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS")
 
-# Backend: Supabase/PostgREST
+# Backend: Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_SERVICE_KEY = (
     os.getenv("SUPABASE_SERVICE_KEY", "").strip()
@@ -56,11 +61,13 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 CACHE_API_TTL = int(os.getenv("CACHE_API_TTL", "60"))
 CACHE_STATIC_MAX_AGE = int(os.getenv("CACHE_STATIC_MAX_AGE", "86400"))
 
-# Metadados
+# Metadata
 SERVICE_ID = "svc-kg"
 SERVICE_AKA = ["sic-kg"]
 
-# ------------------------------ App FastAPI ----------------------------------
+# -----------------------------------------------------------------------------
+# FastAPI app
+# -----------------------------------------------------------------------------
 app = FastAPI(
     title="svc-kg",
     version="v1.7.20",
@@ -70,30 +77,32 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
+# Static
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 if os.path.isdir("docs"):
     app.mount("/docs-static", StaticFiles(directory="docs"), name="docs-static")
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=(
-        [o.strip() for o in CORS_ALLOW_ORIGINS.split(",")]
-        if CORS_ALLOW_ORIGINS != "*"
-        else ["*"]
-    ),
+    allow_origins=[o.strip() for o in CORS_ALLOW_ORIGINS.split(",")] if CORS_ALLOW_ORIGINS != "*" else ["*"],
     allow_credentials=CORS_ALLOW_CREDENTIALS,
     allow_methods=[m.strip() for m in CORS_ALLOW_METHODS.split(",")],
     allow_headers=[h.strip() for h in CORS_ALLOW_HEADERS.split(",")],
 )
 
-# Recursos globais
+# -----------------------------------------------------------------------------
+# Globals
+# -----------------------------------------------------------------------------
 _http: Optional[httpx.AsyncClient] = None
 _redis = None  # type: ignore
 
-
-# ------------------------------- Utilidades ----------------------------------
+# -----------------------------------------------------------------------------
+# Utils
+# -----------------------------------------------------------------------------
 def _env_backend_ok() -> bool:
+    """Confirma se variáveis do backend estão configuradas."""
     return bool(SUPABASE_URL and SUPABASE_SERVICE_KEY and SUPABASE_RPC_FN)
 
 
@@ -119,6 +128,7 @@ def _cache_key(prefix: str, params: Dict[str, Any]) -> str:
 
 
 def _normalize_pg_text_array_label(s: str) -> str:
+    """Converte '{A,B}' -> 'A, B' e remove 'null'."""
     if not s:
         return s
     s2 = s.strip()
@@ -132,88 +142,58 @@ def _normalize_pg_text_array_label(s: str) -> str:
     return s
 
 
-def _dedupe_nodes_edges(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Deduplica nós/arestas e corrige IDs/labels."""
-    raw_nodes = data.get("nodes", []) or []
-    raw_edges = data.get("edges", []) or []
+def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Garante ids como string e limpa labels; filtra arestas órfãs."""
+    nodes = data.get("nodes", []) or []
+    edges = data.get("edges", []) or []
 
-    node_by_id: Dict[str, Dict[str, Any]] = {}
-    for n in raw_nodes:
+    fixed_nodes = []
+    node_ids = set()
+    for n in nodes:
         if not n or "id" not in n:
             continue
         nid = str(n["id"])
+        if nid in node_ids:
+            continue
+        node_ids.add(nid)
         label = n.get("label")
         if isinstance(label, str):
             label = _normalize_pg_text_array_label(label)
-        cur = node_by_id.get(nid)
-        if not cur:
-            cur = dict(n)
-            cur["id"] = nid
-            if label is not None:
-                cur["label"] = label
-            node_by_id[nid] = cur
-        else:
-            if not cur.get("photo_url") and n.get("photo_url"):
-                cur["photo_url"] = n.get("photo_url")
-            try:
-                s_old = float(cur.get("size") or 0)
-                s_new = float(n.get("size") or 0)
-                if s_new > s_old:
-                    cur["size"] = s_new
-            except Exception:
-                pass
-            for k in ("group", "faccao_id", "type"):
-                if not cur.get(k) and n.get(k):
-                    cur[k] = n.get(k)
+        fixed = dict(n)
+        fixed["id"] = nid
+        if label is not None:
+            fixed["label"] = label
+        fixed_nodes.append(fixed)
 
-    node_ids = set(node_by_id.keys())
-
-    seen = set()
     fixed_edges = []
-    for e in raw_edges:
+    for e in edges:
         if not e:
             continue
         a = str(e.get("source"))
         b = str(e.get("target"))
-        if a not in node_ids or b not in node_ids:
-            continue
-        rel = str(e.get("relation") or "")
-        key = (a, b, rel)
-        if key in seen:
-            continue
-        seen.add(key)
-        fe = dict(e)
-        fe["source"] = a
-        fe["target"] = b
-        fe["relation"] = rel
-        fixed_edges.append(fe)
+        if a in node_ids and b in node_ids:
+            fe = dict(e)
+            fe["source"] = a
+            fe["target"] = b
+            fixed_edges.append(fe)
 
-    return {"nodes": list(node_by_id.values()), "edges": fixed_edges}
+    return {"nodes": fixed_nodes, "edges": fixed_edges}
 
 
-def truncate_preview(
-    data: Dict[str, Any], max_nodes: int, max_edges: int
-) -> Dict[str, Any]:
+def truncate_preview(data: Dict[str, Any], max_nodes: int, max_edges: int) -> Dict[str, Any]:
     ns = data.get("nodes", [])[: max(0, max_nodes)]
-    idset = {str(n["id"]) for n in ns if n and "id" in n}
-    es = [
-        e
-        for e in (data.get("edges", []) or [])
-        if e and str(e.get("source")) in idset and str(e.get("target")) in idset
-    ]
+    allowed = {str(n["id"]) for n in ns if n and "id" in n}
+    es = [e for e in (data.get("edges", []) or []) if e and str(e.get("source")) in allowed and str(e.get("target")) in allowed]
     es = es[: max(0, max_edges)]
     return {"nodes": ns, "edges": es}
 
 
-async def supabase_rpc_get_graph(
-    faccao_id: Optional[int], include_co: bool, max_pairs: int
-) -> Dict[str, Any]:
+async def supabase_rpc_get_graph(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> Dict[str, Any]:
+    """Chama o RPC do Supabase com fallback para nomes p_*."""
     if not _env_backend_ok():
-        raise RuntimeError(
-            "backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY"
-        )
+        raise RuntimeError("backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY")
 
-    url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
+    client = await _get_http()
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
@@ -221,53 +201,33 @@ async def supabase_rpc_get_graph(
         "Accept": "application/json",
     }
 
-    # Tenta primeiro assinatura p_*; se 404 PGRST202, tenta sem prefixo.
-    attempts = [
-        {
-            "p_faccao_id": faccao_id,
-            "p_include_co": include_co,
-            "p_max_pairs": max_pairs,
-        },
-        {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs},
-    ]
-
-    client = await _get_http()
-    last_status: Optional[int] = None
-    last_body: Optional[str] = None
-    for payload in attempts:
+    async def _call(payload: Dict[str, Any]) -> Dict[str, Any]:
+        url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
         resp = await client.post(url, json=payload, headers=headers)
-        last_status, last_body = resp.status_code, resp.text
-        if resp.status_code == 200:
-            data = resp.json()
-            if not isinstance(data, dict):
-                if (
-                    isinstance(data, list)
-                    and data
-                    and isinstance(data[0], dict)
-                    and "nodes" in data[0]
-                ):
-                    data = data[0]
-                else:
-                    raise RuntimeError(
-                        "Formato inesperado do RPC (esperado objeto com nodes/edges)"
-                    )
-            return data
-        if resp.status_code == 404 and "PGRST202" in (resp.text or ""):
-            continue
-        break
+        if resp.status_code != 200:
+            raise RuntimeError(f"{resp.status_code}: Supabase RPC {SUPABASE_RPC_FN} falhou: {resp.text}")
+        data = resp.json()
+        if not isinstance(data, dict):
+            if isinstance(data, list) and data and isinstance(data[0], dict) and "nodes" in data[0]:
+                data = data[0]
+            else:
+                raise RuntimeError("Formato inesperado do RPC (esperado objeto com nodes/edges)")
+        return data
 
-    raise RuntimeError(
-        f"{last_status}: Supabase RPC {SUPABASE_RPC_FN} falhou: {last_body}"
-    )
+    # 1) tenta com p_* (nome observado no PostgREST)
+    try:
+        return await _call({"p_faccao_id": faccao_id, "p_include_co": include_co, "p_max_pairs": max_pairs})
+    except Exception as e1:
+        # 2) tenta sem prefixo p_
+        try:
+            return await _call({"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs})
+        except Exception:
+            raise e1
 
 
-async def fetch_graph_sanitized(
-    faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool = True
-) -> Dict[str, Any]:
-    cache_key = _cache_key(
-        "graph",
-        {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs},
-    )
+async def fetch_graph_sanitized(faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool = True) -> Dict[str, Any]:
+    """Busca, normaliza e (opcionalmente) cacheia."""
+    cache_key = _cache_key("graph", {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs})
     if use_cache:
         r = await _get_redis()
         if r:
@@ -279,14 +239,12 @@ async def fetch_graph_sanitized(
                     pass
 
     raw = await supabase_rpc_get_graph(faccao_id, include_co, max_pairs)
-    fixed = _dedupe_nodes_edges(raw)
+    fixed = normalize_graph_labels(raw)
 
     if use_cache:
         r = await _get_redis()
         if r:
-            await r.set(
-                cache_key, json.dumps(fixed, ensure_ascii=False), ex=CACHE_API_TTL
-            )
+            await r.set(cache_key, json.dumps(fixed, ensure_ascii=False), ex=CACHE_API_TTL)
     return fixed
 
 
@@ -304,7 +262,7 @@ def running_in_container() -> bool:
     try:
         with open("/proc/1/cgroup", "rt") as fh:
             content = fh.read()
-            return "docker" in content or "kubepods" in content
+            return ("docker" in content) or ("kubepods" in content)
     except Exception:
         return False
 
@@ -320,18 +278,15 @@ def platform_info() -> Dict[str, Any]:
         "version": app.version,
     }
 
-
-# ----------------------------- Lifecycle -------------------------------------
+# -----------------------------------------------------------------------------
+# Lifecycle
+# -----------------------------------------------------------------------------
 @app.on_event("startup")
 async def _startup():
     await _get_http()
     if ENABLE_REDIS_CACHE and aioredis:
         await _get_redis()
-    log.info(
-        "svc-kg iniciado (backend: %s, cache: %s)",
-        "supabase" if _env_backend_ok() else "none",
-        "redis" if ENABLE_REDIS_CACHE else "none",
-    )
+    log.info("svc-kg iniciado (backend: %s, cache: %s)", "supabase" if _env_backend_ok() else "none", "redis" if ENABLE_REDIS_CACHE else "none")
 
 
 @app.on_event("shutdown")
@@ -344,94 +299,56 @@ async def _shutdown():
         await _redis.close()
         _redis = None
 
-
-# --------------------------------- OPS ---------------------------------------
+# -----------------------------------------------------------------------------
+# Ops
+# -----------------------------------------------------------------------------
 @app.get("/live", response_class=PlainTextResponse, tags=["ops"])
 async def live():
     return PlainTextResponse("ok", status_code=200)
 
 
 @app.get("/health", response_class=JSONResponse, tags=["ops"])
-async def health(deep: bool = Query(default=False)):
+async def health(deep: bool = Query(False)):
     out = platform_info()
-    out.update(
-        {
-            "status": "ok",
-            "redis": False,
-            "backend": "supabase" if _env_backend_ok() else "none",
-            "backend_ok": _env_backend_ok(),
-        }
-    )
-
+    out.update({"status": "ok", "redis": False, "backend": "supabase" if _env_backend_ok() else "none", "backend_ok": _env_backend_ok()})
     r_ok = True
     r = await _get_redis()
     if r:
         try:
-            pong = await r.ping()
-            out["redis"] = bool(pong)
+            out["redis"] = bool(await r.ping())
         except Exception as e:
             r_ok = False
             out["redis_error"] = str(e)
-
-    if deep:
-        b_ok = False
-        if _env_backend_ok():
-            try:
-                _ = await supabase_rpc_get_graph(
-                    faccao_id=None, include_co=False, max_pairs=1
-                )
-                b_ok = True
-            except Exception as e:
-                out["backend_error"] = str(e)
-        out["backend_reachable"] = b_ok
-        out["ok"] = (not ENABLE_REDIS_CACHE or r_ok) and b_ok
-    else:
-        out["ok"] = (not ENABLE_REDIS_CACHE or r_ok) and _env_backend_ok()
-
-    out["supabase"] = {
-        "url": SUPABASE_URL,
-        "rpc_fn": SUPABASE_RPC_FN,
-        "timeout": SUPABASE_TIMEOUT,
-        "service_key_tail": redact(SUPABASE_SERVICE_KEY),
-    }
+    if deep and _env_backend_ok():
+        try:
+            await supabase_rpc_get_graph(None, False, 1)
+            out["backend_reachable"] = True
+        except Exception as e:
+            out["backend_reachable"] = False
+            out["backend_error"] = str(e)
+    out["ok"] = (not ENABLE_REDIS_CACHE or r_ok) and _env_backend_ok()
+    out["supabase"] = {"url": SUPABASE_URL, "rpc_fn": SUPABASE_RPC_FN, "timeout": SUPABASE_TIMEOUT, "service_key_tail": redact(SUPABASE_SERVICE_KEY)}
     return JSONResponse(out, status_code=200 if out.get("ok") else 503)
 
 
 @app.get("/ready", response_class=JSONResponse, tags=["ops"])
 async def ready():
     r_ok = True
-    out = platform_info()
-    out.update(
-        {
-            "redis": False,
-            "backend": "supabase" if _env_backend_ok() else "none",
-            "backend_ok": False,
-        }
-    )
-
     r = await _get_redis()
     if r:
         try:
-            pong = await r.ping()
-            out["redis"] = bool(pong)
-        except Exception as e:
+            await r.ping()
+        except Exception:
             r_ok = False
-            out["redis_error"] = str(e)
-
     b_ok = False
     if _env_backend_ok():
         try:
-            _ = await supabase_rpc_get_graph(
-                faccao_id=None, include_co=False, max_pairs=1
-            )
+            await supabase_rpc_get_graph(None, False, 1)
             b_ok = True
-        except Exception as e:
-            out["backend_error"] = str(e)
-    out["backend_ok"] = b_ok
-
+        except Exception:
+            b_ok = False
     ok = (not ENABLE_REDIS_CACHE or r_ok) and b_ok
-    out["ok"] = ok
-    return JSONResponse(out, status_code=200 if ok else 503)
+    return JSONResponse({"ok": ok}, status_code=200 if ok else 503)
 
 
 @app.get("/ops/status", response_class=JSONResponse, tags=["ops"])
@@ -442,40 +359,23 @@ async def ops_status():
         try:
             r = await _get_redis()
             if r:
-                pong = await r.ping()
-                redis_cfg["ping"] = bool(pong)
+                redis_cfg["ping"] = bool(await r.ping())
         except Exception as e:
             redis_cfg["error"] = str(e)
-
-    supa = {
+    info["redis"] = redis_cfg
+    info["supabase"] = {
         "configured": _env_backend_ok(),
         "url": SUPABASE_URL,
         "rpc_fn": SUPABASE_RPC_FN,
         "timeout": SUPABASE_TIMEOUT,
         "service_key_tail": redact(SUPABASE_SERVICE_KEY),
     }
-
-    info.update(
-        {
-            "redis": redis_cfg,
-            "supabase": supa,
-            "env": {
-                "CORS_ALLOW_ORIGINS": os.getenv("CORS_ALLOW_ORIGINS"),
-                "CORS_ALLOW_METHODS": os.getenv("CORS_ALLOW_METHODS"),
-                "CORS_ALLOW_HEADERS": os.getenv("CORS_ALLOW_HEADERS"),
-            },
-        }
-    )
     return JSONResponse(info, status_code=200)
 
-
-# ----------------------------- Dados do grafo --------------------------------
-@app.get(
-    "/v1/graph/membros",
-    response_class=JSONResponse,
-    tags=["graph"],
-    summary="Retorna grafo (nodes/edges)",
-)
+# -----------------------------------------------------------------------------
+# API: grafo bruto
+# -----------------------------------------------------------------------------
+@app.get("/v1/graph/membros", response_class=JSONResponse, tags=["graph"])
 async def graph_membros(
     faccao_id: Optional[int] = Query(default=None),
     include_co: bool = Query(default=True),
@@ -485,22 +385,16 @@ async def graph_membros(
     cache: bool = Query(default=True),
 ):
     try:
-        data = await fetch_graph_sanitized(
-            faccao_id, include_co, max_pairs, use_cache=cache
-        )
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
         data = truncate_preview(data, max_nodes, max_edges)
         return JSONResponse(data, status_code=200)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"graph_fetch_error: {e}")
 
-
-# ----------------------------- vis.js (vis-network) --------------------------
-@app.get(
-    "/v1/vis/visjs",
-    response_class=HTMLResponse,
-    tags=["viz"],
-    summary="Visualização vis-network (dedupe, arestas finas, busca, fotos, cores CV/PCC/funções)",
-)
+# -----------------------------------------------------------------------------
+# VIS.JS (vis-network)
+# -----------------------------------------------------------------------------
+@app.get("/v1/vis/visjs", response_class=HTMLResponse, tags=["viz"])
 async def vis_visjs(
     response: Response,
     faccao_id: Optional[int] = Query(default=None),
@@ -514,103 +408,68 @@ async def vis_visjs(
     debug: bool = Query(default=False),
     source: str = Query(default="server", pattern="^(server|client)$"),
 ):
-    # Onde carregar os assets do vis-network
-    local_js = "static/vendor/vis-network.min.js"
-    local_css = "static/vendor/vis-network.min.css"
-    has_local = os.path.exists(local_js) and os.path.exists(local_css)
-    if has_local:
-        js_href = "/static/vendor/vis-network.min.js"
-        css_href = "/static/vendor/vis-network.min.css"
-        csp = (
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "script-src 'self' 'unsafe-inline'; img-src 'self' data:; "
-            "font-src 'self' data:; connect-src 'self';"
-        )
-    else:
-        js_href = "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"
-        css_href = "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
-        csp = (
-            "default-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; "
-            "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-            "img-src 'self' data:; font-src 'self' data:; connect-src 'self';"
-        )
-
-    # Incorpora dados no HTML quando source=server
+    # dados incorporados no HTML (para evitar re-download e permitir offline)
     embedded_block = ""
     if source == "server":
-        data = await fetch_graph_sanitized(
-            faccao_id, include_co, max_pairs, use_cache=cache
-        )
-        out = truncate_preview(data, max_nodes, max_edges)
-        out = _dedupe_nodes_edges(out)
-        json_str = json.dumps(out, ensure_ascii=False)
-        embedded_block = (
-            '<script id="__KG_DATA__" type="application/json">' + json_str + "</script>"
-        )
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
+        data = truncate_preview(data, max_nodes, max_edges)
+        json_str = json.dumps(data, ensure_ascii=False)
+        embedded_block = f'<script id="__KG_DATA__" type="application/json">{json_str}</script>'
 
+    has_local = os.path.exists("static/vendor/vis-network.min.js")
+    js_href = "/static/vendor/vis-network.min.js" if has_local else "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"
+    css_href = "/static/vendor/vis-network.min.css" if has_local else "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
-    # Template com marcadores (evita .format/{} colidirem com JS)
-    html_tpl = """
+    # IMPORTANTE: usar f-string e escapar chaves JS/CSS com {{ }}
+    html = f"""
 <!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="utf-8" />
-    <title>Knowledge Graph (vis.js)</title>
-    <link rel="stylesheet" href="%%CSS_HREF%%">
+    <title>{title}</title>
+    <link rel="stylesheet" href="{css_href}">
     <link rel="stylesheet" href="/static/vis-style.css">
-    <meta name="theme-color" content="%%BG%%">
+    <meta name="theme-color" content="{bg}">
     <style>
-      html,body,#mynetwork { height:100%; margin:0; }
-      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
-      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; }
-      .badge { background:#eee; border-radius:6px; padding:2px 8px; font-size:12px; }
+      html,body,#mynetwork {{ height:100%; margin:0; }}
+      .kg-toolbar {{ display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }}
+      .kg-toolbar input[type="search"] {{ flex: 1; min-width: 220px; padding:6px 10px; }}
     </style>
   </head>
-  <body data-theme="%%THEME%%">
+  <body data-theme="{theme}">
     <div class="kg-toolbar">
-      <h4 style="margin:0">Knowledge Graph (vis.js)</h4>
+      <h4 style="margin:0">{title}</h4>
       <input id="kg-search" type="search" placeholder="Buscar nó por rótulo ou ID…" />
-      <button id="btn-print" type="button" title="Imprimir">Print</button>
-      <button id="btn-reload" type="button" title="Recarregar">Reload</button>
-      <span id="badge" class="badge" style="display:%%DEBUG_DISPLAY%%">debug</span>
+      <button id="btn-print" type="button">Print</button>
+      <button id="btn-reload" type="button">Reload</button>
     </div>
 
     <div id="mynetwork"
          style="height:90vh;width:100%;"
          data-endpoint="/v1/graph/membros"
-         data-debug="%%DEBUG_BOOL%%"
-         data-source="%%SOURCE%%"></div>
+         data-debug="{str(debug).lower()}"
+         data-source="{source}"></div>
 
-    %%EMBED%%
-    <script src="%%JS_HREF%%" crossorigin="anonymous"></script>
+    {embedded_block}
+    <script src="{js_href}"></script>
     <script src="/static/vis-embed.js" defer></script>
   </body>
 </html>
 """
-    html = (
-        html_tpl.replace("%%CSS_HREF%%", css_href)
-        .replace("%%JS_HREF%%", js_href)
-        .replace("%%EMBED%%", embedded_block)
-        .replace("%%THEME%%", theme)
-        .replace("%%BG%%", bg)
-        .replace("%%SOURCE%%", source)
-        .replace("%%DEBUG_DISPLAY%%", "inline-block" if debug else "none")
-        .replace("%%DEBUG_BOOL%%", "true" if debug else "false")
+    csp = (
+        "default-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; "
+        "script-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:; "
+        "font-src 'self' data:; connect-src 'self';"
     )
-
     response.headers["Content-Security-Policy"] = csp
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
 
-
-# ------------------------------ PyVis ----------------------------------------
-@app.get(
-    "/v1/vis/pyvis",
-    response_class=HTMLResponse,
-    tags=["viz"],
-    summary="Visualização com PyVis (arestas finas, repulsão forte, busca, cores CV/PCC/funções)",
-)
+# -----------------------------------------------------------------------------
+# PYVIS
+# -----------------------------------------------------------------------------
+@app.get("/v1/vis/pyvis", response_class=HTMLResponse, tags=["viz"])
 async def vis_pyvis(
     faccao_id: Optional[int] = Query(default=None),
     include_co: bool = Query(default=True),
@@ -623,11 +482,9 @@ async def vis_pyvis(
     debug: bool = Query(default=False),
 ):
     try:
-        data = await fetch_graph_sanitized(
-            faccao_id, include_co, max_pairs, use_cache=cache
-        )
+        data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
         data = truncate_preview(data, max_nodes, max_edges)
-        data = _dedupe_nodes_edges(data)
+        data = normalize_graph_labels(data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"graph_fetch_error: {e}")
 
@@ -636,42 +493,36 @@ async def vis_pyvis(
     if not nodes:
         return HTMLResponse("<h3>Sem dados para exibir (nodes=0)</h3>", status_code=200)
 
-    # Map de facções (id -> nome)
+    # mapa de facções (id -> nome) para colorir CV/PCC
     faccao_name_by_id: Dict[str, str] = {}
     for n in nodes:
         if (n or {}).get("type") == "faccao" and n.get("id") is not None:
-            fid = str(n["id"])
-            faccao_name_by_id[fid] = str(n.get("label") or "").strip()
+            faccao_name_by_id[str(n["id"])] = str(n.get("label") or "").strip()
 
-    def color_from_faccao(fid: Optional[str]) -> Optional[str]:
-        if not fid:
-            return None
-        name = (faccao_name_by_id.get(fid) or "").upper()
-        if not name:
-            return None
+    def color_from_context(n: Dict[str, Any]) -> str:
+        group = str(n.get("group") or n.get("faccao_id") or n.get("type") or "")
+        # nós de função: amarelo
+        if (n.get("type") or "").lower() == "funcao":
+            return "#FBC02D"
+        # cor fixa por facção
+        name = (faccao_name_by_id.get(group) or "").upper()
         if "PCC" in name:
-            return "#0d47a1"  # azul escuro
+            return "#0d47a1"
         if name == "CV" or "COMANDO VERMELHO" in name:
-            return "#d32f2f"  # vermelho
-        return None
-
-    def hash_color(s: str) -> str:
+            return "#d32f2f"
+        # fallback por hash
         h = 0
-        for ch in s:
+        for ch in group or "x":
             h = (h << 5) - h + ord(ch)
             h &= 0xFFFFFFFF
         hue = abs(h) % 360
         return f"hsl({hue},70%,50%)"
 
-    height = "90vh"
-    bgcolor = "#0b0f19" if theme == "dark" else "#ffffff"
-    fontcolor = "#e8eaed" if theme == "dark" else "#111827"
-
     net = Network(
-        height=height,
+        height="90vh",
         width="100%",
-        bgcolor=bgcolor,
-        font_color=fontcolor,
+        bgcolor=("#0b0f19" if theme == "dark" else "#ffffff"),
+        font_color=("#e8eaed" if theme == "dark" else "#111827"),
         directed=True,
         cdn_resources="in_line",
     )
@@ -688,23 +539,12 @@ async def vis_pyvis(
         label = str(n.get("label") or nid)
         group = str(n.get("group") or n.get("faccao_id") or n.get("type") or "0")
         size = n.get("size")
-        photo = (
-            n.get("photo_url")
-            if isinstance(n.get("photo_url"), str)
-            and n["photo_url"].startswith(("http://", "https://"))
-            else None
-        )
-
-        fixed_color = color_from_faccao(group)
-        # Nós de função forçam amarelo
-        if str(n.get("type") or "").lower() in ("funcao", "função", "funcao_da_faccao"):
-            fixed_color = "#fbc02d"
-        color = fixed_color or hash_color(group)
+        photo = n.get("photo_url") if isinstance(n.get("photo_url"), str) and n["photo_url"].startswith(("http://", "https://")) else None
+        color = color_from_context(n)
 
         node_kwargs = dict(title=label, color=color, borderWidth=1)
         if isinstance(size, (int, float)):
             node_kwargs["value"] = float(size)
-
         if photo:
             node_kwargs["shape"] = "circularImage"
             node_kwargs["image"] = photo
@@ -714,28 +554,24 @@ async def vis_pyvis(
         net.add_node(nid, label=label, **node_kwargs)
 
     valid_nodes = set(net.get_nodes())
-    EDGE_COLORS = {
-        "PERTENCE_A": "#9e9e9e",
-        "EXERCE": "#fbc02d",  # amarelo (função)
-        "FUNCAO_DA_FACCAO": "#fbc02d",  # amarelo (função)
-        "CO_FACCAO": "#8e24aa",
-        "CO_FUNCAO": "#546e7a",
-    }
     for e in edges:
         if not e:
             continue
         a = str(e.get("source"))
         b = str(e.get("target"))
-        if a in valid_nodes and b in valid_nodes:
-            rel = e.get("relation") or ""
-            try:
-                w = float(e.get("weight") or 1.0)
-            except Exception:
-                w = 1.0
-            color = EDGE_COLORS.get(rel, "#90a4ae")
-            net.add_edge(a, b, value=w, width=1, color=color, title=f"{rel} (w={w})")
+        if a not in valid_nodes or b not in valid_nodes:
+            continue
+        rel = (e.get("relation") or "").upper()
+        # arestas finas + cor amarela quando relação envolve FUNÇÃO
+        color = "#FBC02D" if "FUNCAO" in rel else "#90a4ae"
+        try:
+            w = float(e.get("weight") or 1.0)
+        except Exception:
+            w = 1.0
+        net.add_edge(a, b, value=w, width=0.6, color=color, title=f"{rel or 'REL'} (w={w})")
 
-    # Opções em JSON (pyvis exige JSON válido)
+    # opções (JSON válido)
+    import json as _json
     options = {
         "interaction": {
             "hover": True,
@@ -743,27 +579,30 @@ async def vis_pyvis(
             "dragView": False,
             "zoomView": True,
             "multiselect": True,
-            "navigationButtons": True,
+            "navigationButtons": True
         },
         "manipulation": {"enabled": False},
         "physics": {
+            # física inicialmente ligada p/ espalhar, mas será DESLIGADA via JS onLoad
             "enabled": True,
-            "stabilization": {"enabled": True, "iterations": 250},
+            "stabilization": {"enabled": True, "iterations": 300},
             "barnesHut": {
-                "gravitationalConstant": -24000,
-                "centralGravity": 0.12,
+                "gravitationalConstant": -12000,
+                "centralGravity": 0.15,
                 "springLength": 140,
                 "springConstant": 0.03,
-                "avoidOverlap": 0.6,
-            },
+                "avoidOverlap": 0.3
+            }
         },
         "nodes": {"shape": "dot", "borderWidth": 1},
-        "edges": {"smooth": False},
+        "edges": {"smooth": False}
     }
-    net.set_options(json.dumps(options))
+    net.set_options(_json.dumps(options))
 
-    html = net.generate_html()  # sem argumento title
-    # Toolbar com busca/destaque
+    # HTML
+    html = net.generate_html()
+
+    # toolbar (busca + botões)
     toolbar_css = """
     <style>
       .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
@@ -776,13 +615,21 @@ async def vis_pyvis(
     <div class="kg-toolbar">
       <h4 style="margin:0">{title}</h4>
       <input id="kg-search" type="search" placeholder="Buscar nó por rótulo ou ID…" />
-      <button id="btn-print" type="button" title="Imprimir">Print</button>
-      <button id="btn-reload" type="button" title="Recarregar">Reload</button>
+      <button id="btn-print" type="button">Print</button>
+      <button id="btn-reload" type="button">Reload</button>
     </div>
     """
+
+    # JS: desliga física após estabilização + busca com destaque
     toolbar_js = """
     <script>
       (function(){
+        // desliga física após estabilização para parar de "se mover"
+        if (typeof network !== 'undefined'){
+          network.once('stabilizationIterationsDone', function(){
+            network.setOptions({ physics: { enabled: false } });
+          });
+        }
         function colorObj(c, opacity){
           if (typeof c === 'object' && c) { return Object.assign({}, c, { opacity: opacity }); }
           return {
@@ -802,12 +649,8 @@ async def vis_pyvis(
             if (!t){ return; }
             var hits = all.filter(function(n){ return (String(n.label||'').toLowerCase().indexOf(t) >= 0) || (String(n.id)===t); });
             if (!hits.length) return;
-
-            all.forEach(function(n){ ds.update({ id: n.id, color: colorObj(n.color, 0.25), value: n.value }); });
-            hits.forEach(function(h){
-              var cur = ds.get(h.id);
-              ds.update({ id: h.id, color: colorObj(cur.color, 1), value: (cur.value||16) + 8 });
-            });
+            all.forEach(function(n){ ds.update({ id: n.id, color: colorObj(n.color, 0.25) }); });
+            hits.forEach(function(h){ var cur = ds.get(h.id); ds.update({ id: h.id, color: colorObj(cur.color, 1) }); });
             network.fit({ nodes: hits.map(function(h){return h.id;}), animation: { duration: 300 } });
           }catch(e){ console.error(e); }
         }
@@ -828,8 +671,9 @@ async def vis_pyvis(
     html = html.replace("</body>", toolbar_js + "\n</body>")
     return HTMLResponse(content=html, status_code=200)
 
-
-# ------------------------------ /docs custom ---------------------------------
+# -----------------------------------------------------------------------------
+# /docs (Swagger com painel enxuto)
+# -----------------------------------------------------------------------------
 @app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
 async def custom_docs():
     csp = (
@@ -839,79 +683,22 @@ async def custom_docs():
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "connect-src 'self';"
     )
-    html = r"""
+    html = """
 <!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="utf-8"/>
     <title>svc-kg • API Docs</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist/swagger-ui.css">
-    <style>
-      body { margin:0; }
-      .ops-bar {
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-        padding: 12px 16px; border-bottom: 1px solid #eee; background:#fafafa;
-        display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
-      }
-      .ops-right { display:flex; gap:8px; align-items:center; }
-      .ops-pill { padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #e0e0e0; background:#fff; }
-      .ops-pill.ok { border-color:#c8e6c9; background:#e8f5e9; }
-      .ops-pill.err{ border-color:#ffcdd2; background:#ffebee; }
-      .ops-grid { display:grid; grid-template-columns: repeat(4, minmax(160px,1fr)); gap:8px; margin-top: 6px; }
-      .ops-kv { font-size: 12px; color:#333; background:#fff; border:1px solid #eee; border-radius:8px; padding:8px; }
-      .ops-kv b { color:#111; }
-      #swagger-ui { margin-top: 0; }
-      .note { font-size: 12px; color:#666; }
-      @media (max-width: 900px){ .ops-grid { grid-template-columns: repeat(2, minmax(160px,1fr)); } }
-    </style>
+    <style>body{margin:0}.ops{padding:10px;border-bottom:1px solid #eee;background:#fafafa;font:14px system-ui}</style>
   </head>
   <body>
-    <div class="ops-bar">
-      <div>
-        <div style="font-weight:600;">svc-kg (a.k.a. “sic-kg”)</div>
-        <div class="ops-grid" id="ops-kvs">
-          <div class="ops-kv"><b>Version</b><div id="kv-version">—</div></div>
-          <div class="ops-kv"><b>Env</b><div id="kv-env">—</div></div>
-          <div class="ops-kv"><b>Platform</b><div id="kv-platform">—</div></div>
-          <div class="ops-kv"><b>Host</b><div id="kv-host">—</div></div>
-          <div class="ops-kv"><b>Redis</b><div id="kv-redis">—</div></div>
-          <div class="ops-kv"><b>Supabase URL</b><div id="kv-supa">—</div></div>
-          <div class="ops-kv"><b>RPC</b><div id="kv-rpc">—</div></div>
-          <div class="ops-kv"><b>Timeout</b><div id="kv-timeout">—</div></div>
-        </div>
-        <div class="note">Use os botões para testar live/health/ready. O painel atualiza automaticamente.</div>
-      </div>
-      <div class="ops-right">
-        <a class="ops-pill" href="/live" target="_blank">/live</a>
-        <a class="ops-pill" href="/health" target="_blank">/health</a>
-        <a class="ops-pill" href="/health?deep=true" target="_blank">/health?deep=true</a>
-        <a class="ops-pill" href="/ready" target="_blank">/ready</a>
-        <a class="ops-pill" href="/ops/status" target="_blank">/ops/status</a>
-      </div>
+    <div class="ops">
+      <b>svc-kg</b> — <a href="/live" target="_blank">live</a> · <a href="/health?deep=true" target="_blank">health</a> · <a href="/ready" target="_blank">ready</a> · <a href="/ops/status" target="_blank">ops/status</a>
     </div>
-
     <div id="swagger-ui"></div>
-
     <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist/swagger-ui-bundle.js"></script>
-    <script>
-      function setKV(id, val){ var el=document.getElementById(id); if(el) el.textContent = (val==null?'—': String(val)); }
-      async function j(u){ try{ const r=await fetch(u); return await r.json(); }catch(e){ return {error:String(e)}; } }
-      async function refresh(){
-        const [ops, health] = await Promise.all([ j('/ops/status'), j('/health?deep=true') ]);
-        setKV('kv-version', ops.version || '—');
-        setKV('kv-env', ops.app_env || '—');
-        setKV('kv-platform', ops.coolify_proxy_network ? 'coolify' : (ops.container ? 'container' : 'host'));
-        setKV('kv-host', ops.hostname || location.hostname);
-        setKV('kv-redis', (ops.redis && ops.redis.enabled) ? (ops.redis.ping ? 'ok' : 'enabled') : 'disabled');
-        setKV('kv-supa', (ops.supabase && ops.supabase.url) ? ops.supabase.url : '—');
-        setKV('kv-rpc', (ops.supabase && ops.supabase.rpc_fn) ? ops.supabase.rpc_fn : '—');
-        setKV('kv-timeout', (ops.supabase && ops.supabase.timeout) ? ops.supabase.timeout : '—');
-      }
-      window.onload = function(){
-        const ui = SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui', deepLinking: true, docExpansion: 'none', defaultModelsExpandDepth: -1 });
-        refresh();
-      };
-    </script>
+    <script>window.onload=function(){SwaggerUIBundle({url:'/openapi.json',dom_id:'#swagger-ui',deepLinking:true,docExpansion:'none',defaultModelsExpandDepth:-1})}</script>
   </body>
 </html>
 """
