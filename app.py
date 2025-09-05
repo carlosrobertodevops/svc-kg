@@ -181,14 +181,14 @@ def truncate_preview(
 async def supabase_rpc_get_graph(
     faccao_id: Optional[int], include_co: bool, max_pairs: int
 ) -> Dict[str, Any]:
-    # ---- FIX: NameError (typo) -> usar _env_backend_ok()
+    # FIX: NameError (typo) -> usar _env_backend_ok()
     if not _env_backend_ok():
         raise RuntimeError(
             "backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY"
         )
 
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
-    # PostgREST/Supabase: função espera p_* somente
+    # Função no PostgREST/Supabase espera somente p_*:
     payload = {
         "p_faccao_id": faccao_id,
         "p_include_co": include_co,
@@ -501,10 +501,10 @@ async def vis_visjs(
     <link rel="stylesheet" href="/static/vis-style.css">
     <meta name="theme-color" content="__BG__">
     <style>
-      html,body,#mynetwork {{ height:100%; margin:0; }}
-      .kg-toolbar {{ display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }}
-      .kg-toolbar input[type="search"] {{ flex: 1; min-width: 220px; padding:6px 10px; }}
-      .badge {{ background:#eee; border-radius:6px; padding:2px 8px; font-size:12px; }}
+      html,body,#mynetwork { height:100%; margin:0; }
+      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
+      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; }
+      .badge { background:#eee; border-radius:6px; padding:2px 8px; font-size:12px; }
     </style>
   </head>
   <body data-theme="__THEME__">
@@ -526,17 +526,17 @@ async def vis_visjs(
     <script src="__JS__" crossorigin="anonymous"></script>
 
     <script>
-    (function(){{
+    (function(){
       const COLOR_CV  = '#d32f2f';     // CV vermelho
       const COLOR_PCC = '#0d47a1';     // PCC azul escuro
       const COLOR_FUNCAO = '#c8a600';  // funções amarelo
-      const EDGE_COLORS = {{
+      const EDGE_COLORS = {
         'PERTENCE_A':      '#9e9e9e',
         'EXERCE':          '#00796b',
         'FUNCAO_DA_FACCAO':'#ef6c00',
         'CO_FACCAO':       '#8e24aa',
         'CO_FUNCAO':       '#546e7a'
-      }};
+      };
 
       const container = document.getElementById('mynetwork');
       const source = container.getAttribute('data-source') || 'server';
@@ -548,12 +548,12 @@ async def vis_visjs(
       const btnReload = document.getElementById('btn-reload');
       const badge = document.getElementById('badge');
 
-      function hashColor(s) {{
-        s = String(s||''); let h=0; for (let i=0;i<s.length;i++) {{ h=(h<<5)-h+s.charCodeAt(i); h|=0; }}
+      function hashColor(s) {
+        s = String(s||''); let h=0; for (let i=0;i<s.length;i++) { h=(h<<5)-h+s.charCodeAt(i); h|=0; }
         const hue=Math.abs(h)%360; return 'hsl(' + hue + ',70%,50%)';
-      }}
-      function isPgTextArray(s) {{ s=(s||'').trim(); return s.length>=2 && s[0]=='{{' && s[s.length-1]=='}'; }}
-      function cleanLabel(raw) {{
+      }
+      function isPgTextArray(s) { s=(s||'').trim(); return s.length>=2 && s[0]=='{' && s[s.length-1]=='}'; }
+      function cleanLabel(raw) {
         if(!raw) return '';
         const s=String(raw).trim();
         if(!isPgTextArray(s)) return s;
@@ -562,119 +562,116 @@ async def vis_visjs(
         return inner.replace(/(^|,)\\s*\"?null\"?\\s*(?=,|$)/gi,'')
                     .replace(/\"/g,'')
                     .split(',').map(x=>x.trim()).filter(Boolean).join(', ');
-      }}
-      function degreeMap(nodes,edges) {{
-        const d={{}}; nodes.forEach(n=>d[n.id]=0);
-        edges.forEach(e=>{{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; }});
+      }
+      function degreeMap(nodes,edges) {
+        const d={}; nodes.forEach(n=>d[n.id]=0);
+        edges.forEach(e=>{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; });
         return d;
-      }}
-      function inferFaccaoColors(rawNodes) {{
-        const map={{}};
-        rawNodes.filter(n=>n && n.type==='faccao').forEach(n=>{{
+      }
+      function inferFaccaoColors(rawNodes) {
+        const map={};
+        rawNodes.filter(n=>n && n.type==='faccao').forEach(n=>{
           const name = cleanLabel(n.label||'').toUpperCase();
           const id = String(n.id);
           if(!name) return;
           if (name.includes('PCC')) map[id] = COLOR_PCC;
           else if (name === 'CV' || name.includes('COMANDO VERMELHO')) map[id] = COLOR_CV;
-        }});
+        });
         return map;
-      }}
-      function colorForNode(n, faccaoColorById) {{
+      }
+      function colorForNode(n, faccaoColorById) {
         if ((n.type||'').toLowerCase().startsWith('funcao')) return COLOR_FUNCAO;
         const gid = String(n.group ?? n.faccao_id ?? '');
         if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
         return hashColor(gid || (n.type||'x'));
-      }}
-      function edgeStyleFor(relation) {{
+      }
+      function edgeStyleFor(relation) {
         const base = EDGE_COLORS[relation] || '#90a4ae';
-        return {{ color: base }};
-      }}
-      function attachToolbar(net,dsNodes) {{
+        return { color: base };
+      }
+      function attachToolbar(net,dsNodes) {
         if (btnPrint) btnPrint.onclick = ()=>window.print();
         if (btnReload) btnReload.onclick = ()=>location.reload();
-        if (q) {{
+        if (q) {
           const run = () => selectByQuery(net, dsNodes, q.value);
           q.addEventListener('change', run);
-          q.addEventListener('keyup', (e)=>{{ if(e.key==='Enter') run(); }});
-        }}
-      }}
-      function selectByQuery(net, dsNodes, query) {{
+          q.addEventListener('keyup', (e)=>{ if(e.key==='Enter') run(); });
+        }
+      }
+      function selectByQuery(net, dsNodes, query) {
         const text = (query||'').trim().toLowerCase();
         if (!text) return;
         const all = dsNodes.get();
         const hits = all.filter(n => (String(n.label||'').toLowerCase().includes(text)) || (String(n.id)===text));
         if (!hits.length) return;
 
-        // esmaece demais nós
-        dsNodes.update(all.map(n => Object.assign(n, {{ color: Object.assign({{}}, n.color, {{ opacity: 0.2 }}) }})));
+        dsNodes.update(all.map(n => Object.assign(n, { color: Object.assign({}, n.color, { opacity: 0.2 }) })));
 
-        // destaca e move levemente o primeiro hit
         const id = hits[0].id;
         const cur = dsNodes.get(id);
-        const hi = Object.assign({{}}, cur.color || {{}}, {{ opacity: 1 }});
-        dsNodes.update({{ id, color: hi, borderWidth: 3, value: (cur.value||12)*1.2 }});
+        const hi = Object.assign({}, cur.color || {}, { opacity: 1 });
+        dsNodes.update({ id, color: hi, borderWidth: 3, value: (cur.value||12)*1.2 });
 
-        // foca e puxa para fora do "bolo"
-        net.focus(id, {{ scale: 1.0, animation: {{ duration: 300 }} }});
+        net.focus(id, { scale: 1.0, animation: { duration: 300 } });
         const pos = net.getPositions([id])[id];
-        if (pos) {{ net.moveNode(id, pos.x + 80, pos.y - 60); }}
-      }}
+        if (pos) { net.moveNode(id, pos.x + 80, pos.y - 60); }
+      }
 
-      function render(data) {{
+      function render(data) {
         const rawNodes = data.nodes || [];
         const rawEdges = data.edges || [];
         const faccaoColorById = inferFaccaoColors(rawNodes);
 
         const nodes = rawNodes
           .filter(n=>n&&n.id!=null)
-          .map(n=>{{
+          .map(n=>{
             const id = String(n.id);
             const label = cleanLabel(n.label)||id;
             const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
             const value = (typeof n.size==='number') ? n.size : undefined;
             const photo = n.photo_url && /^https?:\\/\\//i.test(n.photo_url) ? n.photo_url : null;
             const color = colorForNode(n, faccaoColorById);
-            const base = {{ id, label, group, value, color, borderWidth: 1 }};
-            if (photo) {{ base.shape = 'circularImage'; base.image = photo; }} else {{ base.shape = 'dot'; }}
+            const base = { id, label, group, value, color, borderWidth: 1 };
+            if (photo) { base.shape = 'circularImage'; base.image = photo; } else { base.shape = 'dot'; }
             return base;
-          }});
+          });
 
         const nodeIds = new Set(nodes.map(n=>n.id));
         const edges = rawEdges
           .filter(e=>e&&e.source!=null&&e.target!=null && nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)))
-          .map(e=>{{
+          .map(e=>{
             const rel = e.relation || '';
             const style = edgeStyleFor(rel);
-            return {{ from:String(e.source), to:String(e.target), value:(e.weight!=null? Number(e.weight):1.0), title: rel ? (rel + ' (w='+(e.weight??1)+')') : ('w='+(e.weight??1)), width:1, color: style }};
-          }});
+            return { from:String(e.source), to:String(e.target), value:(e.weight!=null? Number(e.weight):1.0), title: rel ? (rel + ' (w='+(e.weight??1)+')') : ('w='+(e.weight??1)), width:1, color: style };
+          });
 
         const dsNodes = new vis.DataSet(nodes);
         const dsEdges = new vis.DataSet(edges);
 
-        const options = {{
-          interaction: {{ hover: true, dragNodes: true, dragView: false, zoomView: true, multiselect: true, navigationButtons: true }},
-          manipulation: {{ enabled: false }},
-          physics: {{ enabled: false }},
-          layout: {{ improvedLayout: true, randomSeed: 42 }},
-          nodes: {{ shape: 'dot', borderWidth: 1 }},
-          edges: {{ smooth: false, width: 1 }}
-        }};
+        const options = {
+          interaction: { hover: true, dragNodes: true, dragView: false, zoomView: true, multiselect: true, navigationButtons: true },
+          manipulation: { enabled: false },
+          physics: { enabled: false },
+          layout: { improvedLayout: true, randomSeed: 42 },
+          nodes: { shape: 'dot', borderWidth: 1 },
+          edges: { smooth: false, width: 1 }
+        };
 
-        const net = new vis.Network(container, {{nodes: dsNodes, edges: dsEdges}}, options);
+        const net = new vis.Network(container, {nodes: dsNodes, edges: dsEdges}, options);
         attachToolbar(net, dsNodes);
-      }}
+      }
 
-      function run() {{
-        if(typeof vis==='undefined') {{
+      function run() {
+        if(typeof vis==='undefined') {
           container.innerHTML='<div style="padding:12px">vis-network não carregou. Verifique CSP/CDN.</div>';
           return;
-        }}
-        if(source==='server') {{
+        }
+        if(source==='server') {
           const tag=document.getElementById('__KG_DATA__');
-          if(!tag) {{ container.innerHTML='<div style="padding:12px">Bloco de dados ausente.</div>'; return; }}
-          try {{ render(JSON.parse(tag.textContent||'{{}}')); }}
-          catch(e){{ console.error(e); container.innerHTML='<pre>'+String(e)+'</pre>'; }}
-        }} else {{
+          if(!tag) { container.innerHTML='<div style="padding:12px">Bloco de dados ausente.</div>'; return; }
+          try { render(JSON.parse(tag.textContent||'{}')); }
+          catch(e){ console.error(e); container.innerHTML='<pre>'+String(e)+'</pre>'; }
+        } else {
           const params=new URLSearchParams(window.location.search);
           const qs=new URLSearchParams();
           const fac=params.get('faccao_id'); if(fac && fac.trim()!=='') qs.set('faccao_id',fac.trim());
@@ -684,14 +681,14 @@ async def vis_visjs(
           qs.set('max_edges',  params.get('max_edges')  ?? '4000');
           qs.set('cache',      params.get('cache')      ?? 'false');
           const url=endpoint+'?'+qs.toString();
-          fetch(url,{{headers:{{'Accept':'application/json'}}}})
-            .then(async r=>{{ if(!r.ok) throw new Error(r.status+': '+await r.text()); return r.json(); }})
+          fetch(url,{headers:{'Accept':'application/json'}})
+            .then(async r=>{ if(!r.ok) throw new Error(r.status+': '+await r.text()); return r.json(); })
             .then(render)
-            .catch(err=>{{ console.error(err); container.innerHTML='<pre>'+String(err).replace(/</g,'&lt;')+'</pre>'; }});
-        }}
-      }}
+            .catch(err=>{ console.error(err); container.innerHTML='<pre>'+String(err).replace(/</g,'&lt;')+'</pre>'; });
+        }
+      }
       if(document.readyState!=='loading') run(); else document.addEventListener('DOMContentLoaded', run);
-    }})();
+    })();
     </script>
 
     <script src="/static/vis-embed.js" defer></script>
@@ -860,7 +857,7 @@ async def vis_pyvis(
     }
     net.set_options(json.dumps(options))
 
-    # Gera HTML e injeta toolbar + busca sem usar argumento 'title'
+    # Gera HTML e injeta toolbar + busca (sem argumento 'title')
     html = net.generate_html()
     html = html.replace("<title>PyVis Network</title>", f"<title>{title}</title>")
 
@@ -909,7 +906,6 @@ async def vis_pyvis(
             var cur = ds.get(id);
             ds.update({ id: id, color: colorObj(cur.color, 1), borderWidth: 3, value: (cur.value||12)*1.2 });
 
-            // foca e desloca um pouco
             if (typeof network !== 'undefined'){
               network.focus(id, { animation: { duration: 300 }, scale: 1.0 });
               var pos = network.getPositions([id])[id];
