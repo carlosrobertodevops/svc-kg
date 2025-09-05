@@ -6,37 +6,34 @@
  * - Variáveis de cor p/ temas light/dark
  * - Estilo da toolbar (botões e input)
  * ============================================================================= */
-:root {
-  --kg-bg: #ffffff;
-  --kg-fg: #111827;
-  --kg-border: #e0e0e0;
-}
-[data-theme="dark"] {
-  --kg-bg: #0b0f19;
-  --kg-fg: #e8eaed;
-  --kg-border: #263238;
-}
 html, body {
-  background: var(--kg-bg);
-  color: var(--kg-fg);
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+  color: #222;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial, sans-serif;
 }
 .kg-toolbar {
-  background: var(--kg-bg);
-  color: var(--kg-fg);
-  border-bottom: 1px solid var(--kg-border);
-}
-.kg-toolbar button {
-  padding: 6px 10px;
-  border: 1px solid var(--kg-border);
-  background: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.kg-toolbar button:hover {
-  background: rgba(0,0,0,.04);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fff;
 }
 .kg-toolbar input[type="search"] {
-  border: 1px solid var(--kg-border);
+  flex: 1;
+  min-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid #d0d0d0;
   border-radius: 6px;
   outline: none;
 }
+.kg-toolbar button {
+  padding: 6px 10px;
+  border: 1px solid #d0d0d0;
+  background: #fafafa;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.kg-toolbar button:hover { background: #f0f0f0; }
