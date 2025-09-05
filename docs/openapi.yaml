@@ -1,12 +1,13 @@
 openapi: 3.1.0
 info:
     title: svc-kg
-    version: v1.7.13
+    version: v1.7.18
     description: |
         Micro serviço de Knowledge Graph (vis.js / PyVis).
         - **svc-kg** (também referido como **“sic-kg”**)
-        - Endpoints de visualização: `/v1/vis/visjs`, `/v1/vis/pyvis`
-        - Endpoints operacionais (Ops): `/live`, `/health`, `/ready`, `/ops/status`
+        - Visualizações: `/v1/vis/visjs`, `/v1/vis/pyvis`
+        - Operação (Ops): `/live`, `/health`, `/ready`, `/ops/status`
+        - Atalhos compat: `/membros`, `/visjs`, `/pyvis`
 
 servers:
   - url: /
@@ -54,16 +55,35 @@ paths:
                                     nodes: { type: array, items: { type: object } }
                                     edges: { type: array, items: { type: object } }
 
+    /membros:
+        get:
+            tags: [ graph ]
+            summary: Alias de /v1/graph/membros
+            responses:
+                "200": { description: OK }
+
     /v1/vis/visjs:
         get:
             tags: [ viz ]
             summary: Visualização vis-network
             responses: { "200": { description: HTML } }
 
+    /visjs:
+        get:
+            tags: [ viz ]
+            summary: Alias de /v1/vis/visjs
+            responses: { "200": { description: HTML } }
+
     /v1/vis/pyvis:
         get:
             tags: [ viz ]
             summary: Visualização PyVis
+            responses: { "200": { description: HTML } }
+
+    /pyvis:
+        get:
+            tags: [ viz ]
+            summary: Alias de /v1/vis/pyvis
             responses: { "200": { description: HTML } }
 
     /live:
@@ -78,13 +98,12 @@ paths:
             tags: [ ops ]
             summary: Health check
             description: |
-                Verifica Redis (ping) e backend (Supabase) configurado.  
+                Verifica Redis (ping) e backend (Supabase).  
                 Use `?deep=true` para executar um RPC real no Supabase e validar conectividade ativa.
             parameters:
               - in: query
                 name: deep
                 schema: { type: boolean, default: false }
-                description: "Se true, executa RPC no Supabase e ping no Redis."
             responses:
                 "200":
                     description: OK

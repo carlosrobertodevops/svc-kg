@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, List
 
 import httpx
 from fastapi import FastAPI, Query, Response, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pyvis.network import Network
@@ -51,17 +51,17 @@ CACHE_STATIC_MAX_AGE = int(os.getenv("CACHE_STATIC_MAX_AGE", "86400"))
 
 # Metadata
 SERVICE_ID = "svc-kg"
-SERVICE_AKA = ["sic-kg"]  # solicitado para aparecer nos status
+SERVICE_AKA = ["sic-kg"]
 
 # -----------------------------------------------------------------------------
-# FastAPI app (docs custom será gerado abaixo)
+# FastAPI app
 # -----------------------------------------------------------------------------
 app = FastAPI(
     title="svc-kg",
-    version="v1.7.13-docs-ops",
+    version="v1.7.18",
     description="Micro serviço de Knowledge Graph com visualizações (vis.js e PyVis).",
-    docs_url=None,          # <— desliga docs padrão
-    redoc_url=None,         # (usaremos /docs custom abaixo)
+    docs_url=None,
+    redoc_url=None,
     openapi_url="/openapi.json",
 )
 
@@ -86,20 +86,17 @@ app.add_middleware(
 _http: Optional[httpx.AsyncClient] = None
 _redis = None  # type: ignore
 
-
 # -----------------------------------------------------------------------------
 # Utils
 # -----------------------------------------------------------------------------
 def _env_backend_ok() -> bool:
     return bool(SUPABASE_URL and SUPABASE_SERVICE_KEY and SUPABASE_RPC_FN)
 
-
 async def _get_http() -> httpx.AsyncClient:
     global _http
     if _http is None:
         _http = httpx.AsyncClient(timeout=SUPABASE_TIMEOUT)
     return _http
-
 
 async def _get_redis():
     global _redis
@@ -109,11 +106,9 @@ async def _get_redis():
         _redis = aioredis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
     return _redis
 
-
 def _cache_key(prefix: str, params: Dict[str, Any]) -> str:
     blob = json.dumps(params, sort_keys=True, ensure_ascii=False)
     return f"kg:{prefix}:{hash(blob)}"
-
 
 def _normalize_pg_text_array_label(s: str) -> str:
     if not s:
@@ -127,7 +122,6 @@ def _normalize_pg_text_array_label(s: str) -> str:
         parts = [p for p in parts if p and p.lower() != "null"]
         return ", ".join(parts)
     return s
-
 
 def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
     nodes = data.get("nodes", []) or []
@@ -163,7 +157,6 @@ def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
 
     return {"nodes": fixed_nodes, "edges": fixed_edges}
 
-
 def truncate_preview(data: Dict[str, Any], max_nodes: int, max_edges: int) -> Dict[str, Any]:
     ns = data.get("nodes", [])[: max(0, max_nodes)]
     idset = {str(n["id"]) for n in ns if n and "id" in n}
@@ -171,32 +164,53 @@ def truncate_preview(data: Dict[str, Any], max_nodes: int, max_edges: int) -> Di
     es = es[: max(0, max_edges)]
     return {"nodes": ns, "edges": es}
 
+async def _rpc_try(client: httpx.AsyncClient, url: str, headers: Dict[str, str], payload: Dict[str, Any]) -> httpx.Response:
+    """Faz a chamada e retorna a resposta sem tratar."""
+    return await client.post(url, json=payload, headers=headers)
 
 async def supabase_rpc_get_graph(faccao_id: Optional[int], include_co: bool, max_pairs: int) -> Dict[str, Any]:
+    """
+    Chama o RPC aceitando duas assinaturas possíveis:
+      1) public.get_graph_membros(p_faccao_id, p_include_co, p_max_pairs)  ← preferida
+      2) public.get_graph_membros(faccao_id, include_co, max_pairs)        ← fallback
+    """
     if not _env_backend_ok():
         raise RuntimeError("backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY")
 
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
-    payload = {
-        "faccao_id": faccao_id,
-        "p_faccao_id": faccao_id,
-        "include_co": include_co,
-        "p_include_co": include_co,
-        "max_pairs": max_pairs,
-        "p_max_pairs": max_pairs,
-    }
-
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-
     client = await _get_http()
-    resp = await client.post(url, json=payload, headers=headers)
+
+    # 1) Tenta com p_* (como indicado pelo erro do PostgREST)
+    payload_p = {
+        "p_faccao_id": faccao_id,
+        "p_include_co": include_co,
+        "p_max_pairs": max_pairs,
+    }
+    resp = await _rpc_try(client, url, headers, payload_p)
+
+    # Caso o PostgREST não aceite essa assinatura, tenta fallback
+    if resp.status_code == 404:
+        try:
+            body = resp.json()
+            if isinstance(body, dict) and body.get("code") == "PGRST202":
+                payload_plain = {
+                    "faccao_id": faccao_id,
+                    "include_co": include_co,
+                    "max_pairs": max_pairs,
+                }
+                resp = await _rpc_try(client, url, headers, payload_plain)
+        except Exception:
+            pass
+
     if resp.status_code != 200:
         raise RuntimeError(f"{resp.status_code}: Supabase RPC {SUPABASE_RPC_FN} falhou: {resp.text}")
+
     data = resp.json()
     if not isinstance(data, dict):
         if isinstance(data, list) and data and isinstance(data[0], dict) and "nodes" in data[0]:
@@ -204,7 +218,6 @@ async def supabase_rpc_get_graph(faccao_id: Optional[int], include_co: bool, max
         else:
             raise RuntimeError("Formato inesperado do RPC (esperado objeto com nodes/edges)")
     return data
-
 
 async def fetch_graph_sanitized(faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool = True) -> Dict[str, Any]:
     cache_key = _cache_key("graph", {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs})
@@ -227,7 +240,6 @@ async def fetch_graph_sanitized(faccao_id: Optional[int], include_co: bool, max_
             await r.set(cache_key, json.dumps(fixed, ensure_ascii=False), ex=CACHE_API_TTL)
     return fixed
 
-
 def redact(token: Optional[str], keep: int = 4) -> Optional[str]:
     if not token:
         return token
@@ -235,16 +247,15 @@ def redact(token: Optional[str], keep: int = 4) -> Optional[str]:
         return "*" * len(token)
     return "*" * (len(token) - keep) + token[-keep:]
 
-
 def running_in_container() -> bool:
     if os.path.exists("/.dockerenv"):
         return True
     try:
         with open("/proc/1/cgroup", "rt") as fh:
-            return "docker" in fh.read() or "kubepods" in fh.read()
+            content = fh.read()
+            return "docker" in content or "kubepods" in content
     except Exception:
         return False
-
 
 def platform_info() -> Dict[str, Any]:
     return {
@@ -257,7 +268,6 @@ def platform_info() -> Dict[str, Any]:
         "version": app.version,
     }
 
-
 # -----------------------------------------------------------------------------
 # Lifecycle
 # -----------------------------------------------------------------------------
@@ -267,7 +277,6 @@ async def _startup():
     if ENABLE_REDIS_CACHE and aioredis:
         await _get_redis()
     log.info("svc-kg iniciado (backend: %s, cache: %s)", "supabase" if _env_backend_ok() else "none", "redis" if ENABLE_REDIS_CACHE else "none")
-
 
 @app.on_event("shutdown")
 async def _shutdown():
@@ -279,29 +288,18 @@ async def _shutdown():
         await _redis.close()
         _redis = None
 
-
 # -----------------------------------------------------------------------------
 # Health / Live / Ready / Ops
 # -----------------------------------------------------------------------------
 @app.get("/live", response_class=PlainTextResponse, include_in_schema=True, tags=["ops"])
 async def live():
-    """Liveness probe simples."""
     return PlainTextResponse("ok", status_code=200)
-
 
 @app.get("/health", response_class=JSONResponse, include_in_schema=True, tags=["ops"])
 async def health(deep: bool = Query(default=False, description="Se true, executa RPC no Supabase e ping no Redis")):
-    """
-    Health check:
-    - `redis`: ping
-    - `backend`: 'supabase' ou 'none'
-    - `backend_ok`: True se variáveis estão configuradas
-    - `deep`: (opcional) faz chamada real ao backend e validações adicionais
-    """
     out = platform_info()
     out.update({"status": "ok", "redis": False, "backend": "supabase" if _env_backend_ok() else "none", "backend_ok": _env_backend_ok()})
 
-    # Redis
     r_ok = True
     r = await _get_redis()
     if r:
@@ -312,7 +310,6 @@ async def health(deep: bool = Query(default=False, description="Se true, executa
             r_ok = False
             out["redis_error"] = str(e)
 
-    # Deep check (RPC no Supabase)
     if deep:
         b_ok = False
         if _env_backend_ok():
@@ -326,7 +323,6 @@ async def health(deep: bool = Query(default=False, description="Se true, executa
     else:
         out["ok"] = (not ENABLE_REDIS_CACHE or r_ok) and _env_backend_ok()
 
-    # Informações do Supabase (sem segredos)
     out["supabase"] = {
         "url": SUPABASE_URL,
         "rpc_fn": SUPABASE_RPC_FN,
@@ -336,10 +332,8 @@ async def health(deep: bool = Query(default=False, description="Se true, executa
 
     return JSONResponse(out, status_code=200 if out.get("ok") else 503)
 
-
 @app.get("/ready", response_class=JSONResponse, include_in_schema=True, tags=["ops"])
 async def ready():
-    """Readiness probe (valida Redis e executa RPC curto no Supabase)."""
     r_ok = True
     out = platform_info()
     out.update({"redis": False, "backend": "supabase" if _env_backend_ok() else "none", "backend_ok": False})
@@ -366,19 +360,10 @@ async def ready():
     out["ok"] = ok
     return JSONResponse(out, status_code=200 if ok else 503)
 
-
 @app.get("/ops/status", response_class=JSONResponse, tags=["ops"])
 async def ops_status():
-    """
-    Status operacional amigável para humanos/automação:
-    - plataforma (Coolify/container)
-    - Redis (ativo/config)
-    - Supabase (config/redacted)
-    - variáveis-chave (sem segredos)
-    """
     info = platform_info()
 
-    # Redis presence
     redis_cfg = {"enabled": ENABLE_REDIS_CACHE, "url": REDIS_URL}
     if ENABLE_REDIS_CACHE and aioredis:
         try:
@@ -389,7 +374,6 @@ async def ops_status():
         except Exception as e:
             redis_cfg["error"] = str(e)
 
-    # Supabase
     supa = {
         "configured": _env_backend_ok(),
         "url": SUPABASE_URL,
@@ -409,7 +393,6 @@ async def ops_status():
     })
     return JSONResponse(info, status_code=200)
 
-
 # -----------------------------------------------------------------------------
 # API: dados brutos
 # -----------------------------------------------------------------------------
@@ -422,20 +405,17 @@ async def graph_membros(
     max_edges: int = Query(default=4000, ge=100, le=200000),
     cache: bool = Query(default=True)
 ):
-    """
-    Saída:
-      {
-        "nodes": [ {id, label, type, group, size, faccao_id?, photo_url?}, ...],
-        "edges": [ {source, target, weight, relation}, ...]
-      }
-    """
     data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
     data = truncate_preview(data, max_nodes, max_edges)
     return JSONResponse(data, status_code=200)
 
+# --- ALIASES compat (shorthands solicitados) ---
+@app.get("/membros", include_in_schema=False)
+async def membros_alias(**kwargs):
+    return await graph_membros(**kwargs)
 
 # -----------------------------------------------------------------------------
-# VIS.JS (vis-network) — mantém visual custom anterior
+# VIS.JS (vis-network)
 # -----------------------------------------------------------------------------
 @app.get(
     "/v1/vis/visjs",
@@ -486,7 +466,6 @@ async def vis_visjs(
 
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
-    # NOTA: string normal (não f-string) para evitar problemas com chaves JS/CSS.
     html = """
 <!doctype html>
 <html lang="pt-br">
@@ -718,9 +697,13 @@ async def vis_visjs(
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
 
+# --- Alias /visjs (compat) ---
+@app.get("/visjs", include_in_schema=False)
+async def visjs_alias(response: Response, **kwargs):
+    return await vis_visjs(response=response, **kwargs)
 
 # -----------------------------------------------------------------------------
-# PYVIS (mantém visual + busca)
+# PYVIS
 # -----------------------------------------------------------------------------
 @app.get(
     "/v1/vis/pyvis",
@@ -932,16 +915,16 @@ async def vis_pyvis(
     html = html.replace("</body>", toolbar_js + "\n</body>")
     return HTMLResponse(content=html, status_code=200)
 
+# --- Alias /pyvis (compat) ---
+@app.get("/pyvis", include_in_schema=False)
+async def pyvis_alias(**kwargs):
+    return await vis_pyvis(**kwargs)
 
 # -----------------------------------------------------------------------------
 # /docs custom (Swagger UI + painel de status)
 # -----------------------------------------------------------------------------
 @app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
 async def custom_docs():
-    """
-    Página Swagger customizada com painel de status (live/health/ready/ops).
-    """
-    # CSP permitindo CDN do swagger-ui + self
     csp = (
         "default-src 'self'; "
         "img-src 'self' data: https://cdn.jsdelivr.net; "
@@ -1019,7 +1002,6 @@ async def custom_docs():
         setKV('kv-rpc', (ops.supabase && ops.supabase.rpc_fn) ? ops.supabase.rpc_fn : '—');
         setKV('kv-timeout', (ops.supabase && ops.supabase.timeout) ? ops.supabase.timeout : '—');
 
-        // pinta pílulas conforme health
         const pills = document.querySelectorAll('.ops-right .ops-pill');
         pills.forEach(p => p.classList.remove('ok','err'));
         if (health && health.ok){ pills.forEach(p => p.classList.add('ok')); }
