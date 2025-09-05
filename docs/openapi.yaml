@@ -1,232 +1,109 @@
 # =============================================================================
 # Arquivo: docs/openapi.yaml
 # Versão: v1.7.20
-# Objetivo: Descrever TODOS os recursos públicos do micro-serviço svc-kg,
-#           sem enxugamentos: ops, dados do grafo e visualizações (vis.js/PyVis).
-# Funções/métodos (rotas):
-# - /live, /health, /ready, /ops/status, /docs
+# Objetivo: Especificação OpenAPI do svc-kg com todos os recursos (ops/graph/viz)
+# Funções/métodos:
+# - /live, /health, /ready, /ops/status
 # - /v1/graph/membros
-# - /visjs, /pyvis  (e aliases legados /v1/vis/visjs, /v1/vis/pyvis)
+# - /v1/vis/visjs, /v1/vis/pyvis
+# - (A página /docs usa /openapi.json gerado pelo FastAPI, mas mantemos este YAML
+#    para referência, publicação e compatibilidade.)
 # =============================================================================
-openapi: 3.0.3
+openapi: 3.1.0
 info:
     title: svc-kg
-    version: "v1.7.20"
+    version: v1.7.20
     description: |
-        Serviço de Knowledge Graph com visualizações em **vis.js** e **PyVis**.
-
-        Convenções visuais implementadas pelos front-ends:
-        - **CV** (facção e membros): vermelho
-        - **PCC** (facção e membros): azul-escuro
-        - **Funções** (nós e arestas `EXERCE` / `FUNCAO_DA_FACCAO`): amarelo
-        - Arestas **muito finas** e opacas; física é usada só para estabilizar e é desativada
-        - Busca com destaque (Enter) e foco do nó correspondente
+        Micro serviço de Knowledge Graph (vis.js / PyVis).
+        - **svc-kg** (também referido como **“sic-kg”**)
+        - Visualizações: `/v1/vis/visjs`, `/v1/vis/pyvis`
+        - Ops: `/live`, `/health`, `/ready`, `/ops/status`
 
 servers:
   - url: /
 
 tags:
-  - name: ops
-    description: Sondas e status operacional (liveness/readiness/health/status)
   - name: graph
-    description: Dados do grafo (nós/arestas) normalizados para consumo por vis.js/PyVis
+    description: Endpoints de dados brutos do grafo.
   - name: viz
-    description: Visualizações HTML (vis.js e PyVis). Inclui aliases legados sob /v1/vis/*
+    description: Visualizações do grafo (vis.js / PyVis).
+  - name: ops
+    description: Operação & saúde do micro-serviço (Coolify, Supabase, Redis).
 
 paths:
-    ###########################################################################
-    # OPS / STATUS
-    ###########################################################################
-    /live:
-        get:
-            tags: [ ops ]
-            summary: Liveness probe
-            description: Retorna OK se o processo está vivo.
-            responses:
-                '200':
-                    description: OK
-                    content:
-                        text/plain:
-                            schema: { type: string, example: ok }
-
-    /health:
-        get:
-            tags: [ ops ]
-            summary: Health probe (checagem rápida)
-            description: Checa configuração do backend e (se habilitado) disponibilidade do Redis.
-            parameters:
-              - in: query
-                name: deep
-                schema: { type: boolean, default: false }
-                description: Quando true, executa uma chamada RPC curta no backend e ping no Redis.
-            responses:
-                '200':
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                type: object
-                                additionalProperties: true
-                '503':
-                    description: Serviço degradado/indisponível
-
-    /ready:
-        get:
-            tags: [ ops ]
-            summary: Readiness probe
-            description: Executa validações ativas (RPC/Redis) para indicar se pode receber tráfego.
-            responses:
-                '200':
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                type: object
-                                additionalProperties: true
-                '503':
-                    description: Não pronto
-
-    /ops/status:
-        get:
-            tags: [ ops ]
-            summary: Status operacional (humano/automação)
-            description: Informações do container/Coolify, versão, Redis, Supabase (sem segredos), CORS, etc.
-            responses:
-                '200':
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                type: object
-                                additionalProperties: true
-
-    # Página de documentação (Swagger UI custom)
-    /docs:
-        get:
-            tags: [ ops ]
-            summary: Página HTML de documentação interativa (Swagger UI custom)
-            description: Retorna HTML com Swagger UI e painel de status no topo.
-            responses:
-                '200':
-                    description: HTML
-                    content:
-                        text/html:
-                            schema: { type: string }
-
-    ###########################################################################
-    # DADOS DO GRAFO
-    ###########################################################################
     /v1/graph/membros:
         get:
             tags: [ graph ]
-            summary: Retorna grafo (nodes/edges) normalizado
-            description: |
-                Retorna `{ nodes, edges }` prontos para renderização.
-                - `nodes`: id/label/type/group/size/faccao_id/photo_url
-                - `edges`: source/target/weight/relation
-                O serviço normaliza labels (arrays do Postgres), garante deduplicação e
-                pode truncar conforme `max_nodes`/`max_edges` (aplicado internamente).
+            summary: Retorna grafo (nodes/edges)
             parameters:
-              - $ref: '#/components/parameters/faccao_id'
-              - $ref: '#/components/parameters/include_co'
-              - $ref: '#/components/parameters/max_pairs'
-              - $ref: '#/components/parameters/max_nodes'
-              - $ref: '#/components/parameters/max_edges'
-              - $ref: '#/components/parameters/cache'
+              - in: query
+                name: faccao_id
+                schema: { type: integer, nullable: true }
+              - in: query
+                name: include_co
+                schema: { type: boolean, default: true }
+              - in: query
+                name: max_pairs
+                schema: { type: integer, default: 8000 }
+              - in: query
+                name: max_nodes
+                schema: { type: integer, default: 2000 }
+              - in: query
+                name: max_edges
+                schema: { type: integer, default: 4000 }
+              - in: query
+                name: cache
+                schema: { type: boolean, default: true }
             responses:
-                '200':
-                    description: Grafo normalizado para vis.js/PyVis
+                "200":
+                    description: OK
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/GraphPayloadRaw'
-                '500':
-                    description: Erro inesperado
+                                type: object
+                                properties:
+                                    nodes:
+                                        type: array
+                                        items: { type: object }
+                                    edges:
+                                        type: array
+                                        items: { type: object }
 
-    ###########################################################################
-    # VISUALIZAÇÕES (vis.js e PyVis) + ALIASES LEGADOS
-    ###########################################################################
-    /visjs:
-        get:
-            tags: [ viz ]
-            summary: Visualização HTML (vis.js)
-            description: |
-                Renderiza a rede com **vis-network**.
-                - Arestas **muito finas** (1px) e com cor/opacity por tipo de relação
-                - Física estabiliza e é **desativada**; drag de **nó isolado**
-                - Busca com destaque/foco (Enter) — parâmetro `search` inicial
-                - Cores: CV (vermelho), PCC (azul-escuro), funções (amarelo)
-            parameters:
-              - $ref: '#/components/parameters/faccao_id'
-              - $ref: '#/components/parameters/include_co'
-              - $ref: '#/components/parameters/max_pairs'
-              - $ref: '#/components/parameters/max_nodes'
-              - $ref: '#/components/parameters/max_edges'
-              - $ref: '#/components/parameters/cache'
-              - $ref: '#/components/parameters/theme'
-              - $ref: '#/components/parameters/title'
-              - $ref: '#/components/parameters/debug'
-              - $ref: '#/components/parameters/source'
-              - $ref: '#/components/parameters/search'
-            responses:
-                '200':
-                    description: HTML (vis.js)
-                    content:
-                        text/html:
-                            schema: { type: string }
-                '500':
-                    description: Erro inesperado
-
-    /pyvis:
-        get:
-            tags: [ viz ]
-            summary: Visualização HTML (PyVis)
-            description: |
-                Gera HTML com **PyVis**.
-                - Arestas **muito finas**; física estabiliza e é **desativada**
-                - Busca com destaque/foco (Enter) — parâmetro `search` inicial
-                - Cores: CV (vermelho), PCC (azul-escuro), funções (amarelo)
-            parameters:
-              - $ref: '#/components/parameters/faccao_id'
-              - $ref: '#/components/parameters/include_co'
-              - $ref: '#/components/parameters/max_pairs'
-              - $ref: '#/components/parameters/max_nodes'
-              - $ref: '#/components/parameters/max_edges'
-              - $ref: '#/components/parameters/cache'
-              - $ref: '#/components/parameters/theme'
-              - $ref: '#/components/parameters/title'
-              - $ref: '#/components/parameters/debug'
-              - $ref: '#/components/parameters/search'
-            responses:
-                '200':
-                    description: HTML (PyVis)
-                    content:
-                        text/html:
-                            schema: { type: string }
-                '500':
-                    description: Erro inesperado
-
-    # -------- Aliases legados (mantidos) --------
     /v1/vis/visjs:
         get:
             tags: [ viz ]
-            summary: (Alias) Visualização HTML (vis.js)
-            description: Alias funcional de **/visjs**.
+            summary: Visualização vis-network
+            description: |
+                Página HTML que carrega vis-network e renderiza o grafo.
+                Parâmetro `source=server|client` define se os dados vêm embutidos (server) ou via fetch (client).
             parameters:
-              - $ref: '#/components/parameters/faccao_id'
-              - $ref: '#/components/parameters/include_co'
-              - $ref: '#/components/parameters/max_pairs'
-              - $ref: '#/components/parameters/max_nodes'
-              - $ref: '#/components/parameters/max_edges'
-              - $ref: '#/components/parameters/cache'
-              - $ref: '#/components/parameters/theme'
-              - $ref: '#/components/parameters/title'
-              - $ref: '#/components/parameters/debug'
-              - $ref: '#/components/parameters/source'
-              - $ref: '#/components/parameters/search'
+              - in: query
+                name: faccao_id
+                schema: { type: integer, nullable: true }
+              - in: query
+                name: include_co
+                schema: { type: boolean, default: true }
+              - in: query
+                name: max_pairs
+                schema: { type: integer, default: 8000 }
+              - in: query
+                name: max_nodes
+                schema: { type: integer, default: 2000 }
+              - in: query
+                name: max_edges
+                schema: { type: integer, default: 4000 }
+              - in: query
+                name: cache
+                schema: { type: boolean, default: true }
+              - in: query
+                name: source
+                schema: { type: string, enum: [ server, client ], default: server }
+              - in: query
+                name: theme
+                schema: { type: string, enum: [ light, dark ], default: light }
             responses:
-                '200':
-                    description: HTML (vis.js)
+                "200":
+                    description: HTML
                     content:
                         text/html:
                             schema: { type: string }
@@ -234,129 +111,90 @@ paths:
     /v1/vis/pyvis:
         get:
             tags: [ viz ]
-            summary: (Alias) Visualização HTML (PyVis)
-            description: Alias funcional de **/pyvis**.
+            summary: Visualização PyVis
             parameters:
-              - $ref: '#/components/parameters/faccao_id'
-              - $ref: '#/components/parameters/include_co'
-              - $ref: '#/components/parameters/max_pairs'
-              - $ref: '#/components/parameters/max_nodes'
-              - $ref: '#/components/parameters/max_edges'
-              - $ref: '#/components/parameters/cache'
-              - $ref: '#/components/parameters/theme'
-              - $ref: '#/components/parameters/title'
-              - $ref: '#/components/parameters/debug'
-              - $ref: '#/components/parameters/search'
+              - in: query
+                name: faccao_id
+                schema: { type: integer, nullable: true }
+              - in: query
+                name: include_co
+                schema: { type: boolean, default: true }
+              - in: query
+                name: max_pairs
+                schema: { type: integer, default: 8000 }
+              - in: query
+                name: max_nodes
+                schema: { type: integer, default: 2000 }
+              - in: query
+                name: max_edges
+                schema: { type: integer, default: 4000 }
+              - in: query
+                name: cache
+                schema: { type: boolean, default: true }
+              - in: query
+                name: theme
+                schema: { type: string, enum: [ light, dark ], default: light }
             responses:
-                '200':
-                    description: HTML (PyVis)
+                "200":
+                    description: HTML
                     content:
                         text/html:
                             schema: { type: string }
 
-components:
-    ###########################################################################
-    # Parâmetros reutilizáveis
-    ###########################################################################
-    parameters:
-        faccao_id:
-            in: query
-            name: faccao_id
-            schema: { type: integer, nullable: true }
-            description: Filtrar por facção (opcional)
-        include_co:
-            in: query
-            name: include_co
-            schema: { type: boolean, default: true }
-            description: Incluir co-ocorrências/associações
-        max_pairs:
-            in: query
-            name: max_pairs
-            schema: { type: integer, default: 8000, minimum: 1, maximum: 200000 }
-            description: Limite de pares retornados pelo backend (controle de volume)
-        max_nodes:
-            in: query
-            name: max_nodes
-            schema: { type: integer, default: 2000, minimum: 100, maximum: 20000 }
-            description: Limite de nós aplicados na prévia/recorte seguro
-        max_edges:
-            in: query
-            name: max_edges
-            schema: { type: integer, default: 4000, minimum: 100, maximum: 200000 }
-            description: Limite de arestas aplicados na prévia/recorte seguro
-        cache:
-            in: query
-            name: cache
-            schema: { type: boolean, default: true }
-            description: Controla uso do cache de respostas (Redis)
-        theme:
-            in: query
-            name: theme
-            schema:
-                type: string
-                enum: [ light, dark ]
-                default: light
-            description: Tema visual da página HTML de visualização
-        title:
-            in: query
-            name: title
-            schema: { type: string, default: "Knowledge Graph" }
-            description: Título exibido na barra da visualização
-        debug:
-            in: query
-            name: debug
-            schema: { type: boolean, default: false }
-            description: Quando true, exibe badges/contagens de nós/arestas
-        source:
-            in: query
-            name: source
-            schema:
-                type: string
-                enum: [ server, client ]
-                default: server
-            description: |
-                server: embute os dados diretamente no HTML
-                client: browser faz `GET /v1/graph/membros` para buscar os dados
-        search:
-            in: query
-            name: search
-            schema: { type: string, nullable: true }
-            description: Texto inicial para focar/destacar o nó (id exato ou parte do label)
+    /live:
+        get:
+            tags: [ ops ]
+            summary: Liveness
+            description: Retorna "ok" se o processo está vivo.
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        text/plain:
+                            schema:
+                                type: string
+                                example: ok
 
-    ###########################################################################
-    # Schemas de dados
-    ###########################################################################
-    schemas:
-        GraphNode:
-            type: object
-            properties:
-                id: { type: string, example: "123" }
-                label: { type: string, example: "JOÃO DA SILVA" }
-                type:
-                    type: string
-                    enum: [ membro, faccao, funcao, outro ]
-                    example: membro
-                group: { type: string, nullable: true, example: "6" }
-                size: { type: number, nullable: true, example: 14.0 }
-                faccao_id: { type: integer, nullable: true, example: 6 }
-                photo_url:
-                    type: string
-                    nullable: true
-                    format: uri
-                    example: "https://supabase.storage/.../m1.jpg"
-        GraphEdgeRaw:
-            type: object
-            properties:
-                source: { type: string, example: "123" }
-                target: { type: string, example: "6" }
-                weight: { type: number, nullable: true, example: 1.0 }
-                relation: { type: string, example: "PERTENCE_A" }
-        GraphPayloadRaw:
-            type: object
-            properties:
-                nodes:
-                    type: array
-                    items: { $ref: '#/components/schemas/GraphNode' }
-                edges:
-                    type: array
-                    items: { $ref: '#/components/schemas/GraphEdgeRaw' }
+    /health:
+        get:
+            tags: [ ops ]
+            summary: Health check
+            description: |
+                Verifica Redis (ping) e backend (Supabase) configurado.
+                Use `?deep=true` para executar um RPC real no Supabase e validar conectividade ativa.
+            parameters:
+              - in: query
+                name: deep
+                schema: { type: boolean, default: false }
+                description: "Se true, executa RPC no Supabase e ping no Redis."
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { type: object, additionalProperties: true }
+                "503":
+                    description: Serviço degradado
+
+    /ready:
+        get:
+            tags: [ ops ]
+            summary: Readiness
+            description: Teste ativo de Redis e RPC curto no Supabase (pronto para tráfego).
+        responses:
+            "200": { description: OK }
+            "503": { description: Não pronto }
+
+    /ops/status:
+        get:
+            tags: [ ops ]
+            summary: Status operacional (humano/automação)
+            description: |
+                Retorna informações do ambiente (Coolify/container), Redis, Supabase (sem expor segredos),
+                versão, hostname e parâmetros principais de CORS.
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema: { type: object, additionalProperties: true }
