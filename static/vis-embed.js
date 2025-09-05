@@ -1,20 +1,23 @@
 // =============================================================================
 // Arquivo: static/vis-embed.js
-// Versão: v1.7.20 (arestas ultrafinas + busca com destaque + física off pós-layout)
-// Objetivo: Renderizar o grafo do /visjs com vis-network.
+// Versão: v1.7.20
+// Objetivo: Renderização cliente do vis-network para /v1/vis/visjs
 // Funções/métodos:
-// - run(): decide fonte (server/client) e chama render()
-// - render(data): normaliza, DEDUPlica nós por id, mapeia edges e monta vis.Network
-// - attachToolbar(): busca com destaque (esmaece demais), print/reload
-// - inferFaccaoColors()/colorForNode(): coloração CV/PCC/função
-// - edgeStyleFor(): cor base por relação
-// - cleanLabel()/hashColor()/degreeMap(): utilitários
+// - Carrega dados embutidos (data-source="server") ou busca do endpoint (client)
+// - Dedup no cliente; mapeia source/target -> from/to
+// - Cores: CV (vermelho), PCC (azul escuro), funções (amarelo)
+// - Arestas muito finas (width baixo + opacidade); setas pequenas
+// - Física só na estabilização (depois OFF); arrastar move apenas o nó
+// - Busca: esmaece todos, destaca hits (borda grossa + aumenta valor) e foca
+// - Explode nós com maior grau (value proporcional ao grau)
 // =============================================================================
 (function () {
+  const container = document.getElementById('mynetwork');
+  if (!container) return;
+
   const COLOR_CV = '#d32f2f';
   const COLOR_PCC = '#0d47a1';
   const COLOR_FUNCAO = '#c8a600';
-
   const EDGE_COLORS = {
     'PERTENCE_A': '#9e9e9e',
     'EXERCE': '#00796b',
@@ -23,215 +26,208 @@
     'CO_FUNCAO': '#546e7a'
   };
 
-  function hashColor(s) {
-    s = String(s || '');
-    let h = 0;
-    for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; }
-    const hue = Math.abs(h) % 360; return `hsl(${hue},70%,50%)`;
-  }
-  function isPgTextArray(s) { s = (s || '').trim(); return s.length >= 2 && s[0] === '{' && s[s.length - 1] === '}'; }
+  function okUrl(u) { return typeof u === 'string' && /^https?:\/\//i.test(u); }
+  function isPgTextArray(s) { s = (s || '').trim(); return s.length >= 2 && s[0] == '{' && s[s.length - 1] == '}'; }
   function cleanLabel(raw) {
     if (!raw) return '';
     const s = String(raw).trim();
     if (!isPgTextArray(s)) return s;
     const inner = s.slice(1, -1);
     if (!inner) return '';
-    return inner
-      .split(',')
-      .map(x => x.trim().replace(/^"(.*)"$/, '$1').replace(/\\"/g, '"'))
-      .filter(Boolean)
-      .join(', ');
+    return inner.replace(/(^|,)\s*"?null"?\s*(?=,|$)/gi, '')
+      .replace(/"/g, '')
+      .split(',').map(x => x.trim()).filter(Boolean).join(', ');
   }
+  function hashColor(s) {
+    s = String(s || ''); let h = 0;
+    for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; }
+    const hue = Math.abs(h) % 360; return `hsl(${hue},70%,50%)`;
+  }
+
+  function inferFaccaoColors(rawNodes) {
+    const facById = {};
+    rawNodes.filter(n => n && n.type === 'faccao').forEach(n => {
+      const name = cleanLabel(n.label || '').toUpperCase();
+      const id = String(n.id);
+      if (!name) return;
+      if (name.includes('PCC')) facById[id] = COLOR_PCC;
+      else if (name === 'CV' || name.includes('COMANDO VERMELHO')) facById[id] = COLOR_CV;
+    });
+    return facById;
+  }
+
+  function colorForNode(n, faccaoColorById) {
+    if ((n.type || '').toLowerCase() === 'funcao' || String(n.group || '') === '6') return COLOR_FUNCAO;
+    const gid = String(n.group ?? n.faccao_id ?? '');
+    if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
+    return hashColor(gid || (n.type || 'x'));
+  }
+
   function degreeMap(nodes, edges) {
     const d = {}; nodes.forEach(n => d[n.id] = 0);
-    edges.forEach(e => { d[e.from]++; d[e.to]++; });
+    edges.forEach(e => { if (e.from in d) d[e.from]++; if (e.to in d) d[e.to]++; });
     return d;
   }
-  function inferFaccaoColors(rawNodes) {
-    const map = new Map();
-    rawNodes.forEach(n => {
-      const group = String(n.group ?? n.faccao_id ?? '');
-      const name = (n.label || '').toString().toUpperCase();
-      if (!group) return;
-      if (name.includes('PCC')) map.set(group, 'PCC');
-      else if (name === 'CV' || name.includes('CV')) map.set(group, 'CV');
-    });
-    return map;
-  }
-  function colorForNode(n, faccaoColorById) {
-    if ((n.type || '').toString().toLowerCase() === 'funcao' || String(n.group) === '6') return COLOR_FUNCAO;
-    const gid = String(n.group ?? n.faccao_id ?? '');
-    const tag = gid && faccaoColorById.get(gid);
-    if (tag === 'PCC') return COLOR_PCC;
-    if (tag === 'CV') return COLOR_CV;
-    const lbl = (n.label || '').toString().toUpperCase();
-    if (lbl.includes('PCC')) return COLOR_PCC;
-    if (lbl === 'CV' || lbl.includes('CV')) return COLOR_CV;
-    return hashColor(gid || lbl);
-  }
-  function edgeStyleFor(rel) {
-    const base = EDGE_COLORS[rel] || '#9e9e9e';
-    return { color: { color: base, highlight: base, hover: base }, opacity: 0.65 };
-  }
 
-  function attachToolbar(net, dsNodes) {
-    const q = document.getElementById('kg-search');
-    const btnPrint = document.getElementById('btn-print');
-    const btnReload = document.getElementById('btn-reload');
-    if (btnPrint) btnPrint.onclick = () => window.print();
-    if (btnReload) btnReload.onclick = () => location.reload();
-    if (!q) return;
-
-    let last = new Set();
-    function clear() {
-      if (!dsNodes) return;
-      dsNodes.update(Array.from(last).map(id => ({ id, borderWidth: 1, color: undefined })));
-      last.clear();
-    }
-
-    q.addEventListener('keydown', (ev) => {
-      if (ev.key !== 'Enter') return;
-      const term = (q.value || '').trim().toLowerCase();
-      clear();
-      if (!term) return;
-
-      const hits = dsNodes.get({
-        filter: n => n.id.toLowerCase() === term || (n.label || '').toLowerCase().includes(term)
-      });
-      if (!hits.length) return;
-
-      const ids = hits.map(h => h.id);
-      last = new Set(ids);
-
-      // esmaece os demais
-      const all = dsNodes.get();
-      dsNodes.update(all.map(n => ({ id: n.id, color: Object.assign({}, n.color || {}, { opacity: 0.15 }), borderWidth: 1 })));
-
-      // destaca os achados
-      ids.forEach(id => {
-        const cur = dsNodes.get(id);
-        const hi = Object.assign({}, cur.color || {}, { opacity: 1 });
-        dsNodes.update({ id, color: hi, borderWidth: 4 });
-      });
-
-      net.focus(ids[0], { scale: 1.2, animation: { duration: 400 } });
-    });
-  }
-
-  function render(data) {
-    const container = document.getElementById('mynetwork');
-    if (!container) return;
-
-    const rawNodes = Array.isArray(data.nodes) ? data.nodes : [];
-    const rawEdges = Array.isArray(data.edges) ? data.edges : [];
+  function toVisData(raw) {
+    const rawNodes = (raw && raw.nodes) ? raw.nodes : [];
+    const rawEdges = (raw && raw.edges) ? raw.edges : [];
     const faccaoColorById = inferFaccaoColors(rawNodes);
 
-    // Dedup nós por id
-    const byId = new Map();
-    for (const n of rawNodes) {
-      if (!n || n.id == null) continue;
-      const id = String(n.id);
-      if (byId.has(id)) continue;
-      const label = cleanLabel(n.label) || id;
-      const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
-      const value = (typeof n.size === 'number') ? n.size : undefined;
-      const photo = n.photo_url && /^https?:\/\//i.test(n.photo_url) ? n.photo_url : null;
-      const color = colorForNode(n, faccaoColorById);
-      const base = { id, label, group, value, color, borderWidth: 1 };
-      if (photo) { base.shape = 'circularImage'; base.image = photo; } else { base.shape = 'dot'; }
-      byId.set(id, base);
-    }
-    const nodes = Array.from(byId.values());
+    const nodes = rawNodes
+      .filter(n => n && n.id != null)
+      .map(n => {
+        const id = String(n.id);
+        const label = cleanLabel(n.label) || id;
+        const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
+        const value = (typeof n.size === 'number') ? n.size : undefined;
+        const photo = okUrl(n.photo_url) ? n.photo_url : null;
+        const type = n.type || '';
+        const color = colorForNode({ group, type }, faccaoColorById);
+        const base = { id, label, group, value, color, borderWidth: 1 };
+        if (photo) { base.shape = 'circularImage'; base.image = photo; } else { base.shape = 'dot'; }
+        return base;
+      });
 
-    const nodeIds = new Set(nodes.map(n => n.id));
+    const idSet = new Set(nodes.map(n => n.id));
     const edges = rawEdges
-      .filter(e => e && e.source != null && e.target != null && nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)))
+      .filter(e => e && e.source != null && e.target != null && idSet.has(String(e.source)) && idSet.has(String(e.target)))
       .map(e => {
         const rel = e.relation || '';
-        const style = edgeStyleFor(rel);
+        const from = String(e.source), to = String(e.target);
+        const baseColor = (rel && rel.toUpperCase().includes('FUNCAO')) ? COLOR_FUNCAO : (EDGE_COLORS[rel] || '#90a4ae');
         return {
-          from: String(e.source),
-          to: String(e.target),
+          from, to,
           value: (e.weight != null ? Number(e.weight) : 1.0),
           title: rel ? `${rel} (w=${e.weight ?? 1})` : `w=${e.weight ?? 1}`,
-          width: 0.2, // ULTRA-FINO
-          ...style,
+          width: 0.25,
+          color: { color: baseColor, opacity: 0.45 },
           arrows: { to: { enabled: true, scaleFactor: 0.3 } }
         };
       });
 
-    if (!nodes.length) {
+    const deg = degreeMap(nodes, edges);
+    nodes.forEach(n => {
+      if (typeof n.value !== 'number') {
+        const d = deg[n.id] || 0;
+        n.value = 10 + Math.pow(d, 0.6) * 8;
+      }
+    });
+
+    return { nodes, edges };
+  }
+
+  function toOpacity(color, opacity) {
+    if (typeof color === 'object' && color) return Object.assign({}, color, { opacity: opacity });
+    return {
+      background: color || '#90a4ae',
+      border: color || '#90a4ae',
+      highlight: { background: color || '#90a4ae', border: color || '#90a4ae' },
+      hover: { background: color || '#90a4ae', border: color || '#90a4ae' },
+      opacity: opacity
+    };
+  }
+
+  function attachToolbar(network, dsNodes) {
+    const q = document.getElementById('kg-search');
+    const p = document.getElementById('btn-print');
+    const r = document.getElementById('btn-reload');
+    if (p) p.onclick = () => window.print();
+    if (r) r.onclick = () => location.reload();
+    if (q) {
+      const run = () => {
+        const text = (q.value || '').trim().toLowerCase();
+        if (!text) return;
+        const all = dsNodes.get();
+        const hits = all.filter(n => (String(n.label || '').toLowerCase().includes(text)) || (String(n.id).toLowerCase() === text));
+        if (!hits.length) return;
+        all.forEach(n => dsNodes.update({ id: n.id, color: toOpacity(n.color, 0.15), borderWidth: 1 }));
+        hits.forEach(h => dsNodes.update({ id: h.id, color: toOpacity(h.color, 1), borderWidth: 4, value: (h.value || 12) + 6 }));
+        network.focus(hits[0].id, { scale: 1.25, animation: { duration: 400 } });
+      };
+      q.addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+    }
+  }
+
+  function render(raw) {
+    if (typeof vis === 'undefined' || !vis.Network) {
+      container.innerHTML = '<div style="padding:12px">vis-network não carregou. Verifique /static/vendor/vis-network.min.js</div>';
+      return;
+    }
+    const data = toVisData(raw);
+    if (!data.nodes.length) {
       container.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;opacity:.85">Nenhum dado para exibir (nodes=0).</div>';
       return;
     }
-
-    // Tamanho por grau se necessário
-    if (!nodes.some(n => typeof n.value === 'number')) {
-      const deg = degreeMap(nodes, edges);
-      nodes.forEach(n => { const d = deg[n.id] || 0; n.value = 10 + Math.log(d + 1) * 8; });
-    }
-
-    let dsNodes, dsEdges;
-    try { dsNodes = new vis.DataSet(nodes); dsEdges = new vis.DataSet(edges); }
-    catch (err) { console.error(err); container.innerHTML = `<pre style="padding:12px">${String(err).replace(/</g,'&lt;')}</pre>`; return; }
+    const dsNodes = new vis.DataSet(data.nodes);
+    const dsEdges = new vis.DataSet(data.edges);
 
     const options = {
-      interaction: { hover: true, dragNodes: true, dragView: false, zoomView: true, multiselect: true, navigationButtons: true },
+      interaction: {
+        hover: true,
+        dragNodes: true,
+        dragView: false,
+        zoomView: true,
+        multiselect: true,
+        navigationButtons: true
+      },
       manipulation: { enabled: false },
       physics: {
         enabled: true,
-        stabilization: { enabled: true, iterations: 300 },
-        barnesHut: { gravitationalConstant: -8000, centralGravity: 0.2, springLength: 120, springConstant: 0.04, avoidOverlap: 0.2 }
+        stabilization: { enabled: true, iterations: 600 },
+        barnesHut: {
+          gravitationalConstant: -18000,
+          centralGravity: 0.2,
+          springLength: 180,
+          springConstant: 0.04,
+          avoidOverlap: 1.2
+        }
       },
       layout: { improvedLayout: true, randomSeed: 42 },
-      nodes: { shape: 'dot', borderWidth: 1 },
-      edges: { smooth: false, width: 0.2, color: { opacity: 0.65 }, arrows: { to: { enabled: true, scaleFactor: 0.3 } } }
+      nodes: { shape: 'dot', borderWidth: 1, scaling: { min: 8, max: 42 } },
+      edges: { smooth: false }
     };
 
-    const net = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
-    net.once('stabilizationIterationsDone', () => {
-      net.fit({ animation: { duration: 300 } });
-      net.setOptions({ physics: false }); // para o movimento
+    const network = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
+    network.once('stabilizationIterationsDone', () => {
+      network.fit({ animation: { duration: 300 } });
+      network.setOptions({
+        edges: {
+          width: 0.25,
+          color: { opacity: 0.45 },
+          arrows: { to: { enabled: true, scaleFactor: 0.3 } }
+        },
+        physics: false
+      });
     });
-    net.on('doubleClick', () => net.fit({ animation: { duration: 300 } }));
+    network.on('doubleClick', () => network.fit({ animation: { duration: 300 } }));
 
-    attachToolbar(net, dsNodes);
+    attachToolbar(network, dsNodes);
   }
 
-  function run() {
-    const container = document.getElementById('mynetwork');
-    if (!container) return;
-
-    if (typeof vis === 'undefined') {
-      container.innerHTML = '<div style="padding:12px">vis-network não carregou. Verifique CSP/CDN.</div>';
+  const source = container.getAttribute('data-source') || 'server';
+  if (source === 'server') {
+    const tag = document.getElementById('__KG_DATA__');
+    if (!tag) {
+      container.innerHTML = '<div style="padding:12px">Bloco de dados embutido ausente.</div>';
       return;
     }
+    try { render(JSON.parse(tag.textContent || '{}')); }
+    catch (e) { console.error(e); container.innerHTML = '<pre>' + String(e).replace(/</g, '&lt;') + '</pre>'; }
+  } else {
+    const params = new URLSearchParams(window.location.search);
+    const qs = new URLSearchParams();
+    const fac = params.get('faccao_id'); if (fac && fac.trim() !== '') qs.set('faccao_id', fac.trim());
+    qs.set('include_co', params.get('include_co') ?? 'true');
+    qs.set('max_pairs', params.get('max_pairs') ?? '8000');
+    qs.set('max_nodes', params.get('max_nodes') ?? '2000');
+    qs.set('max_edges', params.get('max_edges') ?? '4000');
+    qs.set('cache', params.get('cache') ?? 'false');
 
-    const source = container.getAttribute('data-source') || 'server';
-    const endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
-
-    if (source === 'server') {
-      const tag = document.getElementById('__KG_DATA__');
-      if (!tag) { container.innerHTML = '<div style="padding:12px">Bloco de dados ausente.</div>'; return; }
-      try { render(JSON.parse(tag.textContent || '{}')); }
-      catch (e) { console.error(e); container.innerHTML = '<pre>' + String(e).replace(/</g, '&lt;') + '</pre>'; }
-    } else {
-      const params = new URLSearchParams(window.location.search);
-      const qs = new URLSearchParams();
-      const fac = params.get('faccao_id'); if (fac && fac.trim() !== '') qs.set('faccao_id', fac.trim());
-      qs.set('include_co', params.get('include_co') ?? 'true');
-      qs.set('max_pairs', params.get('max_pairs') ?? '8000');
-      qs.set('max_nodes', params.get('max_nodes') ?? '2000');
-      qs.set('max_edges', params.get('max_edges') ?? '4000');
-      qs.set('cache', params.get('cache') ?? 'false');
-      const url = endpoint + '?' + qs.toString();
-      fetch(url, { headers: { 'Accept': 'application/json' } })
-        .then(async r => { if (!r.ok) throw new Error(r.status + ': ' + await r.text()); return r.json(); })
-        .then(render)
-        .catch(err => { console.error(err); container.innerHTML = '<pre>' + String(err).replace(/</g, '&lt;') + '</pre>'; });
-    }
+    const endpoint = (container.getAttribute('data-endpoint') || '/v1/graph/membros') + '?' + qs.toString();
+    fetch(endpoint, { headers: { 'Accept': 'application/json' } })
+      .then(async r => { if (!r.ok) throw new Error(r.status + ': ' + await r.text()); return r.json(); })
+      .then(render)
+      .catch(err => { console.error(err); container.innerHTML = '<pre>' + String(err).replace(/</g, '&lt;') + '</pre>'; });
   }
-
-  if (document.readyState !== 'loading') run();
-  else document.addEventListener('DOMContentLoaded', run);
 })();
