@@ -7,6 +7,7 @@
 # - graph_membros (/v1/graph/membros e alias /membros): retorna grafo via Supabase RPC
 # - vis_visjs (/v1/vis/visjs): HTML + dados embutidos para vis-network (JS em static/vis-embed.js)
 # - vis_pyvis  (/v1/vis/pyvis): PyVis com arestas ultrafinas, busca, física desligada pós-estabilização
+# - /docs: Swagger UI custom com painel de status (live/health/ready/status)
 # - Utilidades: normalização de labels PG, cache Redis, truncamento, RPC com fallback p_* (corrige PGRST202)
 # =============================================================================
 import os
@@ -96,7 +97,6 @@ app.add_middleware(
 _http: Optional[httpx.AsyncClient] = None
 _redis = None  # type: ignore
 
-
 # -----------------------------------------------------------------------------
 # Utils
 # -----------------------------------------------------------------------------
@@ -180,7 +180,6 @@ def truncate_preview(data: Dict[str, Any], max_nodes: int, max_edges: int) -> Di
     es = [e for e in (data.get("edges", []) or []) if e and str(e.get("source")) in idset and str(e.get("target")) in idset]
     es = es[: max(0, max_edges)]
     return {"nodes": ns, "edges": es}
-
 
 # -----------------------------------------------------------------------------
 # RPC Supabase com fallback de parâmetros (corrige PGRST202)
@@ -293,7 +292,6 @@ def platform_info() -> Dict[str, Any]:
         "version": app.version,
     }
 
-
 # -----------------------------------------------------------------------------
 # Lifecycle
 # -----------------------------------------------------------------------------
@@ -318,7 +316,6 @@ async def _shutdown():
     if _redis:
         await _redis.close()
         _redis = None
-
 
 # -----------------------------------------------------------------------------
 # Health / Live / Ready / Ops
@@ -427,7 +424,6 @@ async def ops_status():
     })
     return JSONResponse(info, status_code=200)
 
-
 # -----------------------------------------------------------------------------
 # API de dados (com alias compatível /membros)
 # -----------------------------------------------------------------------------
@@ -444,7 +440,6 @@ async def graph_membros(
     data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
     data = truncate_preview(data, max_nodes, max_edges)
     return JSONResponse(data, status_code=200)
-
 
 # -----------------------------------------------------------------------------
 # VIS.JS (vis-network) – usa Template (sem chaves escapadas) + dados embutidos
@@ -500,7 +495,6 @@ async def vis_visjs(
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
-
 
 # -----------------------------------------------------------------------------
 # PYVIS – arestas ultrafinas + busca + física off (pós-estabilização)
@@ -718,6 +712,104 @@ async def vis_pyvis(
     html = html.replace("<body>", "<body>\n" + toolbar_html + "\n")
     html = html.replace("</body>", toolbar_js + "\n</body>")
     return HTMLResponse(content=html, status_code=200)
+
+# -----------------------------------------------------------------------------
+# /docs (Swagger UI custom + painel de status)
+# -----------------------------------------------------------------------------
+@app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
+async def custom_docs():
+    csp = (
+        "default-src 'self'; "
+        "img-src 'self' data: https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "connect-src 'self';"
+    )
+    html = r"""
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8"/>
+    <title>svc-kg • API Docs</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist/swagger-ui.css">
+    <style>
+      body { margin:0; }
+      .ops-bar {
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        padding: 12px 16px; border-bottom: 1px solid #eee; background:#fafafa;
+        display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+      }
+      .ops-right { display:flex; gap:8px; align-items:center; }
+      .ops-pill { padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #e0e0e0; background:#fff; }
+      .ops-pill.ok { border-color:#c8e6c9; background:#e8f5e9; }
+      .ops-pill.err{ border-color:#ffcdd2; background:#ffebee; }
+      .ops-grid { display:grid; grid-template-columns: repeat(4, minmax(160px,1fr)); gap:8px; margin-top: 6px; }
+      .ops-kv { font-size: 12px; color:#333; background:#fff; border:1px solid #eee; border-radius:8px; padding:8px; }
+      .ops-kv b { color:#111; }
+      #swagger-ui { margin-top: 0; }
+      .note { font-size: 12px; color:#666; }
+      @media (max-width: 900px){ .ops-grid { grid-template-columns: repeat(2, minmax(160px,1fr)); } }
+    </style>
+  </head>
+  <body>
+    <div class="ops-bar">
+      <div>
+        <div style="font-weight:600;">svc-kg (a.k.a. “sic-kg”)</div>
+        <div class="ops-grid" id="ops-kvs">
+          <div class="ops-kv"><b>Version</b><div id="kv-version">—</div></div>
+          <div class="ops-kv"><b>Env</b><div id="kv-env">—</div></div>
+          <div class="ops-kv"><b>Platform</b><div id="kv-platform">—</div></div>
+          <div class="ops-kv"><b>Host</b><div id="kv-host">—</div></div>
+          <div class="ops-kv"><b>Redis</b><div id="kv-redis">—</div></div>
+          <div class="ops-kv"><b>Supabase URL</b><div id="kv-supa">—</div></div>
+          <div class="ops-kv"><b>RPC</b><div id="kv-rpc">—</div></div>
+          <div class="ops-kv"><b>Timeout</b><div id="kv-timeout">—</div></div>
+        </div>
+        <div class="note">Use os botões para testar live/health/ready. O painel atualiza ao abrir.</div>
+      </div>
+      <div class="ops-right">
+        <a class="ops-pill" href="/live" target="_blank">/live</a>
+        <a class="ops-pill" href="/health" target="_blank">/health</a>
+        <a class="ops-pill" href="/health?deep=true" target="_blank">/health?deep=true</a>
+        <a class="ops-pill" href="/ready" target="_blank">/ready</a>
+        <a class="ops-pill" href="/ops/status" target="_blank">/ops/status</a>
+      </div>
+    </div>
+
+    <div id="swagger-ui"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist/swagger-ui-bundle.js"></script>
+    <script>
+      function setKV(id, val){ var el=document.getElementById(id); if(el) el.textContent = (val==null?'—': String(val)); }
+      async function j(u){ try{ const r=await fetch(u); return await r.json(); }catch(e){ return {error:String(e)}; } }
+      async function refresh(){
+        const [ops, health] = await Promise.all([ j('/ops/status'), j('/health?deep=true') ]);
+        setKV('kv-version', ops.version || '—');
+        setKV('kv-env', ops.app_env || '—');
+        setKV('kv-platform', ops.coolify_proxy_network ? 'coolify' : (ops.container ? 'container' : 'host'));
+        setKV('kv-host', ops.hostname || location.hostname);
+        setKV('kv-redis', (ops.redis && ops.redis.enabled) ? (ops.redis.ping ? 'ok' : 'enabled') : 'disabled');
+        setKV('kv-supa', (ops.supabase && ops.supabase.url) ? ops.supabase.url : '—');
+        setKV('kv-rpc', (ops.supabase && ops.supabase.rpc_fn) ? ops.supabase.rpc_fn : '—');
+        setKV('kv-timeout', (ops.supabase && ops.supabase.timeout) ? ops.supabase.timeout : '—');
+
+        const pills = document.querySelectorAll('.ops-right .ops-pill');
+        pills.forEach(p => p.classList.remove('ok','err'));
+        if (health && health.ok){ pills.forEach(p => p.classList.add('ok')); }
+        else { pills.forEach(p => p.classList.add('err')); }
+      }
+      window.onload = function(){
+        SwaggerUIBundle({ url: '/openapi.json', dom_id: '#swagger-ui', deepLinking: true, docExpansion: 'none', defaultModelsExpandDepth: -1 });
+        refresh();
+      };
+    </script>
+  </body>
+</html>
+"""
+    resp = HTMLResponse(content=html, status_code=200)
+    resp.headers["Content-Security-Policy"] = csp
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    return resp
 
 # =============================================================================
 # Fim de app.py
