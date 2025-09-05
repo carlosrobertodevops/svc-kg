@@ -1,35 +1,44 @@
 # =============================================================================
 # Arquivo: docs/openapi.yaml
 # Versão: v1.7.20
-# Objetivo: Especificação OpenAPI da API svc-kg (endpoints de graph, viz e ops)
-# Notas: Descrições ajustadas; contrato dos endpoints preservado
+# Objetivo: Descrever a API pública do svc-kg
+# Funções/métodos:
+# - /v1/graph/membros: grafo normalizado
+# - /visjs: HTML com vis-network
+# - /pyvis: HTML com PyVis
+# - /live, /health, /ready, /ops/status: sondas/status
 # =============================================================================
-openapi: 3.1.0
+openapi: 3.0.3
 info:
   title: svc-kg
-  version: v1.7.20
+  version: "v1.7.20"
   description: |
-    Micro serviço de Knowledge Graph (vis.js / PyVis).
-    - Visualizações: `/v1/vis/visjs`, `/v1/vis/pyvis`
-    - Dados: `/v1/graph/membros`
-    - Operação: `/live`, `/health`, `/ready`, `/ops/status`
-
+    Serviço de Knowledge Graph com visualização em vis.js e PyVis.
 servers:
   - url: /
-
-tags:
-  - name: graph
-    description: Endpoints de dados brutos do grafo.
-  - name: viz
-    description: Visualizações do grafo (vis.js / PyVis).
-  - name: ops
-    description: Operação & saúde do micro-serviço.
-
 paths:
+  /live:
+    get:
+      summary: Liveness probe
+      responses: { '200': { description: OK } }
+  /health:
+    get:
+      summary: Health probe
+      responses: { '200': { description: OK } }
+  /ready:
+    get:
+      summary: Readiness probe
+      responses: { '200': { description: OK } }
+  /ops/status:
+    get:
+      summary: Status operacional
+      responses: { '200': { description: OK } }
   /v1/graph/membros:
     get:
-      tags: [graph]
-      summary: Retorna grafo (nodes/edges)
+      summary: Grafo (nós e arestas) de membros/facções/funções
+      description: |
+        Retorna grafo normalizado para consumo por vis-network/PyVis.
+        Cores aplicadas no cliente: **CV** vermelho, **PCC** azul escuro, **funções** amarelo.
       parameters:
         - in: query
           name: faccao_id
@@ -39,86 +48,79 @@ paths:
           schema: { type: boolean, default: true }
         - in: query
           name: max_pairs
-          schema: { type: integer, default: 8000 }
-        - in: query
-          name: max_nodes
-          schema: { type: integer, default: 2000 }
-        - in: query
-          name: max_edges
-          schema: { type: integer, default: 4000 }
-        - in: query
-          name: cache
-          schema: { type: boolean, default: true }
+          schema: { type: integer, default: 5000, minimum: 1, maximum: 100000 }
       responses:
-        "200":
-          description: OK
+        '200':
+          description: Grafo normalizado
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  nodes: { type: array, items: { type: object } }
-                  edges: { type: array, items: { type: object } }
-
-  /v1/vis/visjs:
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        label: { type: string }
+                        type: { type: string, enum: [membro, faccao, funcao] }
+                        size: { type: number }
+                        group: { nullable: true }
+                  edges:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        from: { type: string }
+                        to: { type: string }
+                        relation: { type: string }
+                        value: { type: number }
+                        arrows: { type: string }
+        '404': { description: Backend não encontrou RPC }
+        '500': { description: Erro inesperado }
+  /visjs:
     get:
-      tags: [viz]
-      summary: Visualização vis-network
+      summary: HTML – vis-network
       description: |
-        Retorna HTML com vis-network.  
-        Quando `source=server` (padrão) o HTML incorpora um bloco JSON com o grafo,
-        e o cliente **não** rebaixa os dados. Cores: CV (vermelho), PCC (azul escuro),
-        funções (amarelo). Arestas finas; busca com destaque.
+        Renderiza a rede no navegador (arestas bem finas, física desligada após estabilizar, busca com destaque).
       parameters:
         - in: query
-          name: source
-          schema: { type: string, enum: [server, client], default: server }
+          name: faccao_id
+          schema: { type: integer, nullable: true }
+        - in: query
+          name: include_co
+          schema: { type: boolean, default: true }
+        - in: query
+          name: max_pairs
+          schema: { type: integer, default: 5000, minimum: 1, maximum: 100000 }
+        - in: query
+          name: search
+          schema: { type: string, nullable: true }
       responses:
-        "200": { description: HTML }
-
-  /v1/vis/pyvis:
+        '200':
+          description: HTML
+          content: { text/html: { schema: { type: string } } }
+  /pyvis:
     get:
-      tags: [viz]
-      summary: Visualização PyVis
+      summary: HTML – PyVis
       description: |
-        HTML gerado pela biblioteca PyVis, com física **desligada após estabilização**,
-        arestas finas, cores por facção (CV/PCC) e funções (amarelo), e caixa de busca.
-      responses:
-        "200": { description: HTML }
-
-  /live:
-    get:
-      tags: [ops]
-      summary: Liveness
-      responses: { "200": { description: OK, content: { text/plain: {} } } }
-
-  /health:
-    get:
-      tags: [ops]
-      summary: Health check
+        Usa PyVis para gerar a visualização. Arestas **muito finas**; física desligada após estabilização; busca com destaque.
       parameters:
         - in: query
-          name: deep
-          schema: { type: boolean, default: false }
+          name: faccao_id
+          schema: { type: integer, nullable: true }
+        - in: query
+          name: include_co
+          schema: { type: boolean, default: true }
+        - in: query
+          name: max_pairs
+          schema: { type: integer, default: 5000, minimum: 1, maximum: 100000 }
+        - in: query
+          name: search
+          schema: { type: string, nullable: true }
       responses:
-        "200": { description: OK }
-        "503": { description: Serviço degradado }
-
-  /ready:
-    get:
-      tags: [ops]
-      summary: Readiness
-      responses:
-        "200": { description: OK }
-        "503": { description: Não pronto }
-
-  /ops/status:
-    get:
-      tags: [ops]
-      summary: Status operacional (humano/automação)
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: { type: object }
+        '200':
+          description: HTML
+          content: { text/html: { schema: { type: string } } }
+        '500': { description: Erro inesperado }
