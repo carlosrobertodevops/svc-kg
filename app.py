@@ -994,7 +994,7 @@
 
 
 
-# =============================================================================
+ # =============================================================================
 # Arquivo: app.py
 # Versão: v1.7.20
 # Objetivo: API FastAPI do micro-serviço svc-kg (graph + visualizações + ops)
@@ -1782,7 +1782,6 @@ async def vis_pyvis(
         if isinstance(size, (int, float)):
             node_kwargs["value"] = float(size)
         else:
-            # explode leve baseado no grau (calcularemos no final com neighbors)
             pass
         if photo:
             node_kwargs["shape"] = "circularImage"
@@ -1813,7 +1812,7 @@ async def vis_pyvis(
         except Exception:
             w = 1.0
         color = EDGE_COLORS.get(rel, "#b0bec5")
-        net.add_edge(a, b, value=w, width=0.2, color=color, title=rel)
+        net.add_edge(a, b, value=w, width=0.1, color=color, title=rel)  # <<< agora 0.1
 
     # opções (física desliga após estabilização via JS injetado abaixo)
     net.set_options(
@@ -1832,7 +1831,7 @@ async def vis_pyvis(
     "stabilization": { "enabled": true, "iterations": 300 }
   },
   "nodes": { "shape": "dot", "borderWidth": 1 },
-  "edges": { "smooth": false, "width": 0.2, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
+  "edges": { "smooth": false, "width": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
 }
     """
     )
