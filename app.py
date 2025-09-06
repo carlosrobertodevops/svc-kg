@@ -472,6 +472,7 @@ async def vis_visjs(
     )
     css_href = (
         "/static/vendor/vis-network.min.css"
+		# "/static/vis-style.css"
         if os.path.exists("static/vendor/vis-network.min.css")
         else "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
     )
@@ -635,7 +636,7 @@ async def vis_visjs(
         "  <head>\n"
         '    <meta charset="utf-8" />\n'
         f"    <title>{title}</title>\n"
-        f'    <link rel="stylesheet" href="/static/vis-style.css">\n'
+        f'    <link rel="stylesheet" href="{css_href}">\n'
         '    <link rel="stylesheet" href="/static/vis-style.css">\n'
         f'    <meta name="theme-color" content="{bg}">\n'
         "    <style>\n"
