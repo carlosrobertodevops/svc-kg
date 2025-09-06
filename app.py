@@ -639,8 +639,8 @@ async def vis_visjs(
         "  <head>\n"
         '    <meta charset="utf-8" />\n'
         f"    <title>{title}</title>\n"
-        # f'    <link rel="stylesheet" href="{css_href}">\n'
-		f'    <link rel="stylesheet" href="/static/vis-style.css">\n'
+        f'    <link rel="stylesheet" href="{css_href}">\n'
+		# f'    <link rel="stylesheet" href="/static/vis-style.css">\n'
         '    <link rel="stylesheet" href="/static/vis-style.css">\n'
         f'    <meta name="theme-color" content="{bg}">\n'
         "    <style>\n"
