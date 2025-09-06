@@ -472,12 +472,12 @@ async def vis_visjs(
     )
     css_href = (
         # "/static/vendor/vis-network.min.css"
-		# "/static/vis-style.css"
+		"/static/vis-style.css"
 		# "static/vis-network.min.css"
         # if os.path.exists("static/vendor/vis-network.min.css")
         # else "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
-  		if os.path.exists("static/vendor/vis-network.min.css")
-        else "/static/vis-network.min.css"
+  		# if os.path.exists("static/vendor/vis-network.min.css")
+    #     else "/static/vis-network.min.css"
     )
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
