@@ -471,13 +471,9 @@ async def vis_visjs(
         else "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"
     )
     css_href = (
-        # "/static/vendor/vis-network.min.css"
-		# "/static/vis-style.css"
-		# "static/vis-network.min.css"
+        "/static/vendor/vis-network.min.css"
         if os.path.exists("static/vendor/vis-network.min.css")
         else "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
-  		# if os.path.exists("static/vendor/vis-network.min.css")
-    #     else "/static/vis-network.min.css"
     )
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
@@ -525,11 +521,21 @@ async def vis_visjs(
     if ((n.type||'').toLowerCase()==='funcao') return COLOR_FUN;
     return '#607d8b';
   }
-  function edgeStyleFor(rel) { return { color: EDGE_COLORS[rel] || '#b0bec5', width: 0.2 }; }
+  function edgeStyleFor(rel) { return { color: EDGE_COLORS[rel] || '#b0bec5', width: 0.1 }; } // <<< mais fino
   function degreeMap(nodes,edges) {
     const d={}; nodes.forEach(n=>d[n.id]=0);
     edges.forEach(e=>{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; });
     return d;
+  }
+  function colorObj(c, opacity){
+    if (typeof c === 'object' && c) { return Object.assign({}, c, { opacity: opacity }); }
+    return {
+      background: c || '#607d8b',
+      border: c || '#607d8b',
+      highlight: { background: c || '#607d8b', border: c || '#607d8b' },
+      hover: { background: c || '#607d8b', border: c || '#607d8b' },
+      opacity: opacity
+    };
   }
 
   function render(data){
@@ -569,9 +575,9 @@ async def vis_visjs(
       return;
     }
 
-    // explode levemente nós mais conectados
+    // explode nós com maior grau (ganho aumentado)
     const deg = degreeMap(nodes, edges);
-    nodes.forEach(n=>{ const d=deg[n.id]||0; n.value = 10 + Math.log(d+1)*8; });
+    nodes.forEach(n=>{ const d=deg[n.id]||0; n.value = 12 + Math.log(d+1)*10; }); // <<< explode mais
 
     const dsNodes = new vis.DataSet(nodes);
     const dsEdges = new vis.DataSet(edges);
@@ -580,14 +586,14 @@ async def vis_visjs(
       interaction: { hover:true, dragNodes:true, dragView:true, zoomView:true, multiselect:true, navigationButtons:true },
       physics: { enabled: true, stabilization: { enabled:true, iterations: 300 } },
       nodes: { shape:'dot', borderWidth:1 },
-      edges: { smooth:false, width:0.2, arrows: { to: { enabled: true, scaleFactor:0.5 } } }
+      edges: { smooth:false, width:0.1, arrows: { to: { enabled: true, scaleFactor:0.5 } } } // <<< mais fino
     };
 
     const net = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
     net.once('stabilizationIterationsDone', ()=>{ net.setOptions({ physics:false }); net.fit({ animation: { duration: 300 } }); });
     net.on('doubleClick', ()=> net.fit({ animation: { duration: 300 } }));
 
-    // Busca/destaque
+    // Busca/destaque (robusto p/ cores string)
     const q = document.getElementById('kg-search');
     if (q) {
       function run() {
@@ -595,11 +601,13 @@ async def vis_visjs(
         const all=dsNodes.get();
         const hits=all.filter(n => (n.label||'').toLowerCase().includes(t) || String(n.id)===t);
         if(!hits.length) return;
-        dsNodes.update(all.map(n => Object.assign(n, { color: Object.assign({}, n.color, { opacity: 0.25 }) })));
-        const ids=hits.map(h=>h.id);
-        ids.forEach(id=>{ const cur=dsNodes.get(id); dsNodes.update({ id, color: Object.assign({}, cur.color, { opacity: 1 }) }); });
+        all.forEach(n => dsNodes.update({ id: n.id, color: colorObj(n.color, 0.25) }));
+        hits.forEach(h => {
+          const cur=dsNodes.get(h.id);
+          dsNodes.update({ id: h.id, color: colorObj(cur.color, 1) });
+        });
         net.setOptions({ physics: false });
-        net.fit({ nodes: ids, animation: { duration: 300 } });
+        net.fit({ nodes: hits.map(h=>h.id), animation: { duration: 300 } });
       }
       q.addEventListener('change', run);
       q.addEventListener('keyup', e=>{ if(e.key==='Enter') run(); });
@@ -640,19 +648,18 @@ async def vis_visjs(
         '    <meta charset="utf-8" />\n'
         f"    <title>{title}</title>\n"
         f'    <link rel="stylesheet" href="{css_href}">\n'
-		# f'    <link rel="stylesheet" href="/static/vis-style.css">\n'
         '    <link rel="stylesheet" href="/static/vis-style.css">\n'
         f'    <meta name="theme-color" content="{bg}">\n'
         "    <style>\n"
         "      html,body,#mynetwork { height:100%; margin:0; }\n"
         "      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }\n"
-        '      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px;}\n'
+        '      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; }\n'
         "    </style>\n"
         "  </head>\n"
         f'  <body data-theme="{theme}">\n'
         '    <div class="kg-toolbar">\n'
         f'      <h4 style="margin:0">{title}</h4>\n'
-        '      <input id="kg-search" type="search" placeholder="Buscar no gráfico" />\n'
+        '      <input id="kg-search" type="search" placeholder="Buscar dentro do gráfico" />\n'
         '      <button id="btn-print" type="button" title="Imprimir">Imprimir</button>\n'
         '      <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>\n'
         "    </div>\n"
@@ -667,9 +674,13 @@ async def vis_visjs(
         "</html>\n"
     )
 
+    # CSP: permitir imagens http/https (para photo_url remota)
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; "
-        "script-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data:; connect-src 'self';"
+        "default-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+        "script-src 'self' 'unsafe-inline' https://unpkg.com; "
+        "img-src 'self' data: https: http:; "
+        "connect-src 'self';"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(html, status_code=200)
@@ -774,6 +785,8 @@ async def vis_pyvis(
         node_kwargs: Dict[str, Any] = dict(title=label, color=color, borderWidth=1)
         if isinstance(size, (int, float)):
             node_kwargs["value"] = float(size)
+        else:
+            pass
         if photo:
             node_kwargs["shape"] = "circularImage"
             node_kwargs["image"] = photo
@@ -803,8 +816,9 @@ async def vis_pyvis(
         except Exception:
             w = 1.0
         color = EDGE_COLORS.get(rel, "#b0bec5")
-        net.add_edge(a, b, value=w, width=0.2, color=color, title=rel)
+        net.add_edge(a, b, value=w, width=0.1, color=color, title=rel)  # <<< agora 0.1
 
+    # opções (física desliga após estabilização via JS injetado abaixo)
     net.set_options(
         """
 {
@@ -821,18 +835,19 @@ async def vis_pyvis(
     "stabilization": { "enabled": true, "iterations": 300 }
   },
   "nodes": { "shape": "dot", "borderWidth": 1 },
-  "edges": { "smooth": false, "width": 0.2, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
+  "edges": { "smooth": false, "width": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
 }
     """
     )
 
     html = net.generate_html()
 
+    # Toolbar minimalista com radius 1px
     toolbar_css = """
 <style>
   .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
-  .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; border-radius:2px; }
-  .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:2px; cursor:pointer; }
+  .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; border:1px solid #e0e0e0; border-radius:1px; outline:none; }
+  .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }
   .kg-toolbar button:hover { background: rgba(0,0,0,.04); }
 </style>
 """
@@ -899,9 +914,10 @@ async def vis_pyvis(
 # -----------------------------------------------------------------------------
 @app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
 async def custom_docs():
+    # CSP: permitir imagens de CDNs e http/https (para screenshots no Swagger etc.)
     csp = (
         "default-src 'self'; "
-        "img-src 'self' data: https://cdn.jsdelivr.net; "
+        "img-src 'self' data: https://cdn.jsdelivr.net https: http:; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "connect-src 'self';"
@@ -995,4 +1011,3 @@ async def custom_docs():
     resp.headers["Content-Security-Policy"] = csp
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
-
