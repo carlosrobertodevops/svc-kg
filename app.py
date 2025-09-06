@@ -9,6 +9,7 @@
 # - vis_pyvis: página HTML com PyVis (arestas ultrafinas; física OFF após estabilizar; busca)
 # - /docs: Swagger UI custom usando /openapi.json do FastAPI
 # - Utilidades: normalização de labels PG array, cache Redis, truncamento seguro
+# Atualização: 06/09/2025 as 18h05min
 # =============================================================================
 
 import os
@@ -511,7 +512,7 @@ async def vis_visjs(
       const name = cleanLabel(n.label||'').toUpperCase();
       const id = String(n.id);
       if (name.includes('PCC')) map[id] = COLOR_PCC;
-      else if (name === 'CV' || name.includes('COMANDO VERMELHO')) map[id] = COLOR_CV;
+      else if (name.includes('CV')) map[id] = COLOR_CV;
     });
     return map;
   }
@@ -650,19 +651,19 @@ async def vis_visjs(
         f'    <link rel="stylesheet" href="{css_href}">\n'
         '    <link rel="stylesheet" href="/static/vis-style.css">\n'
         f'    <meta name="theme-color" content="{bg}">\n'
-#  toolbar_css = """
-# <style>
-#   .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
-#   .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; border:1px solid #e0e0e0; border-radius:1px; outline:none; }
-#   .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }
-#   .kg-toolbar button:hover { background: rgba(0,0,0,.04); }
-# </style>
-# """	
+        #  toolbar_css = """
+        # <style>
+        #   .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
+        #   .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; border:1px solid #e0e0e0; border-radius:1px; outline:none; }
+        #   .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }
+        #   .kg-toolbar button:hover { background: rgba(0,0,0,.04); }
+        # </style>
+        # """
         "    <style>\n"
         "      html,body,#mynetwork { height:100%; margin:0; }\n"
         "      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }\n"
         '      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; border-radius:1px; outline:none; }\n'
-        '      .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }\n'	
+        "      .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }\n"
         "    </style>\n"
         "  </head>\n"
         f'  <body data-theme="{theme}">\n'
