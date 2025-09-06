@@ -472,10 +472,10 @@ async def vis_visjs(
     )
     css_href = (
         # "/static/vendor/vis-network.min.css"
-		"/static/vis-style.css"
+		# "/static/vis-style.css"
 		# "static/vis-network.min.css"
-        # if os.path.exists("static/vendor/vis-network.min.css")
-        # else "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
+        if os.path.exists("static/vendor/vis-network.min.css")
+        else "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
   		# if os.path.exists("static/vendor/vis-network.min.css")
     #     else "/static/vis-network.min.css"
     )
@@ -639,7 +639,8 @@ async def vis_visjs(
         "  <head>\n"
         '    <meta charset="utf-8" />\n'
         f"    <title>{title}</title>\n"
-        f'    <link rel="stylesheet" href="{css_href}">\n'
+        # f'    <link rel="stylesheet" href="{css_href}">\n'
+		f'    <link rel="stylesheet" href="/static/vis-style.css">\n'
         '    <link rel="stylesheet" href="/static/vis-style.css">\n'
         f'    <meta name="theme-color" content="{bg}">\n'
         "    <style>\n"
@@ -651,9 +652,9 @@ async def vis_visjs(
         f'  <body data-theme="{theme}">\n'
         '    <div class="kg-toolbar">\n'
         f'      <h4 style="margin:0">{title}</h4>\n'
-        '      <input id="kg-search" type="search" placeholder="Buscar dentro do gráfico" />\n'
-        '      <button id="btn-print" type="button" title="Imprimir">Imprimir</button>\n'
-        '      <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>\n'
+        '      <input id="kg-search" type="search" border-radius="2px" placeholder="Buscar no gráfico" />\n'
+        '      <button id="btn-print" type="button" border-radius="2px title="Imprimir">Imprimir</button>\n'
+        '      <button id="btn-reload" type="button" border-radius="2px" title="Recarregar">Recarregar</button>\n'
         "    </div>\n"
         '    <div id="mynetwork" style="height:90vh;width:100%;"\n'
         '         data-endpoint="/v1/graph/membros"\n'
@@ -830,8 +831,8 @@ async def vis_pyvis(
     toolbar_css = """
 <style>
   .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
-  .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; border-radius:1px; }
-  .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }
+  .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; border-radius:2px; }
+  .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:2px; cursor:pointer; }
   .kg-toolbar button:hover { background: rgba(0,0,0,.04); }
 </style>
 """
