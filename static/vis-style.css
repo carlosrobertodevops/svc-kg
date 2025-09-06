@@ -9,7 +9,7 @@
  * - Estilo da toolbar (botões e input)
  * ============================================================================= */
 
-/* html, body {
+html, body {
   margin: 0;
   padding: 0;
   background: #ffffff;
@@ -40,61 +40,6 @@
   cursor: pointer;
 }
 .kg-toolbar button:hover { background: #f0f0f0; }
- */
 
 
 
-
-/* =============================================================================
-   Arquivo: static/vis-style.css
-   Objetivo: Estilos compartilhados para as visualizações (visjs/pyvis)
-   Mudança: Border-radius de inputs e botões = 1px
-   ============================================================================= */
-
-:root {
-  --kg-bg: #ffffff;
-  --kg-fg: #111827;
-  --kg-border: #e0e0e0;
-}
-
-[data-theme="dark"] {
-  --kg-bg: #0b0f19;
-  --kg-fg: #e8eaed;
-  --kg-border: #263238;
-}
-
-html, body {
-  background: var(--kg-bg);
-  color: var(--kg-fg);
-}
-
-.kg-toolbar {
-  background: var(--kg-bg);
-  color: var(--kg-fg);
-  border-bottom: 1px solid var(--kg-border);
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 8px;
-}
-
-.kg-toolbar button {
-  padding: 6px 10px;
-  border: 1px solid var(--kg-border);
-  background: transparent;
-  border-radius: 1px; /* raio 1px */
-  cursor: pointer;
-}
-
-.kg-toolbar button:hover {
-  background: rgba(0,0,0,.04);
-}
-
-.kg-toolbar input[type="search"] {
-  flex: 1;
-  min-width: 220px;
-  padding: 6px 10px;
-  border: 1px solid var(--kg-border);
-  border-radius: 1px; /* raio 1px */
-  outline: none;
-}
