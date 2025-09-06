@@ -511,8 +511,8 @@ async def vis_visjs(
     rawNodes.filter(n=>n && n.type==='faccao').forEach(n=>{
       const name = cleanLabel(n.label||'').toUpperCase();
       const id = String(n.id);
-      if (name.includes('PCC')) map[id] = COLOR_PCC;
-      else if (name.includes('CV')) map[id] = COLOR_CV;
+      if (name.includes('PCC') or name == "PCC") map[id] = COLOR_PCC;
+      else if (name.includes('CV') or name == "CV") map[id] = COLOR_CV;
     });
     return map;
   }
@@ -587,7 +587,7 @@ async def vis_visjs(
       interaction: { hover:true, dragNodes:true, dragView:true, zoomView:true, multiselect:true, navigationButtons:true },
       physics: { enabled: true, stabilization: { enabled:true, iterations: 300 } },
       nodes: { shape:'dot', borderWidth:2 },
-      edges: { smooth:false, width:0.1, arrows: { to: { enabled: true, scaleFactor:0.5 } } } // <<< mais fino
+      edges: { smooth:false, width:0.1, arrows: { to: { enabled: true, scaleFactor:0.2 } } } // <<< mais fino
     };
 
     const net = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
@@ -785,7 +785,7 @@ async def vis_pyvis(
         fixed_color = color_from_faccao(group)
         color = fixed_color or ("#fdd835" if is_func(n) else hash_color(group))
 
-        node_kwargs: Dict[str, Any] = dict(title=label, color=color, borderWidth=1)
+        node_kwargs: Dict[str, Any] = dict(title=label, color=color, borderWidth=2)
         if isinstance(size, (int, float)):
             node_kwargs["value"] = float(size)
         else:
@@ -838,7 +838,7 @@ async def vis_pyvis(
     "stabilization": { "enabled": true, "iterations": 300 }
   },
   "nodes": { "shape": "dot", "borderWidth": 2 },
-  "edges": { "smooth": false, "width": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
+  "edges": { "smooth": false, "width": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.2 } } }
 }
     """
     )
