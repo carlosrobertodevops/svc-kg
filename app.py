@@ -651,19 +651,12 @@ async def vis_visjs(
         f'    <link rel="stylesheet" href="{css_href}">\n'
         '    <link rel="stylesheet" href="/static/vis-style.css">\n'
         f'    <meta name="theme-color" content="{bg}">\n'
-        #  toolbar_css = """
-        # <style>
-        #   .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
-        #   .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; border:1px solid #e0e0e0; border-radius:1px; outline:none; }
-        #   .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }
-        #   .kg-toolbar button:hover { background: rgba(0,0,0,.04); }
-        # </style>
-        # """
         "    <style>\n"
         "      html,body,#mynetwork { height:100%; margin:0; }\n"
         "      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }\n"
         '      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; border-radius:1px; outline:none; }\n'
         "      .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }\n"
+        "      .kg-toolbar button:hover { background: rgba(0,0,0,.04); }\n"
         "    </style>\n"
         "  </head>\n"
         f'  <body data-theme="{theme}">\n'
