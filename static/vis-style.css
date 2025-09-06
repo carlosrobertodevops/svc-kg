@@ -2,12 +2,14 @@
  * Arquivo: static/vis-style.css
  * Versão: v1.7.20
  * Objetivo: Estilos comuns para toolbars/temas das visualizações
+ * Estilos compartilhados (toolbar, temas) para /visjs e /pyvis
+ *  Nota: garante bordas de 1px no input e nos botões
  * Funções/métodos:
  * - Variáveis de cor p/ temas light/dark
  * - Estilo da toolbar (botões e input)
  * ============================================================================= */
 
-html, body {
+/* html, body {
   margin: 0;
   padding: 0;
   background: #ffffff;
@@ -38,3 +40,67 @@ html, body {
   cursor: pointer;
 }
 .kg-toolbar button:hover { background: #f0f0f0; }
+ */
+
+/* =============================================================================
+ * Arquivo: static/vis-style.css
+ * Versão: v1.7.20
+ * Objetivo: Estilos comuns para toolbars/temas das visualizações
+ * Estilos compartilhados (toolbar, temas) para /visjs e /pyvis
+ *  Nota: garante bordas de 1px no input e nos botões
+ * Funções/métodos:
+ * - Variáveis de cor p/ temas light/dark
+ * - Estilo da toolbar (botões e input)
+ * ============================================================================= */
+
+:root {
+  --kg-bg: #ffffff;
+  --kg-fg: #111827;
+  --kg-border: #e0e0e0;
+}
+
+[data-theme="dark"] {
+  --kg-bg: #0b0f19;
+  --kg-fg: #e8eaed;
+  --kg-border: #263238;
+}
+
+html, body {
+  background: var(--kg-bg);
+  color: var(--kg-fg);
+}
+
+.kg-toolbar {
+  background: var(--kg-bg);
+  color: var(--kg-fg);
+  border-bottom: 1px solid var(--kg-border);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+}
+
+/* >>> Bordas 1px nos botões */
+.kg-toolbar button {
+  padding: 6px 10px;
+  border: 1px solid var(--kg-border); /* 1px */
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.kg-toolbar button:hover {
+  background: rgba(0,0,0,.04);
+}
+
+/* >>> Borda 1px no input de busca */
+.kg-toolbar input[type="search"] {
+  flex: 1;
+  min-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid var(--kg-border); /* 1px */
+  border-radius: 6px;
+  outline: none;
+  background: var(--kg-bg);
+  color: var(--kg-fg);
+}
