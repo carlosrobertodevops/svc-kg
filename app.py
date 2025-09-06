@@ -587,7 +587,7 @@ async def vis_visjs(
       interaction: { hover:true, dragNodes:true, dragView:true, zoomView:true, multiselect:true, navigationButtons:true },
       physics: { enabled: true, stabilization: { enabled:true, iterations: 300 } },
       nodes: { shape:'dot', borderWidth:2 },
-      edges: { smooth:false, width:0.1, arrows: { to: { enabled: true, scaleFactor:0.2 } } } // <<< mais fino
+      edges: { smooth:false, width:0.1, arrows: { to: { enabled: true, scaleFactor:0.5 } } } // <<< mais fino
     };
 
     const net = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
@@ -838,7 +838,7 @@ async def vis_pyvis(
     "stabilization": { "enabled": true, "iterations": 300 }
   },
   "nodes": { "shape": "dot", "borderWidth": 2 },
-  "edges": { "smooth": false, "width": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.2 } } }
+  "edges": { "smooth": false, "width": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
 }
     """
     )
