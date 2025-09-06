@@ -48,7 +48,7 @@
 /* =============================================================================
    Arquivo: static/vis-style.css
    Objetivo: Estilos compartilhados para as visualizações (visjs/pyvis)
-   Mudança: Border-radius de inputs e botões = 1px (antes: 6px)
+   Mudança: Border-radius de inputs e botões = 1px
    ============================================================================= */
 
 :root {
@@ -82,7 +82,7 @@ html, body {
   padding: 6px 10px;
   border: 1px solid var(--kg-border);
   background: transparent;
-  border-radius: 1px;     /* <<< alterado para 1px */
+  border-radius: 1px; /* raio 1px */
   cursor: pointer;
 }
 
@@ -95,6 +95,6 @@ html, body {
   min-width: 220px;
   padding: 6px 10px;
   border: 1px solid var(--kg-border);
-  border-radius: 1px;     /* <<< alterado para 1px */
+  border-radius: 1px; /* raio 1px */
   outline: none;
 }
