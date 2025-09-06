@@ -645,16 +645,16 @@ async def vis_visjs(
         f'    <meta name="theme-color" content="{bg}">\n'
         "    <style>\n"
         "      html,body,#mynetwork { height:100%; margin:0; }\n"
-        "      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }\n"
-        '      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; }\n'
+        "      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-radius:2px; border-bottom:1px solid #e0e0e0; }\n"
+        '      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; border-radius:2px; padding:6px 10px; }\n'
         "    </style>\n"
         "  </head>\n"
         f'  <body data-theme="{theme}">\n'
         '    <div class="kg-toolbar">\n'
         f'      <h4 style="margin:0">{title}</h4>\n'
-        '      <input id="kg-search" type="search" border-radius="2px" placeholder="Buscar no gráfico" />\n'
-        '      <button id="btn-print" type="button" border-radius="2px title="Imprimir">Imprimir</button>\n'
-        '      <button id="btn-reload" type="button" border-radius="2px" title="Recarregar">Recarregar</button>\n'
+        '      <input id="kg-search" type="search" placeholder="Buscar no gráfico" />\n'
+        '      <button id="btn-print" type="button" title="Imprimir">Imprimir</button>\n'
+        '      <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>\n'
         "    </div>\n"
         '    <div id="mynetwork" style="height:90vh;width:100%;"\n'
         '         data-endpoint="/v1/graph/membros"\n'
