@@ -471,10 +471,13 @@ async def vis_visjs(
         else "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"
     )
     css_href = (
-        "/static/vendor/vis-network.min.css"
+        # "/static/vendor/vis-network.min.css"
 		# "/static/vis-style.css"
-        if os.path.exists("static/vendor/vis-network.min.css")
-        else "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
+		# "static/vis-network.min.css"
+        # if os.path.exists("static/vendor/vis-network.min.css")
+        # else "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
+  		if os.path.exists("/static/vis-style.css")
+        else "/static/vis-style.css"
     )
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
