@@ -855,8 +855,8 @@ async def vis_pyvis(
 <div class="kg-toolbar">
   <h4 style="margin:0">{title}</h4>
   <input id="kg-search" type="search" placeholder="Buscar no gráfico" />
-  <button id="btn-print" type="button" title="Imprimir">Print</button>
-  <button id="btn-reload" type="button" title="Recarregar">Reload</button>
+  <button id="btn-print" type="button" title="Imprimir">Imprimir</button>
+  <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>
 </div>
 """
     toolbar_js = """
