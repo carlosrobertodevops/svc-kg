@@ -645,8 +645,8 @@ async def vis_visjs(
         f'    <meta name="theme-color" content="{bg}">\n'
         "    <style>\n"
         "      html,body,#mynetwork { height:100%; margin:0; }\n"
-        "      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; border-radius:2px; }\n"
-        '      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; border-radius:2px; }\n'
+        "      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }\n"
+        '      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px;}\n'
         "    </style>\n"
         "  </head>\n"
         f'  <body data-theme="{theme}">\n'
