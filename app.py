@@ -647,9 +647,9 @@ async def vis_visjs(
         f'  <body data-theme="{theme}">\n'
         '    <div class="kg-toolbar">\n'
         f'      <h4 style="margin:0">{title}</h4>\n'
-        '      <input id="kg-search" type="search" placeholder="Buscar nó por rótulo ou ID…" />\n'
-        '      <button id="btn-print" type="button" title="Imprimir">Print</button>\n'
-        '      <button id="btn-reload" type="button" title="Recarregar">Reload</button>\n'
+        '      <input id="kg-search" type="search" placeholder="Buscar dentro do gráfico" />\n'
+        '      <button id="btn-print" type="button" title="Imprimir">Imprimir</button>\n'
+        '      <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>\n'
         "    </div>\n"
         '    <div id="mynetwork" style="height:90vh;width:100%;"\n'
         '         data-endpoint="/v1/graph/membros"\n'
@@ -700,7 +700,7 @@ async def vis_pyvis(
     edges = data.get("edges", []) or []
 
     if not nodes:
-        return HTMLResponse("<h3>Sem dados para exibir (nodes=0)</h3>", status_code=200)
+        return HTMLResponse("<h3>Sem dados para exibir.</h3>", status_code=200)
 
     faccao_name_by_id: Dict[str, str] = {}
     for n in nodes:
@@ -715,7 +715,7 @@ async def vis_pyvis(
             return None
         if "PCC" in name:
             return "#0d47a1"
-        if name == "CV" or "COMANDO VERMELHO" in name:
+        if "CV" in name:
             return "#d32f2f"
         return None
 
@@ -826,15 +826,15 @@ async def vis_pyvis(
     toolbar_css = """
 <style>
   .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
-  .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; }
-  .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:6px; cursor:pointer; }
+  .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; border-radius:1px; }
+  .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }
   .kg-toolbar button:hover { background: rgba(0,0,0,.04); }
 </style>
 """
     toolbar_html = f"""
 <div class="kg-toolbar">
   <h4 style="margin:0">{title}</h4>
-  <input id="kg-search" type="search" placeholder="Buscar nó por rótulo ou ID…" />
+  <input id="kg-search" type="search" placeholder="Buscar no gráfico" />
   <button id="btn-print" type="button" title="Imprimir">Print</button>
   <button id="btn-reload" type="button" title="Recarregar">Reload</button>
 </div>
