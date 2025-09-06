@@ -512,7 +512,7 @@ async def vis_visjs(
       const name = cleanLabel(n.label||'').toUpperCase();
       const id = String(n.id);
       if (name.includes('PCC')) map[id] = COLOR_PCC;
-      else if (name ==='CV' ||  name.includes('CV')) map[id] = COLOR_CV;
+      else if (name ==='CV' && name.includes('CV')) map[id] = COLOR_CV;
     });
     return map;
   }
