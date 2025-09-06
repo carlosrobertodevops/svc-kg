@@ -586,7 +586,7 @@ async def vis_visjs(
     const options = {
       interaction: { hover:true, dragNodes:true, dragView:true, zoomView:true, multiselect:true, navigationButtons:true },
       physics: { enabled: true, stabilization: { enabled:true, iterations: 300 } },
-      nodes: { shape:'dot', borderWidth:1 },
+      nodes: { shape:'dot', borderWidth:2 },
       edges: { smooth:false, width:0.1, arrows: { to: { enabled: true, scaleFactor:0.5 } } } // <<< mais fino
     };
 
@@ -837,7 +837,7 @@ async def vis_pyvis(
     "enabled": true,
     "stabilization": { "enabled": true, "iterations": 300 }
   },
-  "nodes": { "shape": "dot", "borderWidth": 1 },
+  "nodes": { "shape": "dot", "borderWidth": 2 },
   "edges": { "smooth": false, "width": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
 }
     """
