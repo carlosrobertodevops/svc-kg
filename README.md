@@ -1,7 +1,6 @@
 
-# svc-kg (v1.7.19)
+# svc-kg (v1.7.20)
 
-(svc-kg-v1.7.19)
 svc-kg/
 ├─ db/
 │  ├─ 00_init.sql    # schema + seed + get_graph_membros
@@ -24,8 +23,6 @@ svc-kg/
 ├─ CHANGELOG.md
 ├─ README.md
 
-
-
 Microserviço de **Knowledge Graph** com:
 - Backend: **Supabase RPC** (`get_graph_membros`) ou **Postgres**.
 - Cache: **Redis** (fallback em memória).
@@ -46,9 +43,8 @@ Microserviço de **Knowledge Graph** com:
 
 ## Rodando LOCAL (Postgres + Redis)
 
-1. Crie `.env` a partir de `.env.example` e defina:
----
----
+### 1. Crie `.env` a partir de `.env.example` e defina:
+
 ```env
    APP_ENV=development
    PORT=8080
@@ -59,6 +55,7 @@ Microserviço de **Knowledge Graph** com:
    DATABASE_URL=postgresql://kg:kg@db:5432/kg
    SUPABASE_URL=
    SUPABASE_SERVICE_KEY=
+		...
 
 ```
 ---
