@@ -23,7 +23,7 @@ svcclica-kg/
 ├─ .dockerignore
 ├─ CHANGELOG.md
 ├─ README.md
-
+```
 Microserviço de **Knowledge Graph** com:
 - Backend: **Supabase RPC** (`get_graph_membros`) ou **Postgres**.
 - Cache: **Redis** (fallback em memória).
