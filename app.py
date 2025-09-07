@@ -9,7 +9,7 @@
 # - vis_pyvis: página HTML com PyVis (arestas ultrafinas; física OFF após estabilizar; busca)
 # - /docs: Swagger UI custom usando /openapi.json do FastAPI
 # - Utilidades: normalização de labels PG array, cache Redis, truncamento seguro
-# Atualização: 07/09/2025 às 08h41min
+# Atualização: 07/09/2025 às 08h57min
 # =============================================================================
 
 import os
@@ -433,7 +433,7 @@ async def graph_membros(
 
 
 # -----------------------------------------------------------------------------
-# VIS.JS (vis-network) — sem f-string no JS para evitar erros com chaves
+# VIS.JS (vis-network)
 # -----------------------------------------------------------------------------
 @app.get("/v1/vis/visjs", response_class=HTMLResponse, tags=["viz"])
 async def vis_visjs(
@@ -477,7 +477,7 @@ async def vis_visjs(
     )
     bg = "#0b0f19" if theme == "dark" else "#ffffff"
 
-    # JavaScript (string normal; pode conter chaves à vontade)
+    # ===================== JS (NÃO f-string) =====================
     script_js = """
 <script>
 (function(){
@@ -485,9 +485,9 @@ async def vis_visjs(
   const source = container.getAttribute('data-source') || 'server';
   const endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
 
-  const COLOR_CV  = '#d32f2f';
-  const COLOR_PCC = '#0d47a1';
-  const COLOR_FUN = '#fdd835';
+  const COLOR_CV  = '#d32f2f';   // vermelho
+  const COLOR_PCC = '#0d47a1';   // azul escuro
+  const COLOR_FUN = '#fdd835';   // amarelo
 
   const EDGE_COLORS = {
     'PERTENCE_A':      '#9e9e9e',
@@ -505,45 +505,57 @@ async def vis_visjs(
     const inner=s.slice(1,-1); if(!inner) return '';
     return inner.replace(/(^|,)\\s*"?null"?\\s*(?=,|$)/gi,'').replace(/"/g,'').split(',').map(x=>x.trim()).filter(Boolean).join(', ');
   }
+
+  function colorObj(hex, opacity){
+    const c = hex || '#607d8b';
+    return {
+      background: c,
+      border: c,
+      highlight: { background: c, border: c },
+      hover: { background: c, border: c },
+      opacity: (typeof opacity==='number'? opacity : 1)
+    };
+  }
+
   function inferFaccaoColors(rawNodes) {
     const map={};
-    rawNodes.filter(n=>n && (String(n.type||'').toLowerCase()==='faccao')).forEach(n=>{
+    rawNodes.forEach(n=>{
+      if(!n) return;
+      const t=String(n.type||'').toLowerCase();
       const label = cleanLabel(n.label||'');
       const nameU = label.toUpperCase();
       const id = String(n.id);
-      if (nameU.includes('PCC')) map[id] = COLOR_PCC;
-      else if (nameU.includes('CV')) map[id] = COLOR_CV;
+      if (t==='faccao'){
+        if (nameU.includes('PCC')) map[id] = COLOR_PCC;
+        else if (nameU.includes('CV')) map[id] = COLOR_CV;
+      }
     });
     return map;
   }
-  // >>> alteração principal: para nós de facção, olhar o PRÓPRIO rótulo além do group
+
+  // >>> Regra: 1) se for facção, usa label; 2) se tiver group/faccao_id mapeado, usa; 3) se label contém CV/PCC (fallback), usa; 4) função => amarelo; 5) default.
   function colorForNode(n, faccaoColorById, labelClean) {
-    const isFaction = (String(n.type||'').toLowerCase()==='faccao');
-    if (isFaction) {
-      const nameU = (labelClean||'').toUpperCase();
+    const t = String(n.type||'').toLowerCase();
+    const nameU = (labelClean||'').toUpperCase();
+    if (t==='faccao'){
       if (nameU.includes('PCC')) return COLOR_PCC;
       if (nameU.includes('CV'))  return COLOR_CV;
     }
     const gid = String(n.group ?? n.faccao_id ?? '');
     if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
-    if ((String(n.type||'').toLowerCase())==='funcao') return COLOR_FUN;
+    if (t==='funcao') return COLOR_FUN;
+    // fallback por texto para qualquer nó
+    if (nameU.includes('PCC')) return COLOR_PCC;
+    if (nameU.includes('CV'))  return COLOR_CV;
     return '#607d8b';
   }
+
   function edgeStyleFor(rel) { return { color: EDGE_COLORS[rel] || '#b0bec5', width: 0.1 }; } // ultrafino
+
   function degreeMap(nodes,edges) {
     const d={}; nodes.forEach(n=>d[n.id]=0);
     edges.forEach(e=>{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; });
     return d;
-  }
-  function colorObj(c, opacity){
-    if (typeof c === 'object' && c) { return Object.assign({}, c, { opacity: opacity }); }
-    return {
-      background: c || '#607d8b',
-      border: c || '#607d8b',
-      highlight: { background: c || '#607d8b', border: c || '#607d8b' },
-      hover: { background: c || '#607d8b', border: c || '#607d8b' },
-      opacity: opacity
-    };
   }
 
   function render(data){
@@ -561,16 +573,15 @@ async def vis_visjs(
 
       const label = cleanLabel(n0.label) || id;
       const isFaction = (String(n0.type||'').toLowerCase()==='faccao');
-      // >>> se for facção, o groupId vira o próprio id (garante cor no próprio nó)
       const groupId = isFaction
-        ? id
+        ? id                               // >>> facção carrega seu próprio id como group
         : (n0.faccao_id!=null ? String(n0.faccao_id)
            : (n0.group!=null ? String(n0.group) : (n0.type || '0')));
 
+      const hex = colorForNode({group: groupId, faccao_id: n0.faccao_id, type: n0.type}, faccaoColorById, label);
       const photo = n0.photo_url && /^https?:\\/\\//i.test(n0.photo_url) ? n0.photo_url : null;
-      const color = colorForNode({group: groupId, faccao_id: n0.faccao_id, type: n0.type}, faccaoColorById, label);
 
-      const base = { id, label, group: groupId, color, borderWidth: 1 };
+      const base = { id, label, group: groupId, color: colorObj(hex, 1), borderWidth: 1 }; // >>> cor como objeto completo
       if (photo) { base.shape='circularImage'; base.image=photo; } else { base.shape='dot'; }
       nodes.push(base);
     }
@@ -591,7 +602,7 @@ async def vis_visjs(
       return;
     }
 
-    // explode nós: mais ligações => mais valor (tamanho)
+    // explode nós de maior grau
     const deg = degreeMap(nodes, edges);
     nodes.forEach(n=>{ const d=deg[n.id]||0; n.value = 12 + Math.log(d+1)*10; });
 
@@ -609,19 +620,19 @@ async def vis_visjs(
     net.once('stabilizationIterationsDone', ()=>{ net.setOptions({ physics:false }); net.fit({ animation: { duration: 300 } }); });
     net.on('doubleClick', ()=> net.fit({ animation: { duration: 300 } }));
 
-    // Busca/destaque
+    // Busca / destaque
     const q = document.getElementById('kg-search');
     if (q) {
+      function colorDim(n){ return colorObj((n.color&&n.color.background)? n.color.background : n.color, 0.25); }
+      function colorFull(n){ return colorObj((n.color&&n.color.background)? n.color.background : n.color, 1); }
+
       function run() {
         const t=(q.value||'').trim().toLowerCase(); if(!t) return;
         const all=dsNodes.get();
         const hits=all.filter(n => (n.label||'').toLowerCase().includes(t) || String(n.id)===t);
         if(!hits.length) return;
-        all.forEach(n => dsNodes.update({ id: n.id, color: colorObj(n.color, 0.25) }));
-        hits.forEach(h => {
-          const cur=dsNodes.get(h.id);
-          dsNodes.update({ id: h.id, color: colorObj(cur.color, 1) });
-        });
+        all.forEach(n => dsNodes.update({ id: n.id, color: colorDim(n) }));
+        hits.forEach(h => dsNodes.update({ id: h.id, color: colorFull(dsNodes.get(h.id)) }));
         net.setOptions({ physics: false });
         net.fit({ nodes: hits.map(h=>h.id), animation: { duration: 300 } });
       }
@@ -692,7 +703,6 @@ async def vis_visjs(
         "</html>\n"
     )
 
-    # CSP: permitir imagens http/https (para photo_url remota)
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "style-src 'self' 'unsafe-inline' https://unpkg.com; "
@@ -982,7 +992,7 @@ async def custom_docs():
         <a class="ops-pill" href="/health" target="_blank">/health</a>
         <a class="ops-pill" href="/health?deep=true" target="_blank">/health?deep=true</a>
         <a class="ops-pill" href="/ready" target="_blank">/ready</a>
-        <a class="ops-pill" href="/ops/status" target="_blank">/ops/status</a>
+        <a class="ops-pill" href="/ops/status" target="__blank">/ops/status</a>
       </div>
     </div>
 
