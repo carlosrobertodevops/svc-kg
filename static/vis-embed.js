@@ -22,6 +22,8 @@
     if (node) {
       const label = String(node.label || "").toLowerCase();
       const type = String(node.type || "").toLowerCase();
+		
+      if (type === "faccao" && label.includes("cv")) return RED;
       if (type === "funcao") return YELLOW;
       if (label === "cv" || label.includes("cv")) return RED;
       if (label.includes("pcc")) return BLUE;
@@ -37,15 +39,15 @@
 		
       const ls = String(labelMap[src] || "").toLowerCase();
       const ld = String(labelMap[dst] || "").toLowerCase();
-      if (ls === "cv" || ld == "cv" || ls.includes("cv") || ld.includes("cv")) return RED;
-	  if (ls === "pcc" || ld == "pcc" || ls.includes("pcc") || ld.includes("pcc")) return RED;
-	  // if (ls.includes("cv") || ld.includes("cv")) return RED;	
-      // if (ls.includes("pcc") || ld.includes("pcc")) return BLUE;
+      // if (ls === "cv" || ld == "cv" || ls.includes("cv") || ld.includes("cv")) return RED;
+	  // if (ls === "pcc" || ld == "pcc" || ls.includes("pcc") || ld.includes("pcc")) return RED;
+	  if (ls.includes("cv") || ld.includes("cv")) return RED;	
+      if (ls.includes("pcc") || ld.includes("pcc")) return BLUE;
       return EDGE_DEFAULT;
 	  //return RED;
     }
-    //return GREY;
-	return RED;
+    return GREY;
+	//return RED;
   }
 
   function buildDataFromEmbedded() {
