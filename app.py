@@ -512,7 +512,7 @@ async def vis_visjs(
       const name = cleanLabel(n.label||'').toUpperCase();
       const id = String(n.id);
       if (name ==='PCC' || name.includes('PCC')) map[id] = COLOR_PCC;
-      else if (name ==='CV' || name.includes('CV')) map[id] = COLOR_CV;
+      if (name ==='CV' || name.includes('CV')) map[id] = COLOR_CV;
     });
     return map;
   }
@@ -578,7 +578,7 @@ async def vis_visjs(
 
     // explode nós com maior grau (ganho aumentado)
     const deg = degreeMap(nodes, edges);
-    nodes.forEach(n=>{ const d=deg[n.id]||0; n.value = 12 + Math.log(d+1)*10; }); // <<< explode mais
+    nodes.forEach(n=>{ const d=deg[n.id]||0; n.value = 14 + Math.log(d+1)*10; }); // <<< explode mais
 
     const dsNodes = new vis.DataSet(nodes);
     const dsEdges = new vis.DataSet(edges);
