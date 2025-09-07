@@ -9,7 +9,7 @@
 # - vis_pyvis: página HTML com PyVis (arestas ultrafinas; física OFF após estabilizar; busca)
 # - /docs: Swagger UI custom usando /openapi.json do FastAPI
 # - Utilidades: normalização de labels PG array, cache Redis, truncamento seguro
-# Atualização: 07/09/2025 as 11h30min
+# Atualização: 07/09/2025 as 18h53min
 # =============================================================================
 
 import os
