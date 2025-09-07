@@ -22,7 +22,7 @@
       const label = String(node.label || "").toLowerCase();
       const type = String(node.type || "").toLowerCase();
       if (type === "funcao") return YELLOW;
-      if (label.includes("cv")) return RED;
+      if (label === "cv" || label.includes("cv")) return RED;
       if (label.includes("pcc")) return BLUE;
       return GREY;
     }
@@ -35,8 +35,8 @@
       }
       const ls = String(labelMap[src] || "").toLowerCase();
       const ld = String(labelMap[dst] || "").toLowerCase();
-      if (ls.includes("cv") || ld.includes("cv")) return RED;
-      if (ls.includes("pcc") || ld.includes("pcc")) return BLUE;
+      if (ls === "cv" || ld === "cv" || ls.includes("cv") || ld.includes("cv")) return RED;
+      if (ls === "pcc" || ld === "pcc" || ls.includes("pcc") || ld.includes("pcc")) return BLUE;
       return EDGE_DEFAULT;
     }
     return GREY;
@@ -134,7 +134,7 @@
     const edges = new vis.DataSet(dataset.edges.map(e => ({
       from: e.from,
       to: e.to,
-      arrows: e.arrows ? { to: { enabled: true, scaleFactor: 0.4 } } : "",
+      arrows: e.arrows ? { to: { enabled: true, scaleFactor: 0.2 } } : "",
       color: { color: mapColors(null, e, labelMap, typeMap), opacity: 0.35 },
       width: 0.5,     // arestas MUITO finas
       smooth: false
@@ -143,7 +143,7 @@
     const data = { nodes, edges };
     const options = {
       nodes: { shape: "dot", font: { size: 12 } },
-      edges: { width: 0.5, selectionWidth: 0.5, smooth: false, color: { opacity: 0.35 } },
+      edges: { width: 0.5, selectionWidth: 0.2, smooth: false, color: { opacity: 0.35 } },
       interaction: { hover: true, dragNodes: true, zoomView: true },
       physics: { enabled: true, solver: "forceAtlas2Based", stabilization: { iterations: 400, fit: true } }
     };
