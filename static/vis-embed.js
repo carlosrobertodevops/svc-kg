@@ -8,6 +8,7 @@
 // - mapColors(node, edge): regras de cor
 // - buildDataFromEmbedded(): lê <script id="__KG_DATA__"> e normaliza
 // - attachSearch(network, nodes): busca + foco
+// Atualização: 07/09/2025 às 10h18min
 // ==============================================================
 
 (function () {
@@ -30,22 +31,21 @@
       const src = String(edge.from);
       const dst = String(edge.to);
       const rel = String(edge.relation || "");
-		
       if (typeMap[src] === "funcao" || typeMap[dst] === "funcao" || rel === "FUNCAO_DA_FACCAO" || rel === "EXERCE") {
         return YELLOW;
-      }
-
-      if (typeMap[src] === "cv" || typeMap[dst] === "CV" ) {
-        return RED;
       }
 		
       const ls = String(labelMap[src] || "").toLowerCase();
       const ld = String(labelMap[dst] || "").toLowerCase();
-      if (ls.includes("cv") || ld.includes("cv")) return RED;
-      if (ls.includes("pcc") || ld.includes("pcc")) return BLUE;
+      if (ls === "cv" || ld == "cv" || ls.includes("cv") || ld.includes("cv")) return RED;
+	  if (ls === "pcc" || ld == "pcc" || ls.includes("pcc") || ld.includes("pcc")) return RED;
+	  // if (ls.includes("cv") || ld.includes("cv")) return RED;	
+      // if (ls.includes("pcc") || ld.includes("pcc")) return BLUE;
       return EDGE_DEFAULT;
+	  //return RED;
     }
-    return GREY;
+    // return GREY;
+	return RED;
   }
 
   function buildDataFromEmbedded() {
