@@ -517,7 +517,7 @@ async def vis_visjs(
     return map;
   }
   function colorForNode(n, faccaoColorById) {
-    const gid = String(n.group ?? n.faccao_nome ?? '');
+    const gid = String(n.group ?? n.faccao_id ?? '');
     if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
 	if (gid.icludes("CV") || (gid.icludes("cv")) return COLOR_CV; // aqui
 	if ((n.type||'').toLowerCase()==='funcao') return COLOR_FUN;
