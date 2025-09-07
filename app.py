@@ -1,16 +1,16 @@
-# # =============================================================================
-# # Arquivo: app.py
-# # Versão: v1.7.20
-# # Objetivo: API FastAPI do micro-serviço svc-kg (graph + visualizações + ops)
-# # Funções/métodos:
-# # - live/health/ready/ops_status: sondas e status operacional
-# # - graph_membros: retorna grafo (nós/arestas) via Supabase RPC (fallback com e sem p_)
-# # - vis_visjs: página HTML com vis-network (sem f-string no JS; arestas ultrafinas; busca; cores CV/PCC/funções; física OFF após estabilizar)
-# # - vis_pyvis: página HTML com PyVis (arestas ultrafinas; física OFF após estabilizar; busca)
-# # - /docs: Swagger UI custom usando /openapi.json do FastAPI
-# # - Utilidades: normalização de labels PG array, cache Redis, truncamento seguro
-# # Atualização: 06/09/2025 as 18h05min
-# # =============================================================================
+# =============================================================================
+# Arquivo: app.py
+# Versão: v1.7.20
+# Objetivo: API FastAPI do micro-serviço svc-kg (graph + visualizações + ops)
+# Funções/métodos:
+# - live/health/ready/ops_status: sondas e status operacional
+# - graph_membros: retorna grafo (nós/arestas) via Supabase RPC (fallback com e sem p_)
+# - vis_visjs: página HTML com vis-network (sem f-string no JS; arestas ultrafinas; busca; cores CV/PCC/funções; física OFF após estabilizar)
+# - vis_pyvis: página HTML com PyVis (arestas ultrafinas; física OFF após estabilizar; busca)
+# - /docs: Swagger UI custom usando /openapi.json do FastAPI
+# - Utilidades: normalização de labels PG array, cache Redis, truncamento seguro
+# Atualização: 06/09/2025 as 18h05min
+# =============================================================================
 
 import os
 import json
