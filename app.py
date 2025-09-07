@@ -12,6 +12,7 @@
 # Atualização: 07/09/2025 às 09h15min
 # =============================================================================
 
+
 import os
 import json
 import logging
@@ -35,7 +36,6 @@ except Exception:  # pragma: no cover
 # Config & logger
 # -----------------------------------------------------------------------------
 APP_ENV = os.getenv("APP_ENV", "production")
-PORT = int(os.getenv("PORT", "8080"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info").upper()
 logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
 log = logging.getLogger("svc-kg")
@@ -71,14 +71,14 @@ SERVICE_AKA = ["sic-kg"]
 # -----------------------------------------------------------------------------
 app = FastAPI(
     title="svc-kg",
-    version="v1.7.22",
+    version="v1.7.20",
     description="Micro serviço de Knowledge Graph com visualizações (vis.js e PyVis).",
-    docs_url=None,             # usaremos /docs custom
+    docs_url=None,  # usamos /docs custom abaixo
     redoc_url=None,
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
 )
 
-# Static
+# Static (opcional)
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 if os.path.isdir("docs"):
@@ -98,7 +98,6 @@ app.add_middleware(
 # -----------------------------------------------------------------------------
 _http: Optional[httpx.AsyncClient] = None
 _redis = None  # type: ignore
-
 
 # -----------------------------------------------------------------------------
 # Utils
@@ -184,20 +183,14 @@ def truncate_preview(data: Dict[str, Any], max_nodes: int, max_edges: int) -> Di
     es = es[: max(0, max_edges)]
     return {"nodes": ns, "edges": es}
 
-
 # -----------------------------------------------------------------------------
-# RPC Supabase com fallback de parâmetros (corrige PGRST202)
+# RPC Supabase com fallback (corrige PGRST202 entre p_* e sem prefixo)
 # -----------------------------------------------------------------------------
 async def supabase_rpc_get_graph(
     faccao_id: Optional[int],
     include_co: bool,
     max_pairs: int
 ) -> Dict[str, Any]:
-    """
-    Tenta duas variantes:
-      1) p_faccao_id, p_include_co, p_max_pairs
-      2) faccao_id, include_co, max_pairs
-    """
     if not _env_backend_ok():
         raise RuntimeError("backend_not_configured: defina SUPABASE_URL e SUPABASE_SERVICE_KEY")
 
@@ -226,9 +219,8 @@ async def supabase_rpc_get_graph(
                 else:
                     raise RuntimeError("Formato inesperado do RPC (esperado objeto com nodes/edges)")
             return data
-
-        txt = resp.text
-        errors.append(f"{resp.status_code}: {txt[:300]}")
+        # guarda erro e tenta próxima assinatura, se houver PGRST202
+        errors.append(f"{resp.status_code}: {resp.text[:300]}")
         try:
             j = resp.json()
         except Exception:
@@ -236,7 +228,7 @@ async def supabase_rpc_get_graph(
         if isinstance(j, dict) and j.get("code") == "PGRST202":
             continue
 
-    raise RuntimeError(f"Supabase RPC {SUPABASE_RPC_FN} falhou em todas as tentativas: {' | '.join(errors)}")
+    raise RuntimeError(f"Supabase RPC {SUPABASE_RPC_FN} falhou: {' | '.join(errors)}")
 
 
 async def fetch_graph_sanitized(
@@ -296,7 +288,6 @@ def platform_info() -> Dict[str, Any]:
         "version": app.version,
     }
 
-
 # -----------------------------------------------------------------------------
 # Lifecycle
 # -----------------------------------------------------------------------------
@@ -322,63 +313,54 @@ async def _shutdown():
         await _redis.close()
         _redis = None
 
-
 # -----------------------------------------------------------------------------
 # Health / Live / Ready / Ops
 # -----------------------------------------------------------------------------
-@app.get("/live", response_class=PlainTextResponse, include_in_schema=True, tags=["ops"])
+@app.get("/live", response_class=PlainTextResponse, tags=["ops"])
 async def live():
     return PlainTextResponse("ok", status_code=200)
 
 
-@app.get("/health", response_class=JSONResponse, include_in_schema=True, tags=["ops"])
+@app.get("/health", response_class=JSONResponse, tags=["ops"])
 async def health(deep: bool = Query(default=False)):
     out = platform_info()
-    out.update({"status": "ok", "redis": False, "backend": "supabase" if _env_backend_ok() else "none", "backend_ok": _env_backend_ok()})
+    out.update({"status": "ok", "redis": False, "backend": "supabase" if _env_backend_ok() else "none"})
 
     r_ok = True
     r = await _get_redis()
     if r:
         try:
-            pong = await r.ping()
-            out["redis"] = bool(pong)
+            out["redis"] = bool(await r.ping())
         except Exception as e:
             r_ok = False
             out["redis_error"] = str(e)
 
-    if deep:
-        b_ok = False
-        if _env_backend_ok():
-            try:
-                _ = await supabase_rpc_get_graph(faccao_id=None, include_co=False, max_pairs=1)
-                b_ok = True
-            except Exception as e:
-                out["backend_error"] = str(e)
-        out["backend_reachable"] = b_ok
-        out["ok"] = (not ENABLE_REDIS_CACHE or r_ok) and b_ok
-    else:
-        out["ok"] = (not ENABLE_REDIS_CACHE or r_ok) and _env_backend_ok()
+    b_ok = _env_backend_ok()
+    if deep and b_ok:
+        try:
+            _ = await supabase_rpc_get_graph(None, False, 1)
+        except Exception as e:
+            b_ok = False
+            out["backend_error"] = str(e)
 
+    out["ok"] = (not ENABLE_REDIS_CACHE or r_ok) and b_ok
     out["supabase"] = {
         "url": SUPABASE_URL,
         "rpc_fn": SUPABASE_RPC_FN,
         "timeout": SUPABASE_TIMEOUT,
         "service_key_tail": redact(SUPABASE_SERVICE_KEY),
     }
-    return JSONResponse(out, status_code=200 if out.get("ok") else 503)
+    return JSONResponse(out, status_code=200 if out["ok"] else 503)
 
 
-@app.get("/ready", response_class=JSONResponse, include_in_schema=True, tags=["ops"])
+@app.get("/ready", response_class=JSONResponse, tags=["ops"])
 async def ready():
     r_ok = True
     out = platform_info()
-    out.update({"redis": False, "backend": "supabase" if _env_backend_ok() else "none", "backend_ok": False})
-
     r = await _get_redis()
     if r:
         try:
-            pong = await r.ping()
-            out["redis"] = bool(pong)
+            out["redis"] = bool(await r.ping())
         except Exception as e:
             r_ok = False
             out["redis_error"] = str(e)
@@ -386,31 +368,26 @@ async def ready():
     b_ok = False
     if _env_backend_ok():
         try:
-            _ = await supabase_rpc_get_graph(faccao_id=None, include_co=False, max_pairs=1)
+            _ = await supabase_rpc_get_graph(None, False, 1)
             b_ok = True
         except Exception as e:
             out["backend_error"] = str(e)
-    out["backend_ok"] = b_ok
 
-    ok = (not ENABLE_REDIS_CACHE or r_ok) and b_ok
-    out["ok"] = ok
-    return JSONResponse(out, status_code=200 if ok else 503)
+    out["ok"] = (not ENABLE_REDIS_CACHE or r_ok) and b_ok
+    return JSONResponse(out, status_code=200 if out["ok"] else 503)
 
 
 @app.get("/ops/status", response_class=JSONResponse, tags=["ops"])
 async def ops_status():
     info = platform_info()
-
     redis_cfg = {"enabled": ENABLE_REDIS_CACHE, "url": REDIS_URL}
     if ENABLE_REDIS_CACHE and aioredis:
         try:
             r = await _get_redis()
             if r:
-                pong = await r.ping()
-                redis_cfg["ping"] = bool(pong)
+                redis_cfg["ping"] = bool(await r.ping())
         except Exception as e:
             redis_cfg["error"] = str(e)
-
     supa = {
         "configured": _env_backend_ok(),
         "url": SUPABASE_URL,
@@ -418,39 +395,28 @@ async def ops_status():
         "timeout": SUPABASE_TIMEOUT,
         "service_key_tail": redact(SUPABASE_SERVICE_KEY),
     }
-
-    info.update({
-        "redis": redis_cfg,
-        "supabase": supa,
-        "env": {
-            "CORS_ALLOW_ORIGINS": os.getenv("CORS_ALLOW_ORIGINS"),
-            "CORS_ALLOW_METHODS": os.getenv("CORS_ALLOW_METHODS"),
-            "CORS_ALLOW_HEADERS": os.getenv("CORS_ALLOW_HEADERS"),
-        }
-    })
+    info.update({"redis": redis_cfg, "supabase": supa})
     return JSONResponse(info, status_code=200)
 
-
 # -----------------------------------------------------------------------------
-# API de dados (com alias compatível /membros)
+# API de dados (com alias /membros)
 # -----------------------------------------------------------------------------
 @app.get("/v1/graph/membros", response_class=JSONResponse, tags=["graph"], summary="Retorna grafo (nodes/edges)")
-@app.get("/membros", response_class=JSONResponse, include_in_schema=False)  # alias legado
+@app.get("/membros", response_class=JSONResponse, include_in_schema=False)
 async def graph_membros(
     faccao_id: Optional[int] = Query(default=None),
     include_co: bool = Query(default=True),
     max_pairs: int = Query(default=8000, ge=1, le=200000),
-    max_nodes: int = Query(default=2000, ge=100, le=20000),
-    max_edges: int = Query(default=4000, ge=100, le=200000),
+    max_nodes: int = Query(default=2000, ge=50, le=20000),
+    max_edges: int = Query(default=4000, ge=50, le=200000),
     cache: bool = Query(default=True)
 ):
     data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
     data = truncate_preview(data, max_nodes, max_edges)
     return JSONResponse(data, status_code=200)
 
-
 # -----------------------------------------------------------------------------
-# VIS.JS (vis-network) – HTML + dados embutidos; JS fica em static/vis-embed.js
+# VIS.JS (vis-network) – HTML com dados e JS EMBUTIDOS  (HOTFIX CV)
 # -----------------------------------------------------------------------------
 @app.get("/v1/vis/visjs", response_class=HTMLResponse, tags=["viz"], summary="Visualização vis-network (dados embutidos)")
 async def vis_visjs(
@@ -458,8 +424,8 @@ async def vis_visjs(
     faccao_id: Optional[int] = Query(default=None),
     include_co: bool = Query(default=True),
     max_pairs: int = Query(default=8000, ge=1, le=200000),
-    max_nodes: int = Query(default=2000, ge=100, le=20000),
-    max_edges: int = Query(default=4000, ge=100, le=200000),
+    max_nodes: int = Query(default=2000, ge=50, le=20000),
+    max_edges: int = Query(default=4000, ge=50, le=200000),
     cache: bool = Query(default=True),
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (vis.js)",
@@ -467,6 +433,164 @@ async def vis_visjs(
     data = await fetch_graph_sanitized(faccao_id, include_co, max_pairs, use_cache=cache)
     data = truncate_preview(data, max_nodes, max_edges)
     json_str = json.dumps(data, ensure_ascii=False)
+
+    # JS embutido com correção forte: se o rótulo (limpo) tiver CV/COMANDO VERMELHO => VERMELHO SEMPRE (no próprio nó)
+    script_js = r"""
+<script>
+(function(){
+  const container = document.getElementById('mynetwork');
+  const COLOR_CV  = '#d32f2f';
+  const COLOR_PCC = '#0d47a1';
+  const COLOR_FUN = '#fdd835';
+  const COLOR_DEF = '#607d8b';
+  const EDGE_COLORS = {
+    'PERTENCE_A':      '#9e9e9e',
+    'EXERCE':          COLOR_FUN,
+    'FUNCAO_DA_FACCAO':COLOR_FUN,
+    'CO_FACCAO':       '#8e24aa',
+    'CO_FUNCAO':       '#546e7a'
+  };
+
+  function isPgTextArray(s){ s=(s||'').trim(); return s.length>=2 && s[0]=='{' && s[s.length-1]=='}'; }
+  function cleanLabel(raw){
+    if(!raw) return '';
+    const s=String(raw).trim();
+    if(!isPgTextArray(s)) return s;
+    const inner=s.slice(1,-1); if(!inner) return '';
+    return inner.replace(/(^|,)\\s*"?null"?\\s*(?=,|$)/gi,'').replace(/"/g,'').split(',').map(x=>x.trim()).filter(Boolean).join(', ');
+  }
+  function hasPCC(txt){ const u=(txt||'').toUpperCase(); return /\\bPCC\\b/.test(u) || u.includes('PRIMEIRO COMANDO DA CAPITAL'); }
+  function hasCV(txt){  const u=(txt||'').toUpperCase(); return /\\bCV\\b/.test(u)  || u.includes('COMANDO VERMELHO'); }
+
+  function colorObj(hex, opacity){
+    const c = hex || COLOR_DEF;
+    return {
+      background: c, border: c,
+      highlight:{background:c, border:c},
+      hover:{background:c, border:c},
+      opacity:(typeof opacity==='number'?opacity:1)
+    };
+  }
+
+  // Mapa de cores por facção (id -> cor) baseado no PRÓPRIO rótulo do nó de facção
+  function inferFactionColors(rawNodes){
+    const map={};
+    for (const n of (rawNodes||[])){
+      if(!n || n.id==null) continue;
+      const label = cleanLabel(n.label||''); const id=String(n.id);
+      // Se o rótulo deixa claro PCC/CV, já fixa a cor, independentemente de "type"
+      if (hasPCC(label)) map[id]=COLOR_PCC;
+      else if (hasCV(label)) map[id]=COLOR_CV;
+    }
+    return map;
+  }
+
+  function decideNodeHex(n0, faccColorById, labelClean){
+    // 1) Se o próprio rótulo indica PCC/CV => força a cor (resolve o caso do nó "CV")
+    if (hasPCC(labelClean)) return COLOR_PCC;
+    if (hasCV(labelClean))  return COLOR_CV;
+
+    // 2) Caso contrário, herda a cor da facção do group/faccao_id (se houver mapeamento)
+    const gid = String(n0.faccao_id ?? n0.group ?? '');
+    if (gid && faccColorById[gid]) return faccColorById[gid];
+
+    // 3) Nó de função (qualquer grafia)
+    const t = String(n0.type||'').toLowerCase();
+    if (t==='funcao' || t.includes('função')) return COLOR_FUN;
+
+    // 4) fallback
+    return COLOR_DEF;
+  }
+
+  function edgeStyleFor(rel){ return { color: EDGE_COLORS[rel] || '#b0bec5', width: 0.1 }; }
+  function degreeMap(nodes,edges){ const d={}; nodes.forEach(n=>d[n.id]=0); edges.forEach(e=>{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; }); return d; }
+
+  function render(data){
+    const rawNodes = data.nodes || [];
+    const rawEdges = data.edges || [];
+
+    const faccColorById = inferFactionColors(rawNodes);
+
+    const nodes=[]; const seen=new Set();
+    for (const n of rawNodes){
+      if(!n || n.id==null) continue;
+      const id=String(n.id); if(seen.has(id)) continue; seen.add(id);
+
+      const label = cleanLabel(n.label)||id;
+      // Escolha do "group" (se for facção, usar o próprio id não é obrigatório agora)
+      const groupId = (n.faccao_id!=null) ? String(n.faccao_id)
+                    : (n.group!=null) ? String(n.group)
+                    : (n.type || '0');
+
+      const hex = decideNodeHex({faccao_id:n.faccao_id, group:groupId, type:n.type}, faccColorById, label);
+      const photo = n.photo_url && /^https?:\\/\\//i.test(n.photo_url) ? n.photo_url : null;
+
+      const base = { id, label, group:groupId, color: colorObj(hex,1), borderWidth:1 };
+      if (photo){ base.shape='circularImage'; base.image=photo; } else { base.shape='dot'; }
+      nodes.push(base);
+    }
+
+    const nodeIds=new Set(nodes.map(n=>n.id));
+    const edges=[];
+    for (const e of (rawEdges||[])){
+      if(!e) continue;
+      const a=String(e.source), b=String(e.target);
+      if(!nodeIds.has(a) || !nodeIds.has(b)) continue;
+      const rel=e.relation||''; const style=edgeStyleFor(rel);
+      edges.push({ from:a, to:b, value:Number(e.weight||1), width:style.width, color:style.color, title:rel });
+    }
+
+    if (!nodes.length){ container.innerHTML='<div style="padding:12px">Sem dados.</div>'; return; }
+
+    // tamanho pelo grau
+    const deg=degreeMap(nodes, edges);
+    nodes.forEach(n=>{ const d=deg[n.id]||0; n.value=12 + Math.log(d+1)*10; });
+
+    const dsNodes=new vis.DataSet(nodes);
+    const dsEdges=new vis.DataSet(edges);
+
+    const options={
+      interaction:{ hover:true, dragNodes:true, dragView:true, zoomView:true, multiselect:true, navigationButtons:true },
+      physics:{ enabled:true, stabilization:{ enabled:true, iterations:300 } },
+      nodes:{ shape:'dot', borderWidth:2 },
+      edges:{ smooth:false, width:0.1, arrows:{ to:{ enabled:true, scaleFactor:0.5 } } }
+    };
+
+    const net=new vis.Network(container, {nodes:dsNodes,edges:dsEdges}, options);
+    net.once('stabilizationIterationsDone', ()=>{ net.setOptions({ physics:false }); net.fit({ animation:{ duration:300 } }); });
+    net.on('doubleClick', ()=> net.fit({ animation:{ duration:300 } }));
+
+    // Busca com "escurecimento" e restauração da opacidade
+    const q=document.getElementById('kg-search');
+    if (q){
+      function dim(n){ const bg=(n.color&&n.color.background)? n.color.background : n.color; return colorObj(bg,0.25); }
+      function full(n){ const bg=(n.color&&n.color.background)? n.color.background : n.color; return colorObj(bg,1); }
+      function run(){
+        const t=(q.value||'').trim().toLowerCase(); if(!t) return;
+        const all=dsNodes.get();
+        const hits=all.filter(n=> (n.label||'').toLowerCase().includes(t) || String(n.id)===t );
+        if(!hits.length) return;
+        all.forEach(n=> dsNodes.update({ id:n.id, color:dim(n) }) );
+        hits.forEach(h=> dsNodes.update({ id:h.id, color:full(dsNodes.get(h.id)) }) );
+        net.setOptions({ physics:false });
+        net.fit({ nodes: hits.map(h=>h.id), animation:{ duration:300 } });
+      }
+      q.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
+    }
+    const p=document.getElementById('btn-print'); if(p) p.onclick=()=>window.print();
+    const r=document.getElementById('btn-reload'); if(r) r.onclick=()=>location.reload();
+  }
+
+  function boot(){
+    const tag=document.getElementById('__KG_DATA__');
+    if(!tag){ container.innerHTML='<div style="padding:12px">Dados não incorporados.</div>'; return; }
+    try{ render(JSON.parse(tag.textContent||'{}')); }
+    catch(e){ container.innerHTML='<pre>'+String(e)+'</pre>'; }
+  }
+  if (document.readyState!=='loading') boot(); else document.addEventListener('DOMContentLoaded', boot);
+})();
+</script>
+"""
 
     tpl = Template("""
 <!doctype html>
@@ -476,8 +600,13 @@ async def vis_visjs(
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>$TITLE</title>
     <link rel="stylesheet" href="/static/vendor/vis-network.min.css" onerror="this.onerror=null;this.href='https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css'">
-    <link rel="stylesheet" href="/static/vis-style.css">
-    <style>html,body,#mynetwork{height:100%;margin:0;}</style>
+    <style>
+      html,body,#mynetwork{height:100%;margin:0;}
+      .kg-toolbar{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid #e0e0e0;background:#fafafa;}
+      .kg-toolbar input[type="search"]{flex:1;min-width:220px;padding:6px 10px;border:1px solid #e0e0e0;border-radius:4px;outline:none;}
+      .kg-toolbar button{padding:6px 10px;border:1px solid #e0e0e0;background:transparent;border-radius:6px;cursor:pointer;}
+      .kg-toolbar button:hover{background:rgba(0,0,0,.04);}
+    </style>
   </head>
   <body data-theme="$THEME">
     <div class="kg-toolbar">
@@ -486,35 +615,35 @@ async def vis_visjs(
       <button id="btn-print" type="button" title="Imprimir">Imprimir</button>
       <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>
     </div>
-    <div id="mynetwork" style="height:90vh;width:100%;" data-endpoint="/v1/graph/membros" data-source="server"></div>
+    <div id="mynetwork" style="height:90vh;width:100%;"></div>
     <script id="__KG_DATA__" type="application/json">$DATA</script>
     <script src="/static/vendor/vis-network.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js'"></script>
-    <script src="/static/vis-embed.js" defer></script>
+    $SCRIPT
   </body>
 </html>
 """)
-    html = tpl.safe_substitute(TITLE=title, THEME=theme, DATA=json_str)
+    html = tpl.safe_substitute(TITLE=title, THEME=theme, DATA=json_str, SCRIPT=script_js)
 
+    # CSP (permitir imagens http/https para photo_url)
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "style-src 'self' 'unsafe-inline'; "
         "script-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: http: https:; font-src 'self' data:;"
+        "img-src 'self' data: https: http:; font-src 'self' data:;"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(content=html, status_code=200)
 
-
 # -----------------------------------------------------------------------------
-# PYVIS – arestas ultrafinas + busca + física off (pós-estabilização)
+# PYVIS – arestas ultrafinas + busca + física OFF após estabilizar
 # -----------------------------------------------------------------------------
 @app.get("/v1/vis/pyvis", response_class=HTMLResponse, tags=["viz"], summary="Visualização PyVis (arestas ultrafinas + busca)")
 async def vis_pyvis(
     faccao_id: Optional[int] = Query(default=None),
     include_co: bool = Query(default=True),
     max_pairs: int = Query(default=8000, ge=1, le=200000),
-    max_nodes: int = Query(default=2000, ge=100, le=20000),
-    max_edges: int = Query(default=4000, ge=100, le=200000),
+    max_nodes: int = Query(default=2000, ge=50, le=20000),
+    max_edges: int = Query(default=4000, ge=50, le=200000),
     cache: bool = Query(default=True),
     theme: str = Query(default="light", pattern="^(light|dark)$"),
     title: str = "Knowledge Graph (PyVis)",
@@ -529,9 +658,9 @@ async def vis_pyvis(
     nodes = data.get("nodes", []) or []
     edges = data.get("edges", []) or []
     if not nodes:
-        return HTMLResponse("<h3>Sem dados para exibir (nodes=0)</h3>", status_code=200)
+        return HTMLResponse("<h3>Sem dados para exibir.</h3>", status_code=200)
 
-    # Grau para escalar nós
+    # grau para tamanho
     deg = {str(n["id"]): 0 for n in nodes if n and n.get("id") is not None}
     for e in edges:
         a = str(e.get("source")); b = str(e.get("target"))
@@ -544,15 +673,15 @@ async def vis_pyvis(
             faccao_name_by_id[str(n["id"])] = str(n.get("label") or "").strip()
 
     def color_from(n: Dict[str, Any]) -> str:
-        if (n.get("type") or "").lower() == "funcao" or str(n.get("group") or "") == "6":
+        if (n.get("type") or "").lower() == "funcao" or "função" in str(n.get("type") or "").lower():
             return "#fdd835"
         gid = str(n.get("group") or n.get("faccao_id") or "")
         name = (faccao_name_by_id.get(gid) or "").upper()
         if "PCC" in name or "PRIMEIRO COMANDO DA CAPITAL" in name:
             return "#0d47a1"
-        if " COMANDO VERMELHO" in (" " + name) or name == "CV" or "/CV" in name or " CV " in (" " + name + " "):
+        if "COMANDO VERMELHO" in name or name == "CV" or " CV " in (" " + name + " "):
             return "#d32f2f"
-        # fallback estável
+        # fallback estável (hash do grupo)
         s = gid or (n.get("type") or "x")
         h = 0
         for ch in s:
@@ -565,14 +694,7 @@ async def vis_pyvis(
     bgcolor = "#0b0f19" if theme == "dark" else "#ffffff"
     fontcolor = "#e8eaed" if theme == "dark" else "#111827"
 
-    net = Network(
-        height=height,
-        width="100%",
-        bgcolor=bgcolor,
-        font_color=fontcolor,
-        directed=True,
-        cdn_resources="in_line",
-    )
+    net = Network(height=height, width="100%", bgcolor=bgcolor, font_color=fontcolor, directed=True, cdn_resources="in_line")
 
     seen = set()
     for n in nodes:
@@ -623,18 +745,8 @@ async def vis_pyvis(
     net.set_options(
         """
 {
-  "interaction": {
-    "hover": true,
-    "dragNodes": true,
-    "dragView": true,
-    "zoomView": true,
-    "multiselect": true,
-    "navigationButtons": true
-  },
-  "physics": {
-    "enabled": true,
-    "stabilization": { "enabled": true, "iterations": 300 }
-  },
+  "interaction": { "hover": true, "dragNodes": true, "dragView": true, "zoomView": true, "multiselect": true, "navigationButtons": true },
+  "physics": { "enabled": true, "stabilization": { "enabled": true, "iterations": 300 } },
   "nodes": { "shape": "dot", "borderWidth": 2 },
   "edges": { "smooth": false, "width": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
 }
@@ -642,7 +754,6 @@ async def vis_pyvis(
     )
 
     html = net.generate_html()
-
     # Barra + busca + física OFF após estabilização
     toolbar_css = """
     <style>
@@ -665,13 +776,9 @@ async def vis_pyvis(
       (function(){
         function colorObj(c, opacity){
           if (typeof c === 'object' && c) { return Object.assign({}, c, { opacity: opacity }); }
-          return {
-            background: c || '#90a4ae',
-            border: c || '#90a4ae',
-            highlight: { background: c || '#90a4ae', border: c || '#90a4ae' },
-            hover: { background: c || '#90a4ae', border: c || '#90a4ae' },
-            opacity: opacity
-          };
+          return { background: c || '#90a4ae', border: c || '#90a4ae',
+                   highlight:{background:c||'#90a4ae',border:c||'#90a4ae'},
+                   hover:{background:c||'#90a4ae',border:c||'#90a4ae'}, opacity:opacity };
         }
         function runSearch(txt){
           try{
@@ -688,17 +795,14 @@ async def vis_pyvis(
             network.fit({ nodes: hits.map(function(h){return h.id;}), animation: { duration: 300 } });
           }catch(e){ console.error(e); }
         }
-        if (typeof network !== 'undefined') {
-          network.once('stabilizationIterationsDone', function(){
-            network.setOptions({ physics: false });
-            network.fit({ animation: { duration: 300 } });
-          });
+        if (typeof network !== 'undefined'){
+          network.once('stabilizationIterationsDone', function(){ network.setOptions({ physics: false }); network.fit({ animation: { duration: 300 } }); });
         }
-        var q = document.getElementById('kg-search');
-        var p = document.getElementById('btn-print');
-        var r = document.getElementById('btn-reload');
-        if (p) p.onclick = function(){ window.print(); };
-        if (r) r.onclick = function(){ location.reload(); };
+        var q=document.getElementById('kg-search');
+        var p=document.getElementById('btn-print');
+        var r=document.getElementById('btn-reload');
+        if (p) p.onclick=function(){ window.print(); };
+        if (r) r.onclick=function(){ location.reload(); };
         if (q) q.addEventListener('keydown', function(e){ if(e.key==='Enter') runSearch(q.value); });
       })();
     </script>
@@ -708,13 +812,11 @@ async def vis_pyvis(
     html = html.replace("</body>", toolbar_js + "\n</body>")
     return HTMLResponse(content=html, status_code=200)
 
-
 # -----------------------------------------------------------------------------
-# /docs (Swagger UI custom) — usa /openapi.json do FastAPI
+# /docs (Swagger UI custom)
 # -----------------------------------------------------------------------------
 @app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
 async def custom_docs():
-    # CSP: permitir imagens http/https (screenshots), CSS/JS do jsdelivr
     csp = (
         "default-src 'self'; "
         "img-src 'self' data: https://cdn.jsdelivr.net https: http:; "
@@ -811,6 +913,10 @@ async def custom_docs():
     resp.headers["Content-Security-Policy"] = csp
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
+
+# =============================================================================
+# Fim de app.py
+# =============================================================================
 
 # =============================================================================
 # Fim de app.py
