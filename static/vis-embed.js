@@ -10,9 +10,6 @@
 // - attachSearch(network, nodes): busca + foco
 // ==============================================================
 
-
-
-
 (function () {
   const RED = "#D32F2F";     // CV
   const BLUE = "#0D47A1";    // PCC
