@@ -12,18 +12,6 @@
 # Atualização: 07/09/2025 às 09h15min
 # =============================================================================
 
-# =============================================================================
-# Arquivo: app.py
-# Versão: v1.7.22
-# Objetivo: API FastAPI do micro-serviço svc-kg (graph + visualizações + ops)
-# Funções/métodos:
-# - live/health/ready/ops_status: sondas e status operacional
-# - graph_membros (/v1/graph/membros e alias /membros): retorna grafo via Supabase RPC
-# - vis_visjs (/v1/vis/visjs): HTML + dados embutidos para vis-network (JS em static/vis-embed.js)
-# - vis_pyvis  (/v1/vis/pyvis): PyVis (arestas ultrafinas; busca; física OFF após estabilização)
-# - /docs: Swagger UI custom usando /openapi.json do FastAPI (link para /docs-static/openapi.yaml)
-# - Utilidades: normalização de labels PG, cache Redis, truncamento, RPC com fallback p_* (corrige PGRST202)
-# =============================================================================
 import os
 import json
 import logging
