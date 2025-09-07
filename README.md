@@ -1,6 +1,6 @@
 
 # svc-kg (v1.7.20)
-- Data atualização: 07/09/2025 às 07h49min
+- Data atualização: 09/07/2025 às 18h25min
 ```
 svc-kg/
 ├─ db/
