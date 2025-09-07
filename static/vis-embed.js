@@ -8,17 +8,7 @@
 // - mapColors(node, edge): regras de cor
 // - buildDataFromEmbedded(): lê <script id="__KG_DATA__"> e normaliza
 // - attachSearch(network, nodes): busca + foco
-// =============================================================================
-/* ============================================================================
- * vis-embed.js  (para /v1/vis/visjs)
- * Regras de cor (prioridade):
- * 1) Nó de facção: se rótulo contém PCC => azul; se contém CV/Comando Vermelho => vermelho.
- * 2) Nós comuns: se faccao_id (ou group) aponta para facção mapeada => herda a cor.
- * 3) Nó de função => amarelo.
- * 4) Fallback pelo texto do próprio rótulo (contém PCC/CV) => usa as cores.
- * 5) Senão => cor default.
- * Mantém edges ultrafinas, busca, física OFF após estabilização.
- * ========================================================================== */
+// ==============================================================
 
 (function(){
   const container = document.getElementById('mynetwork');
@@ -52,11 +42,12 @@
 
   function hasTagPCC(name){
     const s = (name||'').toUpperCase();
-    return /\\bPCC\\b/.test(s) || s.includes('PRIMEIRO COMANDO DA CAPITAL');
+    return /\\bPCC\\b/.test(s) || s.includes('PCC');
   }
+
   function hasTagCV(name){
     const s = (name||'').toUpperCase();
-    return /\\bCV\\b/.test(s) || s.includes('COMANDO VERMELHO');
+    return /\\bCV\\b/.test(s) || s.includes('CV');
   }
 
   function colorObj(hex, opacity){
