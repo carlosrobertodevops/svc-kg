@@ -41,11 +41,11 @@
 	  if (ls === "pcc" || ld == "pcc" || ls.includes("pcc") || ld.includes("pcc")) return RED;
 	  // if (ls.includes("cv") || ld.includes("cv")) return RED;	
       // if (ls.includes("pcc") || ld.includes("pcc")) return BLUE;
-      //return EDGE_DEFAULT;
-	  return RED;
+      return EDGE_DEFAULT;
+	  //return RED;
     }
-    return GREY;
-	// return RED;
+    //return GREY;
+	return RED;
   }
 
   function buildDataFromEmbedded() {
