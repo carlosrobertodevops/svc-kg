@@ -2,7 +2,7 @@
 # svc-kg (v1.7.20)
 - Data atualização: 07/09/2025 às 07h49min
 ```
-svcclica-kg/
+svc-kg/
 ├─ db/
 │  ├─ 00_init.sql    # schema + seed + get_graph_membros
 │  ├─ 01_indexes.sql # índices
