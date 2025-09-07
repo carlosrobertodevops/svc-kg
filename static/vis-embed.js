@@ -22,12 +22,13 @@
     if (node) {
       const label = String(node.label || "").toLowerCase();
       const type = String(node.type || "").toLowerCase();
-		
       if (type === "faccao" && label.includes("cv")) return RED;
       if (type === "funcao") return YELLOW;
-      if (label === "cv" || label.includes("cv")) return RED;
+	  if (type === "funcao" && label.includes("cv")) return RED;	
+      if (label.includes("cv")) return RED;
       if (label.includes("pcc")) return BLUE;
       return GREY;
+		
     }
     if (edge) {
       const src = String(edge.from);
