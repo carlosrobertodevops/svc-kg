@@ -9,7 +9,7 @@
 # - vis_pyvis: página HTML com PyVis (arestas ultrafinas; física OFF após estabilizar; busca)
 # - /docs: Swagger UI custom usando /openapi.json do FastAPI
 # - Utilidades: normalização de labels PG array, cache Redis, truncamento seguro
-# Atualização: 06/09/2025 as 18h05min
+# Atualização: 07/09/2025 as 11h30min
 # =============================================================================
 
 import os
@@ -517,9 +517,10 @@ async def vis_visjs(
     return map;
   }
   function colorForNode(n, faccaoColorById) {
-    const gid = String(n.group ?? n.faccao_id ?? '');
+    const gid = String(n.group ?? n.faccao_nome ?? '');
     if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
-    if ((n.type||'').toLowerCase()==='funcao') return COLOR_FUN;
+	if (gid.icludes("CV") || (gid.icludes("cv")) return COLOR_CV; // aqui
+	if ((n.type||'').toLowerCase()==='funcao') return COLOR_FUN;
     return '#607d8b';
   }
   function edgeStyleFor(rel) { return { color: EDGE_COLORS[rel] || '#b0bec5', width: 0.1 }; } // <<< mais fino
