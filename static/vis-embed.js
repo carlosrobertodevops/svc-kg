@@ -8,7 +8,7 @@
 // - mapColors(node, edge): regras de cor
 // - buildDataFromEmbedded(): lê <script id="__KG_DATA__"> e normaliza
 // - attachSearch(network, nodes): busca + foco
-// Atualização: 07/09/2025 às 10h18min
+// Atualização: 07/09/2025 às 10h57min
 // ==============================================================
 
 (function () {
