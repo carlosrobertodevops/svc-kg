@@ -1,8 +1,11 @@
 
 # svc-kg (v1.7.20)
-- Data atualização: 09/07/2025 às 18h25min
+- Data atualização: 08/09/2025 às 10h26min
+---
 ```
 svc-kg/
+├─ .vscode/
+│  ├─ {} settings.json
 ├─ db/
 │  ├─ 00_init.sql    	# schema + seed + get_graph_membros
 │  ├─ 01_indexes.sql 	# índices
@@ -13,21 +16,24 @@ svc-kg/
 │   ├─ vis-embed.js		# Apoio do visjs
 │   ├─ vis-page.js
 │   └─ vis-style.css	# Apoio do visjs e do pyvis
+├─ .dockerignore
+├─ .editorconfig
+├─ .env
+├─ .env.example
+├─ .gitignore
 ├─ app.py
-├─ Dockerfile
 ├─ docker-compose.local.yml		# docker local
 ├─ docker-compose.coolify.yml	# docker coolify
 ├─ docker-compose.yml			# docker prinicpal para o coolify
 ├─ requirements.txt
-├─ start.sh
-├─ test_svc_kg.sh
-├─ .env
-├─ .env.example
-├─ .gitignore
-├─ .dockerignore
+├─ Dockerfile
 ├─ CHANGELOG.md
 ├─ README.md
+├─ start.sh
+├─ test_svc_kg.sh
+
 ```
+---
 Microserviço de **Knowledge Graph** com:
 - Backend: **Supabase RPC** (`get_graph_membros`) ou **Postgres**.
 - Cache: **Redis** (fallback em memória).
@@ -50,6 +56,7 @@ Microserviço de **Knowledge Graph** com:
 
 ### 1. Crie `.env` a partir de `.env.example` e defina:
 
+---
 ```env
    APP_ENV=development
    PORT=8080
