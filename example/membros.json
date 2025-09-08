@@ -1,0 +1,656 @@
+{
+	"nodes": [
+		{
+			"id": "263",
+			"size": 46.4310151328043,
+			"type": "membro",
+			"group": 21,
+			"label": "DEDE"
+		},
+		{
+			"id": "312",
+			"size": 32.1807097779183,
+			"type": "membro",
+			"group": 7,
+			"label": "RANDINHO"
+		},
+		{
+			"id": "418",
+			"size": 26.6355323334387,
+			"type": "membro",
+			"group": 21,
+			"label": "PEBA"
+		},
+		{
+			"id": "241",
+			"size": 38.2108841969293,
+			"type": "membro",
+			"group": 21,
+			"label": "PAULINHO"
+		},
+		{
+			"id": "243",
+			"size": 36.3666949280346,
+			"type": "membro",
+			"group": 21,
+			"label": "REGIS"
+		},
+		{
+			"id": "245",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "BOLÍVIA"
+		},
+		{
+			"id": "246",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "VARÃO"
+		},
+		{
+			"id": "252",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "BABAU"
+		},
+		{
+			"id": "259",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "GERALDINHO"
+		},
+		{
+			"id": "272",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": ""
+		},
+		{
+			"id": "379",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "BAGA"
+		},
+		{
+			"id": "313",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": ""
+		},
+		{
+			"id": "425",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": ""
+		},
+		{
+			"id": "212",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "BIGULINHA"
+		},
+		{
+			"id": "234",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 21,
+			"label": "XIMENES, ZANGADO"
+		},
+		{
+			"id": "248",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": ""
+		},
+		{
+			"id": "253",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": ""
+		},
+		{
+			"id": "283",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": ""
+		},
+		{
+			"id": "287",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "VICTOR DO VAVÁ"
+		},
+		{
+			"id": "281",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "BISCOITO"
+		},
+		{
+			"id": "172",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "NEM CATENGA"
+		},
+		{
+			"id": "223",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "RARIDADE"
+		},
+		{
+			"id": "227",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 21,
+			"label": "CIDINHO"
+		},
+		{
+			"id": "244",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": ""
+		},
+		{
+			"id": "254",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "DA ROÇA"
+		},
+		{
+			"id": "249",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": ""
+		},
+		{
+			"id": "261",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "BABU"
+		},
+		{
+			"id": "265",
+			"size": 25.5672811924425,
+			"type": "membro",
+			"group": 21,
+			"label": ""
+		},
+		{
+			"id": "427",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": ""
+		},
+		{
+			"id": "257",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "DE BOA"
+		},
+		{
+			"id": "266",
+			"size": 25.5672811924425,
+			"type": "membro",
+			"group": 21,
+			"label": ""
+		},
+		{
+			"id": "270",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "MILINHA"
+		},
+		{
+			"id": "274",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "JEFINHO, MOSQUITO"
+		},
+		{
+			"id": "284",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "MADU"
+		},
+		{
+			"id": "285",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "JOSI GALVÃO"
+		},
+		{
+			"id": "269",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "TUBARÃO"
+		},
+		{
+			"id": "275",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "AVATAR"
+		},
+		{
+			"id": "279",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "CRIS CIGANO"
+		},
+		{
+			"id": "164",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": ""
+		},
+		{
+			"id": "213",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "GRILO"
+		},
+		{
+			"id": "240",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 21,
+			"label": "BARRÃO, DINADO"
+		},
+		{
+			"id": "247",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": ""
+		},
+		{
+			"id": "251",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "BAMBI"
+		},
+		{
+			"id": "260",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "VENTÃO"
+		},
+		{
+			"id": "242",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": ""
+		},
+		{
+			"id": "264",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "MAY"
+		},
+		{
+			"id": "268",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": ""
+		},
+		{
+			"id": "271",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "BIANO"
+		},
+		{
+			"id": "276",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": ""
+		},
+		{
+			"id": "277",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "PITANGUINHA"
+		}
+	],
+	"edges": [
+		{
+			"source": "263",
+			"target": "264",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "263",
+			"target": "265",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "263",
+			"target": "266",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "263",
+			"target": "418",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "242",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "243",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "244",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "245",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "246",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "247",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "248",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "249",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "251",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "252",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "253",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "254",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "257",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "259",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "260",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "261",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "263",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "264",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "265",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "266",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "418",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "244",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "245",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "246",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "247",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "248",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "249",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "251",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "252",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "253",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "254",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "257",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "259",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "260",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "261",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "263",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "264",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "265",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "243",
+			"target": "266",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "263",
+			"target": "265",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "266",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "268",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "269",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "270",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "271",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "272",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		}
+	]
+}

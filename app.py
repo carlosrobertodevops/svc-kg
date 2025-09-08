@@ -9,7 +9,7 @@
 # - vis_pyvis: página HTML com PyVis (arestas ultrafinas; física OFF após estabilizar; busca)
 # - /docs: Swagger UI custom usando /openapi.json do FastAPI
 # - Utilidades: normalização de labels PG array, cache Redis, truncamento seguro
-# Atualização: 08/09/2025 10:27
+# Atualização: 08/09/2025 17h51min
 # =============================================================================
 
 import os
@@ -146,6 +146,7 @@ def platform_info() -> Dict[str, Any]:
         "version": app.version,
     }
 
+
 # -----------------------------------------------------------------------------
 # Utils: normalização e truncamento
 # -----------------------------------------------------------------------------
@@ -161,6 +162,7 @@ def _normalize_pg_text_array_label(s: str) -> str:
         parts = [p for p in parts if p and p.lower() != "null"]
         return ", ".join(parts)
     return s
+
 
 def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
     nodes = data.get("nodes", []) or []
@@ -430,6 +432,7 @@ async def graph_membros(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"graph_fetch_error: {e}")
 
+
 # -----------------------------------------------------------------------------
 # VIS.JS (vis-network) — sem f-string ao redor do JS para evitar problemas com chaves
 # -----------------------------------------------------------------------------
@@ -697,18 +700,30 @@ async def vis_visjs(
     parts.append(f'    <meta name="theme-color" content="{bg}">\n')
     parts.append("    <style>\n")
     parts.append("      html,body,#mynetwork { height:100%; margin:0; }\n")
-    parts.append("      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }\n")
-    parts.append('      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; border-radius:1px; outline:none; }\n')
-    parts.append("      .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }\n")
+    parts.append(
+        "      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }\n"
+    )
+    parts.append(
+        '      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; border-radius:1px; outline:none; }\n'
+    )
+    parts.append(
+        "      .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }\n"
+    )
     parts.append("      .kg-toolbar button:hover { background: rgba(0,0,0,.04); }\n")
     parts.append("    </style>\n")
     parts.append("  </head>\n")
     parts.append(f'  <body data-theme="{theme}">\n')
     parts.append('    <div class="kg-toolbar">\n')
     parts.append(f'      <h4 style="margin:0">{title}</h4>\n')
-    parts.append('      <input id="kg-search" type="search" placeholder="Buscar no gráfico" />\n')
-    parts.append('      <button id="btn-print" type="button" title="Imprimir">Imprimir</button>\n')
-    parts.append('      <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>\n')
+    parts.append(
+        '      <input id="kg-search" type="search" placeholder="Buscar no gráfico" />\n'
+    )
+    parts.append(
+        '      <button id="btn-print" type="button" title="Imprimir">Imprimir</button>\n'
+    )
+    parts.append(
+        '      <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>\n'
+    )
     parts.append("    </div>\n")
     parts.append('    <div id="mynetwork" style="height:90vh;width:100%;"\n')
     parts.append('         data-endpoint="/v1/graph/membros"\n')
@@ -731,593 +746,3 @@ async def vis_visjs(
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
     return HTMLResponse(html, status_code=200)
-
-
-
-# @app.get("/v1/vis/visjs", response_class=HTMLResponse, tags=["viz"])
-# async def vis_visjs(
-#     response: Response,
-#     faccao_id: Optional[int] = Query(default=None),
-#     include_co: bool = Query(default=True),
-#     max_pairs: int = Query(default=8000),
-#     max_nodes: int = Query(default=2000),
-#     max_edges: int = Query(default=4000),
-#     cache: bool = Query(default=True),
-#     theme: str = Query(default="light"),
-#     title: str = Query(default="Knowledge Graph (vis.js)"),
-#     debug: bool = Query(default=False),
-#     source: str = Query(default="server", pattern="^(server|client)$"),
-# ):
-#     embedded_block = ""
-#     if source == "server":
-#         try:
-#             data = await fetch_graph_sanitized(
-#                 faccao_id, include_co, max_pairs, use_cache=cache
-#             )
-#             data = truncate_preview(data, max_nodes, max_edges)
-#             data = normalize_graph_labels(data)
-#         except Exception as e:
-#             raise HTTPException(status_code=500, detail=f"graph_fetch_error: {e}")
-#         embedded_block = (
-#             '<script id="__KG_DATA__" type="application/json">'
-#             + json.dumps(data, ensure_ascii=False)
-#             + "</script>"
-#         )
-
-#     js_href = (
-#         "/static/vendor/vis-network.min.js"
-#         if os.path.exists("static/vendor/vis-network.min.js")
-#         else "https://unpkg.com/vis-network@9.1.6/dist/vis-network.min.js"
-#     )
-#     css_href = (
-#         "/static/vendor/vis-network.min.css"
-#         if os.path.exists("static/vendor/vis-network.min.css")
-#         else "https://unpkg.com/vis-network@9.1.6/styles/vis-network.min.css"
-#     )
-#     bg = "#0b0f19" if theme == "dark" else "#ffffff"
-
-#     # ---- JavaScript embutido (NÃO É f-string) ----
-#     script_js = """
-# <script>
-# (function(){
-#   const container = document.getElementById('mynetwork');
-#   const source = container.getAttribute('data-source') || 'server';
-#   const endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
-
-#   const COLOR_CV  = '#d32f2f';
-#   const COLOR_PCC = '#0d47a1';
-#   const COLOR_FUN = '#fdd835';
-
-#   const EDGE_COLORS = {
-#     'PERTENCE_A':      '#9e9e9e',
-#     'EXERCE':          COLOR_FUN,
-#     'FUNCAO_DA_FACCAO':COLOR_FUN,
-#     'CO_FACCAO':       '#aa9424',
-#     'CO_FUNCAO':       '#546e7a'
-#   };
-
-#   function isPgTextArray(s) { s=(s||'').trim(); return s.length>=2 && s[0]=='{' && s[s.length-1]=='}'; }
-#   function cleanLabel(raw) {
-#     if(!raw) return '';
-#     const s=String(raw).trim();
-#     if(!isPgTextArray(s)) return s;
-#     const inner=s.slice(1,-1); if(!inner) return '';
-#     return inner.replace(/(^|,)\\s*"?null"?\\s*(?=,|$)/gi,'').replace(/"/g,'').split(',').map(x=>x.trim()).filter(Boolean).join(', ');
-#   }
-#   function inferFaccaoColors(rawNodes) {
-#     const map={};
-#     rawNodes.filter(n=>n && n.type==='faccao').forEach(n=>{
-#       const name = cleanLabel(n.label||'').toUpperCase();
-#       const id = String(n.id);
-#       if (name ==='PCC' || name.includes('PCC')) map[id] = COLOR_PCC;
-#       if (name ==='CV'  || name.includes('CV'))  map[id] = COLOR_CV;
-#     });
-#     return map;
-#   }
-#   function colorForNode(n, faccaoColorById) {
-#     const gid = String(n.group ?? n.faccao_id ?? '');
-#     if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
-#     if ((n.type||'').toLowerCase()==='funcao') return COLOR_FUN;
-#     return '#607d8b';
-#   }
-#   function edgeStyleFor(rel) { return { color: EDGE_COLORS[rel] || '#b0bec5', width: 0.1 }; } // ultrafina
-#   function degreeMap(nodes,edges) {
-#     const d={}; nodes.forEach(n=>d[n.id]=0);
-#     edges.forEach(e=>{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; });
-#     return d;
-#   }
-#   function colorObj(c, opacity){
-#     if (typeof c === 'object' && c) { return Object.assign({}, c, { opacity: opacity }); }
-#     return {
-#       background: c || '#607d8b',
-#       border: c || '#607d8b',
-#       highlight: { background: c || '#607d8b', border: c || '#607d8b' },
-#       hover: { background: c || '#607d8b', border: c || '#607d8b' },
-#       opacity: opacity
-#     };
-#   }
-
-#   function render(data){
-#     const rawNodes = data.nodes || [];
-#     const rawEdges = data.edges || [];
-
-#     const faccaoColorById = inferFaccaoColors(rawNodes);
-
-#     const nodes = [];
-#     const seen = new Set();
-#     for (const n of rawNodes) {
-#       if(!n || n.id==null) continue;
-#       const id = String(n.id);
-#       if (seen.has(id)) continue; seen.add(id);
-#       const label = cleanLabel(n.label) || id;
-#       const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
-#       const photo = n.photo_url && /^https?:\\/\\//i.test(n.photo_url) ? n.photo_url : null;
-#       const color = colorForNode({group, type:n.type}, faccaoColorById);
-#       const base = { id, label, group, color, borderWidth: 1 };
-#       if (photo) { base.shape='circularImage'; base.image=photo; } else { base.shape='dot'; }
-#       nodes.push(base);
-#     }
-
-#     const nodeIds = new Set(nodes.map(n=>n.id));
-#     const edges = [];
-#     for (const e of (rawEdges||[])) {
-#       if(!e) continue;
-#       const a = String(e.source), b = String(e.target);
-#       if(!nodeIds.has(a) || !nodeIds.has(b)) continue;
-#       const rel = e.relation || '';
-#       const style = edgeStyleFor(rel);
-#       edges.push({ from:a, to:b, value: Number(e.weight||1), width: style.width, color: style.color, title: rel });
-#     }
-
-#     if (!nodes.length) {
-#       container.innerHTML='<div style="padding:12px">Sem dados.</div>';
-#       return;
-#     }
-
-#     // explode nós com maior grau (ganho aumentado)
-#     const deg = degreeMap(nodes, edges);
-#     nodes.forEach(n=>{ const d=deg[n.id]||0; n.value = 14 + Math.log(d+1)*10; });
-
-#     const dsNodes = new vis.DataSet(nodes);
-#     const dsEdges = new vis.DataSet(edges);
-
-#     const options = {
-#       interaction: { hover:true, dragNodes:true, dragView:true, zoomView:true, multiselect:true, navigationButtons:true },
-#       physics: { enabled: true, stabilization: { enabled:true, iterations: 300 } },
-#       nodes: { shape:'dot', borderWidth:2 },
-#       edges: { smooth:false, width:0.1, arrows: { to: { enabled: true, scaleFactor:0.5 } } }
-#     };
-
-#     const net = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
-#     net.once('stabilizationIterationsDone', ()=>{ net.setOptions({ physics:false }); net.fit({ animation: { duration: 300 } }); });
-#     net.on('doubleClick', ()=> net.fit({ animation: { duration: 300 } }));
-
-#     // Busca/destaque
-#     const q = document.getElementById('kg-search');
-#     if (q) {
-#       function run() {
-#         const t=(q.value||'').trim().toLowerCase(); if(!t) return;
-#         const all=dsNodes.get();
-#         const hits=all.filter(n => (n.label||'').toLowerCase().includes(t) || String(n.id)===t);
-#         if(!hits.length) return;
-#         all.forEach(n => dsNodes.update({ id: n.id, color: colorObj(n.color, 0.25) }));
-#         hits.forEach(h => {
-#           const cur=dsNodes.get(h.id);
-#           dsNodes.update({ id: h.id, color: colorObj(cur.color, 1) });
-#         });
-#         net.setOptions({ physics: false });
-#         net.fit({ nodes: hits.map(h=>h.id), animation: { duration: 300 } });
-#       }
-#       q.addEventListener('change', run);
-#       q.addEventListener('keyup', e=>{ if(e.key==='Enter') run(); });
-#     }
-#     const p=document.getElementById('btn-print'); if(p) p.onclick=()=>window.print();
-#     const r=document.getElementById('btn-reload'); if(r) r.onclick=()=>location.reload();
-#   }
-
-#   function run(){
-#     if ((container.getAttribute('data-source')||'server') === 'server'){
-#       const tag=document.getElementById('__KG_DATA__'); if(!tag) { container.innerHTML='<div style="padding:12px">Dados não incorporados.</div>'; return; }
-#       try { render(JSON.parse(tag.textContent||'{}')); } catch(e){ container.innerHTML='<pre>'+String(e)+'</pre>'; }
-#     } else {
-#       const params=new URLSearchParams(window.location.search);
-#       const qs=new URLSearchParams();
-#       if(params.get('faccao_id')) qs.set('faccao_id', params.get('faccao_id'));
-#       qs.set('include_co', params.get('include_co') ?? 'true');
-#       qs.set('max_pairs',  params.get('max_pairs')  ?? '8000');
-#       qs.set('max_nodes',  params.get('max_nodes')  ?? '2000');
-#       qs.set('max_edges',  params.get('max_edges')  ?? '4000');
-#       qs.set('cache',      params.get('cache')      ?? 'true');
-#       const url=endpoint+'?'+qs.toString();
-#       fetch(url,{ headers:{ 'Accept':'application/json' } })
-#         .then(r=>r.json())
-#         .then(render)
-#         .catch(err=>{ container.innerHTML='<pre>'+String(err)+'</pre>'; });
-#     }
-#   }
-#   if(document.readyState!=='loading') run(); else document.addEventListener('DOMContentLoaded', run);
-# })();
-# </script>
-# """
-
-#     # ---- HTML montado por concatenação (apenas pequenas f-strings controladas) ----
-#     parts: List[str] = []
-#     parts.append("<!doctype html>\n")
-#     parts.append('<html lang="pt-br">\n')
-#     parts.append("  <head>\n")
-#     parts.append('    <meta charset="utf-8" />\n')
-#     parts.append(f"    <title>{title}</title>\n")
-#     parts.append(f'    <link rel="stylesheet" href="{css_href}">\n')
-#     parts.append('    <link rel="stylesheet" href="/static/vis-style.css">\n')
-#     parts.append(f'    <meta name="theme-color" content="{bg}">\n')
-#     parts.append("    <style>\n")
-#     parts.append("      html,body,#mynetwork { height:100%; margin:0; }\n")
-#     parts.append(
-#         "      .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }\n"
-#     )
-#     parts.append(
-#         '      .kg-toolbar input[type="search"] { flex: 1; min-width: 220px; padding:6px 10px; border-radius:1px; outline:none; }\n'
-#     )
-#     parts.append(
-#         "      .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }\n"
-#     )
-#     parts.append("      .kg-toolbar button:hover { background: rgba(0,0,0,.04); }\n")
-#     parts.append("    </style>\n")
-#     parts.append("  </head>\n")
-#     parts.append(f'  <body data-theme="{theme}">\n')
-#     parts.append('    <div class="kg-toolbar">\n')
-#     parts.append(f'      <h4 style="margin:0">{title}</h4>\n')
-#     parts.append(
-#         '      <input id="kg-search" type="search" placeholder="Buscar no gráfico" />\n'
-#     )
-#     parts.append(
-#         '      <button id="btn-print" type="button" title="Imprimir">Imprimir</button>\n'
-#     )
-#     parts.append(
-#         '      <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>\n'
-#     )
-#     parts.append("    </div>\n")
-#     parts.append('    <div id="mynetwork" style="height:90vh;width:100%;"\n')
-#     parts.append('         data-endpoint="/v1/graph/membros"\n')
-#     parts.append(f'         data-source="{source}"\n')
-#     parts.append(f'         data-debug="{str(debug).lower()}"></div>\n')
-#     parts.append(f"    {embedded_block}\n")
-#     parts.append(f'    <script src="{js_href}"></script>\n')
-#     parts.append(script_js)
-#     parts.append("  </body>\n")
-#     parts.append("</html>\n")
-#     html = "".join(parts)
-
-#     # CSP: permitir imagens http/https (para photo_url)
-#     response.headers["Content-Security-Policy"] = (
-#         "default-src 'self'; "
-#         "style-src 'self' 'unsafe-inline' https://unpkg.com; "
-#         "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-#         "img-src 'self' data: https: http:; "
-#         "connect-src 'self';"
-#     )
-#     response.headers["X-Content-Type-Options"] = "nosniff"
-#     return HTMLResponse(html, status_code=200)
-
-
-# -----------------------------------------------------------------------------
-# PYVIS
-# -----------------------------------------------------------------------------
-from pyvis.network import Network  # noqa: E402
-
-
-@app.get("/v1/vis/pyvis", response_class=HTMLResponse, tags=["viz"])
-async def vis_pyvis(
-    faccao_id: Optional[int] = Query(default=None),
-    include_co: bool = Query(default=True),
-    max_pairs: int = Query(default=8000),
-    max_nodes: int = Query(default=2000),
-    max_edges: int = Query(default=4000),
-    cache: bool = Query(default=True),
-    theme: str = Query(default="light"),
-    title: str = Query(default="Knowledge Graph (PyVis)"),
-):
-    try:
-        data = await fetch_graph_sanitized(
-            faccao_id, include_co, max_pairs, use_cache=cache
-        )
-        data = truncate_preview(data, max_nodes, max_edges)
-        data = normalize_graph_labels(data)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"graph_fetch_error: {e}")
-
-    nodes = data.get("nodes", []) or []
-    edges = data.get("edges", []) or []
-
-    if not nodes:
-        return HTMLResponse("<h3>Sem dados para exibir.</h3>", status_code=200)
-
-    faccao_name_by_id: Dict[str, str] = {}
-    for n in nodes:
-        if (n or {}).get("type") == "faccao" and n.get("id") is not None:
-            faccao_name_by_id[str(n["id"])] = str(n.get("label") or "").strip()
-
-    def color_from_faccao(fid: Optional[str]) -> Optional[str]:
-        if not fid:
-            return None
-        name = (faccao_name_by_id.get(fid) or "").upper()
-        if not name:
-            return None
-        if "PCC" in name:
-            return "#0d47a1"  # azul escuro
-        if "CV" in name:
-            return "#d32f2f"  # vermelho
-        return None
-
-    def is_func(n: Dict[str, Any]) -> bool:
-        t = str(n.get("type") or "").lower()
-        return t == "funcao" or "função" in t or "funcao" in t
-
-    def hash_color(s: str) -> str:
-        h = 0
-        for ch in s:
-            h = (h << 5) - h + ord(ch)
-            h &= 0xFFFFFFFF
-        hue = abs(h) % 360
-        return f"hsl({hue},70%,50%)"
-
-    height = "90vh"
-    bgcolor = "#0b0f19" if theme == "dark" else "#ffffff"
-    fontcolor = "#e8eaed" if theme == "dark" else "#111827"
-
-    net = Network(
-        height=height,
-        width="100%",
-        bgcolor=bgcolor,
-        font_color=fontcolor,
-        directed=True,
-        cdn_resources="in_line",
-    )
-
-    seen = set()
-    for n in nodes:
-        if not n or n.get("id") is None:
-            continue
-        nid = str(n["id"])
-        if nid in seen:
-            continue
-        seen.add(nid)
-
-        label = str(n.get("label") or nid)
-        group = str(n.get("group") or n.get("faccao_id") or n.get("type") or "0")
-        size = n.get("size")
-        photo = (
-            n.get("photo_url")
-            if isinstance(n.get("photo_url"), str)
-            and str(n["photo_url"]).startswith(("http://", "https://"))
-            else None
-        )
-
-        fixed_color = color_from_faccao(group)
-        color = fixed_color or ("#fdd835" if is_func(n) else hash_color(group))
-
-        node_kwargs: Dict[str, Any] = dict(title=label, color=color, borderWidth=2)
-        if isinstance(size, (int, float)):
-            node_kwargs["value"] = float(size)
-        if photo:
-            node_kwargs["shape"] = "circularImage"
-            node_kwargs["image"] = photo
-        else:
-            node_kwargs["shape"] = "dot"
-
-        net.add_node(nid, label=label, **node_kwargs)
-
-    valid_nodes = set(net.get_nodes())
-    EDGE_COLORS = {
-        "PERTENCE_A": "#9e9e9e",
-        "EXERCE": "#fdd835",  # amarelo (funções)
-        "FUNCAO_DA_FACCAO": "#fdd835",
-        "CO_FACCAO": "#8e24aa",
-        "CO_FUNCAO": "#546e7a",
-    }
-    for e in edges:
-        if not e:
-            continue
-        a = str(e.get("source"))
-        b = str(e.get("target"))
-        if a not in valid_nodes or b not in valid_nodes:
-            continue
-        rel = e.get("relation") or ""
-        try:
-            w = float(e.get("weight") or 1.0)
-        except Exception:
-            w = 1.0
-        color = EDGE_COLORS.get(rel, "#b0bec5")
-        net.add_edge(a, b, value=w, width=0.1, color=color, title=rel)  # ultrafina
-
-    # physics ON para estabilizar e depois OFF por JS
-    net.set_options(
-        """
-{
-  "interaction": {
-    "hover": true,
-    "dragNodes": true,
-    "dragView": true,
-    "zoomView": true,
-    "multiselect": true,
-    "navigationButtons": true
-  },
-  "physics": {
-    "enabled": true,
-    "stabilization": { "enabled": true, "iterations": 300 }
-  },
-  "nodes": { "shape": "dot", "borderWidth": 2 },
-  "edges": { "smooth": false, "width": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
-}
-        """
-    )
-
-    html = net.generate_html()
-
-    toolbar_css = """
-<style>
-  .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
-  .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; border:1px solid #e0e0e0; border-radius:1px; outline:none; }
-  .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }
-  .kg-toolbar button:hover { background: rgba(0,0,0,.04); }
-</style>
-"""
-    toolbar_html = (
-        '<div class="kg-toolbar">\n'
-        f'  <h4 style="margin:0">{title}</h4>\n'
-        '  <input id="kg-search" type="search" placeholder="Buscar no gráfico" />\n'
-        '  <button id="btn-print" type="button" title="Imprimir">Imprimir</button>\n'
-        '  <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>\n'
-        "</div>\n"
-    )
-    toolbar_js = """
-<script>
-(function(){
-  function colorObj(c, opacity){
-    if (typeof c === 'object' && c) { return Object.assign({}, c, { opacity: opacity }); }
-    return {
-      background: c || '#90a4ae',
-      border: c || '#90a4ae',
-      highlight: { background: c || '#90a4ae', border: c || '#90a4ae' },
-      hover: { background: c || '#90a4ae', border: c || '#90a4ae' },
-      opacity: opacity
-    };
-  }
-  function runSearch(txt){
-    try{
-      var ds = (typeof nodes !== 'undefined') ? nodes : (network && network.body && network.body.data && network.body.data.nodes);
-      if (!ds) return;
-      var all = ds.get();
-      var t = (txt||'').trim().toLowerCase();
-      if (!t){ return; }
-      var hits = all.filter(function(n){ return (String(n.label||'').toLowerCase().indexOf(t) >= 0) || (String(n.id)===t); });
-      if (!hits.length) return;
-
-      all.forEach(function(n){ ds.update({ id: n.id, color: colorObj(n.color, 0.25) }); });
-      hits.forEach(function(h){ var cur = ds.get(h.id); ds.update({ id: h.id, color: colorObj(cur.color, 1) }); });
-      network.setOptions({ physics: false });
-      network.fit({ nodes: hits.map(function(h){return h.id;}), animation: { duration: 300 } });
-    }catch(e){ console.error(e); }
-  }
-  var q = document.getElementById('kg-search');
-  var p = document.getElementById('btn-print');
-  var r = document.getElementById('btn-reload');
-  if (p) p.onclick = function(){ window.print(); };
-  if (r) r.onclick = function(){ location.reload(); };
-  if (q){
-    q.addEventListener('change', function(){ runSearch(q.value); });
-    q.addEventListener('keyup', function(e){ if(e.key==='Enter') runSearch(q.value); });
-  }
-  if (typeof network !== 'undefined'){
-    network.once('stabilizationIterationsDone', function(){ network.setOptions({ physics: false }); });
-  }
-})();
-</script>
-"""
-    html = html.replace("</head>", toolbar_css + "\n</head>")
-    html = html.replace("<body>", "<body>\n" + toolbar_html + "\n")
-    html = html.replace("</body>", toolbar_js + "\n</body>")
-    return HTMLResponse(html, status_code=200)
-
-
-# -----------------------------------------------------------------------------
-# /docs (Swagger UI custom)
-# -----------------------------------------------------------------------------
-@app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
-async def custom_docs():
-    csp = (
-        "default-src 'self'; "
-        "img-src 'self' data: https://cdn.jsdelivr.net https: http:; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-        "connect-src 'self';"
-    )
-    html = """
-<!doctype html>
-<html lang="pt-br">
-  <head>
-    <meta charset="utf-8"/>
-    <title>svc-kg • API Docs</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist/swagger-ui.css">
-    <style>
-      body { margin:0; }
-      .ops-bar {
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-        padding: 12px 16px; border-bottom: 1px solid #eee; background:#fafafa;
-        display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
-      }
-      .ops-right { display:flex; gap:8px; align-items:center; }
-      .ops-pill { padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #e0e0e0; background:#fff; }
-      .ops-pill.ok { border-color:#c8e6c9; background:#e8f5e9; }
-      .ops-pill.err{ border-color:#ffcdd2; background:#ffebee; }
-      .ops-grid { display:grid; grid-template-columns: repeat(4, minmax(160px,1fr)); gap:8px; margin-top: 6px; }
-      .ops-kv { font-size: 12px; color:#333; background:#fff; border:1px solid #eee; border-radius:8px; padding:8px; }
-      .ops-kv b { color:#111; }
-      #swagger-ui { margin-top: 0; }
-      .note { font-size: 12px; color:#666; }
-      @media (max-width: 900px){ .ops-grid { grid-template-columns: repeat(2, minmax(160px,1fr)); } }
-    </style>
-  </head>
-  <body>
-    <div class="ops-bar">
-      <div>
-        <div style="font-weight:600;">svc-kg (a.k.a. “sic-kg”)</div>
-        <div class="ops-grid" id="ops-kvs">
-          <div class="ops-kv"><b>Version</b><div id="kv-version">—</div></div>
-          <div class="ops-kv"><b>Env</b><div id="kv-env">—</div></div>
-          <div class="ops-kv"><b>Platform</b><div id="kv-platform">—</div></div>
-          <div class="ops-kv"><b>Host</b><div id="kv-host">—</div></div>
-          <div class="ops-kv"><b>Redis</b><div id="kv-redis">—</div></div>
-          <div class="ops-kv"><b>Supabase URL</b><div id="kv-supa">—</div></div>
-          <div class="ops-kv"><b>RPC</b><div id="kv-rpc">—</div></div>
-          <div class="ops-kv"><b>Timeout</b><div id="kv-timeout">—</div></div>
-        </div>
-        <div class="note">Links rápidos: <a href="/docs-static/openapi.yaml" target="_blank">openapi.yaml</a></div>
-      </div>
-      <div class="ops-right">
-        <a class="ops-pill" href="/live" target="_blank">/live</a>
-        <a class="ops-pill" href="/health" target="_blank">/health</a>
-        <a class="ops-pill" href="/health?deep=true" target="_blank">/health?deep=true</a>
-        <a class="ops-pill" href="/ready" target="_blank">/ready</a>
-        <a class="ops-pill" href="/ops/status" target="_blank">/ops/status</a>
-      </div>
-    </div>
-
-    <div id="swagger-ui"></div>
-
-    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist/swagger-ui-bundle.js"></script>
-    <script>
-      function setKV(id, val){ var el=document.getElementById(id); if(el) el.textContent = (val==null?'—': String(val)); }
-      async function j(u){ try{ const r=await fetch(u); return await r.json(); }catch(e){ return {error:String(e)}; } }
-      async function refresh(){
-        const [ops, health] = await Promise.all([ j('/ops/status'), j('/health?deep=true') ]);
-        setKV('kv-version', ops.version || '—');
-        setKV('kv-env', ops.app_env || '—');
-        setKV('kv-platform', ops.coolify_proxy_network ? 'coolify' : (ops.container ? 'container' : 'host'));
-        setKV('kv-host', ops.hostname || location.hostname);
-        setKV('kv-redis', (ops.redis && ops.redis.enabled) ? (ops.redis.ping ? 'ok' : 'enabled') : 'disabled');
-        setKV('kv-supa', (ops.supabase && ops.supabase.url) ? ops.supabase.url : '—');
-        setKV('kv-rpc', (ops.supabase && ops.supabase.rpc_fn) ? ops.supabase.rpc_fn : '—');
-        setKV('kv-timeout', (ops.supabase && ops.supabase.timeout) ? ops.supabase.timeout : '—');
-        const pills = document.querySelectorAll('.ops-right .ops-pill');
-        pills.forEach(p => p.classList.remove('ok','err'));
-        if (health && health.ok) pills.forEach(p => p.classList.add('ok')); else pills.forEach(p => p.classList.add('err'));
-      }
-      window.onload = function(){
-        SwaggerUIBundle({
-          url: '/openapi.json',
-          dom_id: '#swagger-ui',
-          deepLinking: true,
-          docExpansion: 'none',
-          defaultModelsExpandDepth: -1
-        });
-        refresh();
-      };
-    </script>
-  </body>
-</html>
-"""
-    resp = HTMLResponse(html, status_code=200)
-    resp.headers["Content-Security-Policy"] = csp
-    resp.headers["X-Content-Type-Options"] = "nosniff"
-    return resp
