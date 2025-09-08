@@ -14,3 +14,4 @@ __pycache__
 .env
 .editorconfig
 .vscode/
+app-bkp.py
