@@ -18,6 +18,9 @@ svc-kg/
 ├─ docker-compose.local.yml		# docker local
 ├─ docker-compose.coolify.yml	# docker coolify
 ├─ docker-compose.yml			# docker prinicpal para o coolify
+├─ requirements.txt
+├─ start.sh
+├─ test_svc_kg.sh
 ├─ .env
 ├─ .env.example
 ├─ .gitignore
