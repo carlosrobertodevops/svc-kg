@@ -1,357 +1,2195 @@
 {
-	"nodes": [
-		{
-			"id": "263",
-			"size": 46.4310151328043,
-			"type": "membro",
-			"group": 21,
-			"label": "DEDE"
-		},
-		{
-			"id": "312",
-			"size": 32.1807097779183,
-			"type": "membro",
-			"group": 7,
-			"label": "RANDINHO"
-		},
-		{
-			"id": "418",
-			"size": 26.6355323334387,
-			"type": "membro",
-			"group": 21,
-			"label": "PEBA"
-		},
-		{
-			"id": "241",
-			"size": 38.2108841969293,
-			"type": "membro",
-			"group": 21,
-			"label": "PAULINHO"
-		},
-		{
-			"id": "243",
-			"size": 36.3666949280346,
-			"type": "membro",
-			"group": 21,
-			"label": "REGIS"
-		},
-		{
-			"id": "245",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 21,
-			"label": "BOLÍVIA"
-		},
-		{
-			"id": "246",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 21,
-			"label": "VARÃO"
-		},
-		{
-			"id": "252",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": "BABAU"
-		},
-		{
-			"id": "259",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": "GERALDINHO"
-		},
-		{
-			"id": "272",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 7,
-			"label": ""
-		},
-		{
-			"id": "379",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 20,
-			"label": "BAGA"
-		},
-		{
-			"id": "313",
-			"size": 15.5451774444796,
-			"type": "membro",
-			"group": 20,
-			"label": ""
-		},
-		{
-			"id": "425",
-			"size": 18.7888983093449,
-			"type": "membro",
-			"group": 20,
-			"label": ""
-		},
-		{
-			"id": "212",
-			"size": 18.7888983093449,
-			"type": "membro",
-			"group": 6,
-			"label": "BIGULINHA"
-		},
-		{
-			"id": "234",
-			"size": 18.7888983093449,
-			"type": "membro",
-			"group": 21,
-			"label": "XIMENES, ZANGADO"
-		},
-		{
-			"id": "248",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": ""
-		},
-		{
-			"id": "253",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": ""
-		},
-		{
-			"id": "283",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 20,
-			"label": ""
-		},
-		{
-			"id": "287",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 7,
-			"label": "VICTOR DO VAVÁ"
-		},
-		{
-			"id": "281",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 7,
-			"label": "BISCOITO"
-		},
-		{
-			"id": "172",
-			"size": 18.7888983093449,
-			"type": "membro",
-			"group": 6,
-			"label": "NEM CATENGA"
-		},
-		{
-			"id": "223",
-			"size": 18.7888983093449,
-			"type": "membro",
-			"group": 6,
-			"label": "RARIDADE"
-		},
-		{
-			"id": "227",
-			"size": 18.7888983093449,
-			"type": "membro",
-			"group": 21,
-			"label": "CIDINHO"
-		},
-		{
-			"id": "244",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 21,
-			"label": ""
-		},
-		{
-			"id": "254",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": "DA ROÇA"
-		},
-		{
-			"id": "249",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": ""
-		},
-		{
-			"id": "261",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": "BABU"
-		},
-		{
-			"id": "265",
-			"size": 25.5672811924425,
-			"type": "membro",
-			"group": 21,
-			"label": ""
-		},
-		{
-			"id": "427",
-			"size": 18.7888983093449,
-			"type": "membro",
-			"group": 20,
-			"label": ""
-		},
-		{
-			"id": "257",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": "DE BOA"
-		},
-		{
-			"id": "266",
-			"size": 25.5672811924425,
-			"type": "membro",
-			"group": 21,
-			"label": ""
-		},
-		{
-			"id": "270",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 7,
-			"label": "MILINHA"
-		},
-		{
-			"id": "274",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 7,
-			"label": "JEFINHO, MOSQUITO"
-		},
-		{
-			"id": "284",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 20,
-			"label": "MADU"
-		},
-		{
-			"id": "285",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 20,
-			"label": "JOSI GALVÃO"
-		},
-		{
-			"id": "269",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 7,
-			"label": "TUBARÃO"
-		},
-		{
-			"id": "275",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 7,
-			"label": "AVATAR"
-		},
-		{
-			"id": "279",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 20,
-			"label": "CRIS CIGANO"
-		},
-		{
-			"id": "164",
-			"size": 15.5451774444796,
-			"type": "membro",
-			"group": 20,
-			"label": ""
-		},
-		{
-			"id": "213",
-			"size": 18.7888983093449,
-			"type": "membro",
-			"group": 6,
-			"label": "GRILO"
-		},
-		{
-			"id": "240",
-			"size": 15.5451774444796,
-			"type": "membro",
-			"group": 21,
-			"label": "BARRÃO, DINADO"
-		},
-		{
-			"id": "247",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": ""
-		},
-		{
-			"id": "251",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": "BAMBI"
-		},
-		{
-			"id": "260",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": "VENTÃO"
-		},
-		{
-			"id": "242",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 21,
-			"label": ""
-		},
-		{
-			"id": "264",
-			"size": 22.8755032994728,
-			"type": "membro",
-			"group": 21,
-			"label": "MAY"
-		},
-		{
-			"id": "268",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 20,
-			"label": ""
-		},
-		{
-			"id": "271",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 7,
-			"label": "BIANO"
-		},
-		{
-			"id": "276",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 7,
-			"label": ""
-		},
-		{
-			"id": "277",
-			"size": 21.0903548889591,
-			"type": "membro",
-			"group": 7,
-			"label": "PITANGUINHA"
-		}
-	],
 	"edges": [
+		{
+			"source": "263",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "312",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "418",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "241",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "243",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "245",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "246",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "252",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "259",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "272",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "379",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "313",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "425",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "212",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "234",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "248",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "253",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "283",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "287",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "281",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "172",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "223",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "227",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "244",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "254",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "249",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "261",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "265",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "427",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "257",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "266",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "270",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "274",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "284",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "285",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "269",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "275",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "279",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "164",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "213",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "240",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "247",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "251",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "260",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "242",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "264",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "268",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "271",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "276",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "277",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "295",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "262",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "278",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "239",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "273",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "292",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "306",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "296",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "290",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "299",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "302",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "393",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "304",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "380",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "400",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "411",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "381",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "146",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "258",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "314",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "370",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "382",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "168",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "371",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "383",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "367",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "317",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "250",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "318",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "326",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "366",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "384",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "320",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "403",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "412",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "407",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "369",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "408",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "298",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "372",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "385",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "337",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "397",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "373",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "386",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "288",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "409",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "405",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "358",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "413",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "387",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "297",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "374",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "209",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "351",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "375",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "365",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "388",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "414",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "415",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "342",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "338",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "349",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "347",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "345",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "341",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "346",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "348",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "354",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "359",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "376",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "389",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "329",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "377",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "390",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "339",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "416",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "378",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "391",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "392",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "401",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "417",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "410",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "300",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "344",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "331",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "362",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "352",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "307",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "419",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "305",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "340",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "316",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "319",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "328",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "343",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "286",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "335",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "420",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "421",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "423",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "424",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "321",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "327",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "311",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "323",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "422",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "426",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "428",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "395",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "394",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "396",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "398",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "399",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "402",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "404",
+			"target": "7",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "294",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "267",
+			"target": "22",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "282",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "289",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "280",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "350",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "406",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "308",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "324",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "322",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "291",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "293",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "353",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "363",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "364",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "210",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "211",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "225",
+			"target": "6",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "255",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "256",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "310",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "334",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "361",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "357",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "356",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "355",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "360",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "336",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "303",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "315",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "333",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "325",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "309",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "332",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "330",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "301",
+			"target": "20",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "226",
+			"target": "21",
+			"weight": 3,
+			"relation": "PERTENCE_A"
+		},
+		{
+			"source": "263",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "312",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "418",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "241",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "252",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "259",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "272",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "379",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "425",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "212",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "234",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "248",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "253",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "283",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "287",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "281",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "172",
+			"target": "1",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "223",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "227",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "254",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "249",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "261",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "265",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "427",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "257",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "266",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "270",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "274",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "284",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "285",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "269",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "275",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "279",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "213",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "247",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "251",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "260",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "242",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "268",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "271",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "276",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "277",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "295",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "262",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "278",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "273",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "292",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "306",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "296",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "290",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "302",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "393",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "304",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "380",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "411",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "381",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "258",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "314",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "382",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "371",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "383",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "317",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "318",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "326",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "366",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "384",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "320",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "403",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "412",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "407",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "369",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "408",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "385",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "397",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "373",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "386",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "288",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "409",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "405",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "413",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "387",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "374",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "209",
+			"target": "4",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "375",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "388",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "414",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "415",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "346",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "348",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "376",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "389",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "377",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "390",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "339",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "416",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "378",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "391",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "392",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "401",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "417",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "410",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "362",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "352",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "419",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "305",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "340",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "316",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "319",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "328",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "343",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "286",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "420",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "421",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "423",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "424",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "321",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "327",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "422",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "426",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "428",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "395",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "394",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "396",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "398",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "399",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "402",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "404",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "282",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "406",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "291",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "211",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "225",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "255",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "226",
+			"target": "0",
+			"weight": 3,
+			"relation": "EXERCE"
+		},
+		{
+			"source": "3",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "1",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "2",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "4",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "5",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "6",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "7",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "8",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "9",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "10",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "11",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "12",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "13",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "14",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "15",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "16",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "17",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "18",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "19",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "20",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "21",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "22",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "23",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "24",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "25",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "26",
+			"target": "6",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "0",
+			"target": "0",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
+		{
+			"source": "27",
+			"target": "22",
+			"weight": 2,
+			"relation": "FUNCAO_DA_FACCAO"
+		},
 		{
 			"source": "263",
 			"target": "264",
@@ -372,7 +2210,133 @@
 		},
 		{
 			"source": "263",
+			"target": "414",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "263",
+			"target": "415",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "263",
+			"target": "416",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "263",
 			"target": "418",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "263",
+			"target": "421",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "263",
+			"target": "422",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "263",
+			"target": "424",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "314",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "316",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "320",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "394",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "395",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "396",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "397",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "398",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "399",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "402",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "403",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "312",
+			"target": "404",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "418",
+			"target": "421",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "418",
+			"target": "422",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "418",
+			"target": "424",
 			"weight": 0.5,
 			"relation": "CO_FACCAO"
 		},
@@ -450,7 +2414,25 @@
 		},
 		{
 			"source": "241",
+			"target": "255",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "256",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
 			"target": "257",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "258",
 			"weight": 0.5,
 			"relation": "CO_FACCAO"
 		},
@@ -469,6 +2451,12 @@
 		{
 			"source": "241",
 			"target": "261",
+			"weight": 0.5,
+			"relation": "CO_FACCAO"
+		},
+		{
+			"source": "241",
+			"target": "262",
 			"weight": 0.5,
 			"relation": "CO_FACCAO"
 		},
@@ -498,115 +2486,7 @@
 		},
 		{
 			"source": "241",
-			"target": "418",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "244",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "245",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "246",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "247",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "248",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "249",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "251",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "252",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "253",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "254",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "257",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "259",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "260",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "261",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "263",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "264",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "265",
-			"weight": 0.5,
-			"relation": "CO_FACCAO"
-		},
-		{
-			"source": "243",
-			"target": "266",
+			"target": "414",
 			"weight": 0.5,
 			"relation": "CO_FACCAO"
 		},
@@ -651,6 +2531,1925 @@
 			"target": "272",
 			"weight": 0.8,
 			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "273",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "274",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "275",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "276",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "277",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "278",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "279",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "281",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "282",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "283",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "284",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "285",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "286",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "287",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "288",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "290",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "291",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "292",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "295",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "296",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "302",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "304",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "305",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "306",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "312",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "314",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "316",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "317",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "318",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "319",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "320",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "321",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "326",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "327",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "328",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "339",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "340",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "343",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "346",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "348",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "352",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "362",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		},
+		{
+			"source": "263",
+			"target": "366",
+			"weight": 0.8,
+			"relation": "CO_FUNCAO"
+		}
+	],
+	"nodes": [
+		{
+			"id": "263",
+			"size": 43.2710646668774,
+			"type": "membro",
+			"group": 21,
+			"label": "DEDE"
+		},
+		{
+			"id": "312",
+			"size": 32.1807097779183,
+			"type": "membro",
+			"group": 7,
+			"label": "RANDINHO"
+		},
+		{
+			"id": "418",
+			"size": 25.5672811924425,
+			"type": "membro",
+			"group": 21,
+			"label": "PEBA"
+		},
+		{
+			"id": "241",
+			"size": 36.6576360814016,
+			"type": "membro",
+			"group": 21,
+			"label": "PAULINHO"
+		},
+		{
+			"id": "243",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 21,
+			"label": "REGIS"
+		},
+		{
+			"id": "245",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 21,
+			"label": "BOLÍVIA"
+		},
+		{
+			"id": "246",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 21,
+			"label": "VARÃO"
+		},
+		{
+			"id": "252",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "BABAU"
+		},
+		{
+			"id": "259",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "GERALDINHO"
+		},
+		{
+			"id": "272",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "EMERSON RUBENS SANTOS DA SILVA"
+		},
+		{
+			"id": "379",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "BAGA"
+		},
+		{
+			"id": "313",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "JEANDERSON DA SILVA BISPO"
+		},
+		{
+			"id": "425",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "RAFAEL SANTOS DE MOURA"
+		},
+		{
+			"id": "212",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "BIGULINHA"
+		},
+		{
+			"id": "234",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 21,
+			"label": "XIMENES"
+		},
+		{
+			"id": "248",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "EVA BEATRIZ SANTOS"
+		},
+		{
+			"id": "253",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "LEANDRO ROSA LIMA"
+		},
+		{
+			"id": "283",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "LETYCIA VITORIA SANTOS COSTA"
+		},
+		{
+			"id": "287",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "VICTOR DO VAVÁ"
+		},
+		{
+			"id": "281",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "BISCOITO"
+		},
+		{
+			"id": "172",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "NEM CATENGA"
+		},
+		{
+			"id": "223",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "RARIDADE"
+		},
+		{
+			"id": "227",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 21,
+			"label": "CIDINHO"
+		},
+		{
+			"id": "244",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 21,
+			"label": "SAMARA SANTOS DA SILVA"
+		},
+		{
+			"id": "254",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "DA ROÇA"
+		},
+		{
+			"id": "249",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "VALDEMIR DOS SANTOS"
+		},
+		{
+			"id": "261",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "BABU"
+		},
+		{
+			"id": "265",
+			"size": 24.3340757538244,
+			"type": "membro",
+			"group": 21,
+			"label": "ANA PAULA CONCEIÇÃO FIRMINO DOS SANTOS"
+		},
+		{
+			"id": "427",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "GABRIELA SANTANA GOMES DE MELO"
+		},
+		{
+			"id": "257",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "DE BOA"
+		},
+		{
+			"id": "266",
+			"size": 24.3340757538244,
+			"type": "membro",
+			"group": 21,
+			"label": "FABRÍCIA JOVINO DOS SANTOS"
+		},
+		{
+			"id": "270",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "MILINHA"
+		},
+		{
+			"id": "274",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "JEFINHO"
+		},
+		{
+			"id": "284",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "MADU"
+		},
+		{
+			"id": "285",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "JOSI GALVÃO"
+		},
+		{
+			"id": "269",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "TUBARÃO"
+		},
+		{
+			"id": "275",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "AVATAR"
+		},
+		{
+			"id": "279",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "CRIS CIGANO"
+		},
+		{
+			"id": "164",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "CHARLES GOMES DE BARROS"
+		},
+		{
+			"id": "213",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "GRILO"
+		},
+		{
+			"id": "240",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 21,
+			"label": "BARRÃO"
+		},
+		{
+			"id": "247",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "JOSÉ FERNANDO LIMA SILVA"
+		},
+		{
+			"id": "251",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "BAMBI"
+		},
+		{
+			"id": "260",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "VENTÃO"
+		},
+		{
+			"id": "242",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "MARIA EDUARDA DA SILVA ACACIO"
+		},
+		{
+			"id": "264",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "MAY"
+		},
+		{
+			"id": "268",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "RAFAEL DORVILLE DE MELO"
+		},
+		{
+			"id": "271",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "BIANO"
+		},
+		{
+			"id": "276",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "NUBIA CAROLINA SANTOS DA SILVA"
+		},
+		{
+			"id": "277",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "PITANGUINHA"
+		},
+		{
+			"id": "295",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "ADRIAN VIEIRA DA SILVA"
+		},
+		{
+			"id": "262",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "GORDO"
+		},
+		{
+			"id": "278",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "PIPA"
+		},
+		{
+			"id": "239",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 21,
+			"label": "RAFINHA"
+		},
+		{
+			"id": "273",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "MATEUSINHO"
+		},
+		{
+			"id": "292",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "JOSE JEAN DA SILVA"
+		},
+		{
+			"id": "306",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "NANDO"
+		},
+		{
+			"id": "296",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "CARLINHOS"
+		},
+		{
+			"id": "290",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "TENEBROSA"
+		},
+		{
+			"id": "299",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "WALDIR VINICIUS DA SILVA SANTOS"
+		},
+		{
+			"id": "302",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "TONY SANTUSS"
+		},
+		{
+			"id": "393",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "JOSÉ PAULO DA SILVA"
+		},
+		{
+			"id": "304",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "NANDINHO"
+		},
+		{
+			"id": "380",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "GALEGUINHO"
+		},
+		{
+			"id": "400",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "MENOR DA 150"
+		},
+		{
+			"id": "411",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "NINHO"
+		},
+		{
+			"id": "381",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "SARA MARIA DA SILVA"
+		},
+		{
+			"id": "146",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "JACOB VELOSO"
+		},
+		{
+			"id": "258",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "FOFA"
+		},
+		{
+			"id": "314",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 7,
+			"label": "TIO PATINHAS"
+		},
+		{
+			"id": "370",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "MARIA VANUZA VITORIA COSTA DE AQUINO"
+		},
+		{
+			"id": "382",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "JUCA"
+		},
+		{
+			"id": "168",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "GILBERTO PEDRO DE FARIAS JUNIOR"
+		},
+		{
+			"id": "371",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "LALO"
+		},
+		{
+			"id": "383",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "DUQUE"
+		},
+		{
+			"id": "367",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "ERIKA PAULA DOS SANTOS RODRIGUES"
+		},
+		{
+			"id": "317",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 6,
+			"label": "M2"
+		},
+		{
+			"id": "250",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "DANIELE DA SILVA SANTOS"
+		},
+		{
+			"id": "318",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 6,
+			"label": "CHOCOLATE"
+		},
+		{
+			"id": "326",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 6,
+			"label": "PEQUENO"
+		},
+		{
+			"id": "366",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 6,
+			"label": "COROA"
+		},
+		{
+			"id": "384",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "BIEL"
+		},
+		{
+			"id": "320",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 7,
+			"label": "MACACO"
+		},
+		{
+			"id": "403",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "NEM"
+		},
+		{
+			"id": "412",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "PERIGOSO"
+		},
+		{
+			"id": "407",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "MENSON"
+		},
+		{
+			"id": "369",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "VANEUSON MATIAS DOS SANTOS"
+		},
+		{
+			"id": "408",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "GUGU"
+		},
+		{
+			"id": "298",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "GUILHERME GUSTAVO SANTOS"
+		},
+		{
+			"id": "372",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "ITHALA TAMIRES DOS SANTOS"
+		},
+		{
+			"id": "385",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "FOGUINHO"
+		},
+		{
+			"id": "337",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "CREMARAS"
+		},
+		{
+			"id": "397",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "NENÉM"
+		},
+		{
+			"id": "373",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "EDCLEIDE DOS SANTOS SILVA"
+		},
+		{
+			"id": "386",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "COLÔMBIA"
+		},
+		{
+			"id": "288",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "JONATA PITBULL"
+		},
+		{
+			"id": "409",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "DUDU"
+		},
+		{
+			"id": "405",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "NEGÃO"
+		},
+		{
+			"id": "358",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "FÉLIX BATISTA SANTOS"
+		},
+		{
+			"id": "413",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "VAL"
+		},
+		{
+			"id": "387",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "CH"
+		},
+		{
+			"id": "297",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "MIRELLY CECILIA MENEZES REIS"
+		},
+		{
+			"id": "374",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "AK"
+		},
+		{
+			"id": "209",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "joaozinho"
+		},
+		{
+			"id": "351",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "ANTONIO SOARES DA SILVA"
+		},
+		{
+			"id": "375",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "CHIQUINHO"
+		},
+		{
+			"id": "365",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "ADRIAN VIEIRA DA SILVA"
+		},
+		{
+			"id": "388",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "IAN MARKIS DE OLIVEIRA DA SILVA"
+		},
+		{
+			"id": "414",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "DANIELA ROSELI DA SILVA"
+		},
+		{
+			"id": "415",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "WALISSON COMÉDIA"
+		},
+		{
+			"id": "342",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "BRENO LIMA SANTOS"
+		},
+		{
+			"id": "338",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "TRINTADO"
+		},
+		{
+			"id": "349",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "CLEISINHO CLS"
+		},
+		{
+			"id": "347",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "HEVAIR ALVES SANTOS"
+		},
+		{
+			"id": "345",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "MAGO DA XRE"
+		},
+		{
+			"id": "341",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "JOSE VIEIRA DOS SANTOS JUNIOR"
+		},
+		{
+			"id": "346",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 6,
+			"label": "MANOEL LUIZ SANTOS DE ALMEIDA"
+		},
+		{
+			"id": "348",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 6,
+			"label": "DL"
+		},
+		{
+			"id": "354",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "DJORKAEFF DOS SANTOS DE MELO"
+		},
+		{
+			"id": "359",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "ALEX ROCHA DO SACRAMENTO"
+		},
+		{
+			"id": "376",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "JHON"
+		},
+		{
+			"id": "389",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "ZÉ PEQUENO"
+		},
+		{
+			"id": "329",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "BRUNÃO"
+		},
+		{
+			"id": "377",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "CARECA"
+		},
+		{
+			"id": "390",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "BRUNO DA SILVA SANTOS"
+		},
+		{
+			"id": "339",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "CHAÍSCA"
+		},
+		{
+			"id": "416",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "ALICIA MARIA RODRIGUES DA SILVA"
+		},
+		{
+			"id": "378",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "JU"
+		},
+		{
+			"id": "391",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "CRISTIANE VITÓRIA DA CONCEIÇÃO"
+		},
+		{
+			"id": "392",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "NEGO"
+		},
+		{
+			"id": "401",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "JOSÉ FERNANDO DOS SANTOS"
+		},
+		{
+			"id": "417",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "BALA"
+		},
+		{
+			"id": "410",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "LUIZ HENRIQUE SILVA DOS SANTOS"
+		},
+		{
+			"id": "300",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "DAIANE FRANCIELE DA SILVA"
+		},
+		{
+			"id": "344",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "IGOR SANTOS COSTA DAMASCENO"
+		},
+		{
+			"id": "331",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "CHESTER"
+		},
+		{
+			"id": "362",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "DANI"
+		},
+		{
+			"id": "352",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "GUILHERME KAUAN PINTO COSTA"
+		},
+		{
+			"id": "307",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "MAYKON FERREIRA ANDRADE"
+		},
+		{
+			"id": "419",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "MERCIA VIVIANE CANUTO LEANDRO"
+		},
+		{
+			"id": "305",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "WAL DIAS"
+		},
+		{
+			"id": "340",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "XANDY PH"
+		},
+		{
+			"id": "316",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 7,
+			"label": "DOMAGO"
+		},
+		{
+			"id": "319",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 6,
+			"label": "CIDE CIGANO"
+		},
+		{
+			"id": "328",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "JUNIOR DO DIMAS"
+		},
+		{
+			"id": "343",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "LEBRE"
+		},
+		{
+			"id": "286",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "CABRITO/CABRITINHO"
+		},
+		{
+			"id": "335",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "JOHN CLAY SANTOS"
+		},
+		{
+			"id": "420",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "COROA"
+		},
+		{
+			"id": "421",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "TAMIRES SILVESTRE DE MELO"
+		},
+		{
+			"id": "423",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "ERISON MACHADO DA SILVA"
+		},
+		{
+			"id": "424",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "PEDRINHO"
+		},
+		{
+			"id": "321",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 6,
+			"label": "PLAYBOY"
+		},
+		{
+			"id": "327",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "RAMON EDGAR SANTOS"
+		},
+		{
+			"id": "311",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "ALDO SANTOS"
+		},
+		{
+			"id": "323",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "CRIS-GV"
+		},
+		{
+			"id": "422",
+			"size": 22.8755032994728,
+			"type": "membro",
+			"group": 21,
+			"label": "DANIELA ROCHA VALENÇA"
+		},
+		{
+			"id": "426",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "JAIRLANE CRISTINA DA SILVA SANTOS"
+		},
+		{
+			"id": "428",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 20,
+			"label": "LUCAS PAULINO DOS SANTOS"
+		},
+		{
+			"id": "395",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "RODEIRINHA"
+		},
+		{
+			"id": "394",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "INHÃM"
+		},
+		{
+			"id": "396",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "LIPE"
+		},
+		{
+			"id": "398",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "WILLA"
+		},
+		{
+			"id": "399",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "JOSÉ ARTHUR BARBOSA DOS SANTOS"
+		},
+		{
+			"id": "402",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "FAMOSINHO"
+		},
+		{
+			"id": "404",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 7,
+			"label": "LALO"
+		},
+		{
+			"id": "294",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "NILSINHO"
+		},
+		{
+			"id": "267",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 22,
+			"label": "teste"
+		},
+		{
+			"id": "282",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "ANTONIO ISAQUE PAZ ALVES"
+		},
+		{
+			"id": "289",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "ELBI DO JATOBÁ"
+		},
+		{
+			"id": "280",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "GAÚCHO CIGANO"
+		},
+		{
+			"id": "350",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "TIA"
+		},
+		{
+			"id": "406",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "SINTONIA"
+		},
+		{
+			"id": "308",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "NUNES"
+		},
+		{
+			"id": "324",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "FILIPE DOS SANTOS PEREIRA"
+		},
+		{
+			"id": "322",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "IGUINHO"
+		},
+		{
+			"id": "291",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 20,
+			"label": "CEIÇA"
+		},
+		{
+			"id": "293",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "ADRIANO JOSE DOS SANTOS"
+		},
+		{
+			"id": "353",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "DAVYSON GUILHERME SANTOS LIMA"
+		},
+		{
+			"id": "363",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "EDNA DA SILVA SANTOS"
+		},
+		{
+			"id": "364",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "LUIS FERNANDO RAMOS DA SILVA"
+		},
+		{
+			"id": "210",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 6,
+			"label": "PEPE"
+		},
+		{
+			"id": "211",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "NAN"
+		},
+		{
+			"id": "225",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 6,
+			"label": "PIRRI"
+		},
+		{
+			"id": "255",
+			"size": 21.0903548889591,
+			"type": "membro",
+			"group": 21,
+			"label": "DAVI SILVA SOUZA"
+		},
+		{
+			"id": "256",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 21,
+			"label": "VALKIRIA MOREIRA DA SILVA"
+		},
+		{
+			"id": "310",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "GEOVANNE JUSTINO DOS SANTOS"
+		},
+		{
+			"id": "334",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "MARDEN AYSLAN RODRIGUES LIMA"
+		},
+		{
+			"id": "361",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "BRUNO VIEIRA LISBOA"
+		},
+		{
+			"id": "357",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "CARLA VITORIA LEITE DA SILVA"
+		},
+		{
+			"id": "356",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "RONALDINHO"
+		},
+		{
+			"id": "355",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "NETO"
+		},
+		{
+			"id": "360",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "MARIA NATALIA SILVA SANTOS"
+		},
+		{
+			"id": "336",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "WENDELL YURY RODRIGUES SANTOS"
+		},
+		{
+			"id": "303",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "GABRIEL MAIA"
+		},
+		{
+			"id": "315",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "VITÃO"
+		},
+		{
+			"id": "333",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "MERKLYS WILLIAN DOS SANTOS"
+		},
+		{
+			"id": "325",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "MAGO"
+		},
+		{
+			"id": "309",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "PIRATA"
+		},
+		{
+			"id": "332",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "VOVOZONA"
+		},
+		{
+			"id": "330",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "THIAGO TRATOR"
+		},
+		{
+			"id": "301",
+			"size": 15.5451774444796,
+			"type": "membro",
+			"group": 20,
+			"label": "VITOR GABRIEL SOUZA CRUZ"
+		},
+		{
+			"id": "226",
+			"size": 18.7888983093449,
+			"type": "membro",
+			"group": 21,
+			"label": "MANCHA"
+		},
+		{
+			"id": "6",
+			"size": 46.7609588010767,
+			"type": "faccao",
+			"group": 6,
+			"label": "CV"
+		},
+		{
+			"id": "7",
+			"size": 43.8728520367781,
+			"type": "faccao",
+			"group": 7,
+			"label": "PCC"
+		},
+		{
+			"id": "21",
+			"size": 44.7504433748295,
+			"type": "faccao",
+			"group": 21,
+			"label": "BPL/PCC"
+		},
+		{
+			"id": "20",
+			"size": 53.185301612142,
+			"type": "faccao",
+			"group": 20,
+			"label": "Sem Facção"
+		},
+		{
+			"id": "22",
+			"size": 25.5672811924425,
+			"type": "faccao",
+			"group": 22,
+			"label": "Sem Informação"
+		},
+		{
+			"id": "0",
+			"size": 54.697989267202,
+			"type": "faccao",
+			"group": 0,
+			"label": "Facção 0"
+		},
+		{
+			"id": "3",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Porta-Voz"
+		},
+		{
+			"id": "1",
+			"size": 18.7888983093449,
+			"type": "funcao",
+			"group": 6,
+			"label": "Presidente"
+		},
+		{
+			"id": "2",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Vice-Presidente"
+		},
+		{
+			"id": "4",
+			"size": 18.7888983093449,
+			"type": "funcao",
+			"group": 6,
+			"label": "Tesoureiro"
+		},
+		{
+			"id": "5",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Final dos Cadastros Geral"
+		},
+		{
+			"id": "6",
+			"size": 46.7609588010767,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Final do Progresso Geral"
+		},
+		{
+			"id": "7",
+			"size": 43.8728520367781,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Final das Dívidas Geral"
+		},
+		{
+			"id": "8",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Final das Biqueiras Geral"
+		},
+		{
+			"id": "9",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Torre e Sintonia Estadual"
+		},
+		{
+			"id": "10",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Sintonia Interestadual"
+		},
+		{
+			"id": "11",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Responsável pelo Paiol"
+		},
+		{
+			"id": "12",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Geral das Missões"
+		},
+		{
+			"id": "13",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Final da ONG e dos Gravatas"
+		},
+		{
+			"id": "14",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Final da Disciplina Geral"
+		},
+		{
+			"id": "15",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Final dos Interiores"
+		},
+		{
+			"id": "16",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Final das Trancas Geral"
+		},
+		{
+			"id": "17",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Final das Rifas Geral"
+		},
+		{
+			"id": "18",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Orientadoras Gerais de Grupo de Whatsapp"
+		},
+		{
+			"id": "19",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Idealizador de Missões"
+		},
+		{
+			"id": "20",
+			"size": 53.185301612142,
+			"type": "funcao",
+			"group": 6,
+			"label": "Final do Cadastro das Biqueiras e Final do Cadastro dos Fornecedores"
+		},
+		{
+			"id": "21",
+			"size": 44.7504433748295,
+			"type": "funcao",
+			"group": 6,
+			"label": "Disciplina Rotativa Final das Trancas"
+		},
+		{
+			"id": "22",
+			"size": 25.5672811924425,
+			"type": "funcao",
+			"group": 6,
+			"label": "Disciplina Rotativa Final das Dívidas"
+		},
+		{
+			"id": "23",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Tesoureiro de área"
+		},
+		{
+			"id": "24",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Orientadores de grupos de whatsapp de área"
+		},
+		{
+			"id": "25",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Final dos Fornecedores"
+		},
+		{
+			"id": "26",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 6,
+			"label": "Conselho Final dos Jogos"
+		},
+		{
+			"id": "0",
+			"size": 54.697989267202,
+			"type": "funcao",
+			"group": 0,
+			"label": "sem informação"
+		},
+		{
+			"id": "27",
+			"size": 15.5451774444796,
+			"type": "funcao",
+			"group": 22,
+			"label": "sem função"
 		}
 	]
 }
