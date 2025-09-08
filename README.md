@@ -4,19 +4,20 @@
 ```
 svc-kg/
 ├─ db/
-│  ├─ 00_init.sql    # schema + seed + get_graph_membros
-│  ├─ 01_indexes.sql # índices
-│  └─ 02_alias.sql   # et_graph_membros -> get_graph_membros
+│  ├─ 00_init.sql    	# schema + seed + get_graph_membros
+│  ├─ 01_indexes.sql 	# índices
+│  └─ 02_alias.sql   	# et_graph_membros -> get_graph_membros
 ├─ docs/
-│  └─ openapi.yaml   # Swagger spec estático (usado no /docs)
-├─ static/           # (montado no container)
-│   ├─ vis-embed.js
+│  └─ openapi.yaml   	# Swagger spec estático (usado no /docs)
+├─ static/           	# (montado no container)
+│   ├─ vis-embed.js		# Apoio do visjs
 │   ├─ vis-page.js
-│   └─ vis-style.css
+│   └─ vis-style.css	# Apoio do visjs e do pyvis
 ├─ app.py
 ├─ Dockerfile
-├─ docker-compose.local.yml
-├─ docker-compose.coolify.yml
+├─ docker-compose.local.yml		# docker local
+├─ docker-compose.coolify.yml	# docker coolify
+├─ docker-compose.yml			# docker prinicpal para o coolify
 ├─ .env
 ├─ .env.example
 ├─ .gitignore
