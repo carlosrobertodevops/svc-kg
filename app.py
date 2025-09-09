@@ -707,7 +707,7 @@ async def vis_visjs(
     parts.append("<!doctype html>\n")
     parts.append('<html lang="pt-br">\n')
     parts.append("  <head>\n")
-    parts.append('    <meta charset="utf-8" />\n")
+    parts.append('    <meta charset="utf-8" />\n')
     parts.append(f"    <title>{title}</title>\n")
     parts.append(f'    <link rel="stylesheet" href="{css_href}">\n")
     parts.append('    <link rel="stylesheet" href="/static/vis-style.css">\n")
