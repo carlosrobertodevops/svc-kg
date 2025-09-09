@@ -711,7 +711,7 @@ async def vis_visjs(
     parts.append(f"    <title>{title}</title>\n")
     parts.append(f'    <link rel="stylesheet" href="{css_href}">\n')
     parts.append('    <link rel="stylesheet" href="/static/vis-style.css">\n')
-    parts.append(f'    <meta name="theme-color" content="{bg}">\n")
+    parts.append(f'    <meta name="theme-color" content="{bg}">\n')
     parts.append("    <style>\n")
     parts.append("      html,body,#mynetwork { height:100%; margin:0; }\n")
     parts.append(
@@ -766,6 +766,7 @@ async def vis_visjs(
 # PYVIS — layout/physics tunado + painel de física + labels adaptativos
 # -----------------------------------------------------------------------------
 from pyvis.network import Network  # noqa: E402
+
 
 @app.get("/v1/vis/pyvis", response_class=HTMLResponse, tags=["viz"])
 async def vis_pyvis(
@@ -872,8 +873,8 @@ async def vis_pyvis(
 
         # tamanho/massa pelo grau
         d = float(deg.get(nid, 0))
-        value = 16.0 + (d ** 0.5) * 12.0
-        mass = 1.0 + (d ** 0.5) * 0.7
+        value = 16.0 + (d**0.5) * 12.0
+        mass = 1.0 + (d**0.5) * 0.7
 
         node_kwargs: Dict[str, Any] = dict(
             title=label,
@@ -1140,7 +1141,6 @@ async def custom_docs():
     resp.headers["Content-Security-Policy"] = csp
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
-
 
 
 # import os
