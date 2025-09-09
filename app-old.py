@@ -1,15 +1,16 @@
 # =============================================================================
 # Arquivo: app.py
-# Versão: v1.7.20
+# Versão: v1.7.21
 # Objetivo: API FastAPI do micro-serviço svc-kg (graph + visualizações + ops)
 # Funções/métodos:
 # - live/health/ready/ops_status: sondas e status operacional
 # - graph_membros: retorna grafo (nós/arestas) via Supabase RPC (fallback com e sem p_)
-# - vis_visjs: página HTML com vis-network (sem f-string ao redor do JS; arestas ultrafinas; busca; cores CV/PCC/funções; física OFF após estabilizar)
-# - vis_pyvis: página HTML com PyVis (arestas ultrafinas; física OFF após estabilizar; busca)
+# - vis_visjs: página HTML com vis-network (arestas ultrafinas; busca; cores CV/PCC/funções;
+#              layout/physics tunado; configure UI; física OFF após estabilizar)
+# - vis_pyvis: página HTML com PyVis (arestas ultrafinas; configure UI; física OFF após estabilizar; busca)
 # - /docs: Swagger UI custom usando /openapi.json do FastAPI
 # - Utilidades: normalização de labels PG array, cache Redis, truncamento seguro
-# Atualização: 08/09/2025 17h51min
+# Atualização: 09/09/2025 09h55min
 # =============================================================================
 
 import os
@@ -57,7 +58,7 @@ log = logging.getLogger("svc-kg")
 
 app = FastAPI(
     title="svc-kg",
-    version="v1.7.20",
+    version="v1.7.21",
     description="Micro serviço de Knowledge Graph com visualizações (vis.js e PyVis).",
     docs_url=None,
     redoc_url=None,
@@ -188,8 +189,8 @@ def normalize_graph_labels(data: Dict[str, Any]) -> Dict[str, Any]:
     for e in edges:
         if not e:
             continue
-        a = str(e.get("source"))
-        b = str(e.get("target"))
+        a = str(e.get("source") or e.get("from"))
+        b = str(e.get("target") or e.get("to"))
         if a in node_ids and b in node_ids:
             fe = dict(e)
             fe["source"] = a
@@ -434,7 +435,7 @@ async def graph_membros(
 
 
 # -----------------------------------------------------------------------------
-# VIS.JS (vis-network) — sem f-string ao redor do JS para evitar problemas com chaves
+# VIS.JS (vis-network) — layout/physics tunado + configure UI + cores CV/PCC/funções
 # -----------------------------------------------------------------------------
 @app.get("/v1/vis/visjs", response_class=HTMLResponse, tags=["viz"])
 async def vis_visjs(
@@ -466,6 +467,31 @@ async def vis_visjs(
             + "</script>"
         )
 
+    # Config padrão de física (pode ser alterada no painel "configure")
+    physics_cfg = {
+        "solver": "forceAtlas2Based",
+        "stabilization": {"enabled": True, "iterations": 900, "fit": True},
+        "forceAtlas2Based": {
+            "gravitationalConstant": -18000,
+            "centralGravity": 0.02,
+            "springLength": 220,
+            "springConstant": 0.015,
+            "damping": 0.45,
+            "avoidOverlap": 1.0,
+        },
+        "repulsion": {
+            "nodeDistance": 240,
+            "springLength": 200,
+            "springConstant": 0.02,
+            "damping": 0.35,
+        },
+    }
+    embedded_cfg = (
+        '<script id="__KG_CFG__" type="application/json">'
+        + json.dumps({"physics": physics_cfg}, ensure_ascii=False)
+        + "</script>"
+    )
+
     js_href = (
         "/static/vendor/vis-network.min.js"
         if os.path.exists("static/vendor/vis-network.min.js")
@@ -486,10 +512,10 @@ async def vis_visjs(
   const source = container.getAttribute('data-source') || 'server';
   const endpoint = container.getAttribute('data-endpoint') || '/v1/graph/membros';
 
-  const COLOR_CV  = '#d32f2f';  // vermelho
-  const COLOR_PCC = '#0d47a1';  // azul escuro
-  const COLOR_FUN = '#fdd835';  // amarelo (função)
-  const COLOR_DEF = '#607d8b';  // cinza padrão
+  const COLOR_CV  = '#d32f2f';
+  const COLOR_PCC = '#0d47a1';
+  const COLOR_FUN = '#fdd835';
+  const COLOR_DEF = '#607d8b';
 
   const EDGE_COLORS = {
     'PERTENCE_A':       '#9e9e9e',
@@ -499,17 +525,22 @@ async def vis_visjs(
     'CO_FUNCAO':        '#546e7a'
   };
 
-  function isPgTextArray(s) { s=(s||'').trim(); return s.length>=2 && s[0]=='{' && s[s.length-1]=='}'; }
-  function cleanLabel(raw) {
+  const cfgTag = document.getElementById('__KG_CFG__');
+  const CFG = cfgTag ? (JSON.parse(cfgTag.textContent||'{}')||{}) : {};
+  const PHYS = (CFG.physics||{});
+
+  function isPgTextArray(s){ s=(s||'').trim(); return s.length>=2 && s[0]=='{' && s[s.length-1]=='}'; }
+  function cleanLabel(raw){
     if(!raw) return '';
     const s=String(raw).trim();
     if(!isPgTextArray(s)) return s;
     const inner=s.slice(1,-1); if(!inner) return '';
-    return inner.replace(/(^|,)\\s*"?null"?\\s*(?=,|$)/gi,'').replace(/"/g,'').split(',').map(x=>x.trim()).filter(Boolean).join(', ');
+    return inner.replace(/(^|,)\\s*"?null"?\\s*(?=,|$)/gi,'')
+                .replace(/"/g,'')
+                .split(',').map(x=>x.trim()).filter(Boolean).join(', ');
   }
 
-  // mapeia cor da facção pelo ID do nó de facção
-  function inferFaccaoColors(rawNodes) {
+  function inferFaccaoColors(rawNodes){
     const map={};
     rawNodes.filter(n=>n && String(n.type||'').toLowerCase().includes('facc')).forEach(n=>{
       const name = cleanLabel(n.label||'').toUpperCase();
@@ -520,33 +551,26 @@ async def vis_visjs(
     return map;
   }
 
-  // regra de cor por nó (considera group/faccao_id; type; e o próprio label)
-  function colorForNode(n, faccaoColorById) {
+  function colorForNode(n, faccaoColorById){
     const gid = String(n.group ?? n.faccao_id ?? '');
     if (gid && faccaoColorById[gid]) return faccaoColorById[gid];
 
     const t = String(n.type||'').toLowerCase();
     const L = String(n.label||'').toUpperCase();
 
-    // variações "funcao/função"
     if (t.includes('funç') || t === 'funcao') return COLOR_FUN;
-
-    // variações "faccao/facção"
-    if (t.includes('facc')) {
+    if (t.includes('facc')){
       if (L.includes('CV'))  return COLOR_CV;
       if (L.includes('PCC')) return COLOR_PCC;
     }
-
-    // fallback pelo rótulo do nó
     if (L.includes('CV'))  return COLOR_CV;
     if (L.includes('PCC')) return COLOR_PCC;
-
     return COLOR_DEF;
   }
 
-  function edgeStyleFor(rel) { return { color: EDGE_COLORS[rel] || '#b0bec5', width: 0.1 }; } // ultrafina
+  function edgeStyleFor(rel){ return { color: EDGE_COLORS[rel] || '#b0bec5', width: 0.1 }; }
 
-  function degreeMap(nodes,edges) {
+  function degreeMap(nodes,edges){
     const d={}; nodes.forEach(n=>d[n.id]=0);
     edges.forEach(e=>{ if(e.from in d) d[e.from]++; if(e.to in d) d[e.to]++; });
     return d;
@@ -554,13 +578,10 @@ async def vis_visjs(
 
   function colorObj(c, opacity){
     if (typeof c === 'object' && c) { return Object.assign({}, c, { opacity: opacity }); }
-    return {
-      background: c || COLOR_DEF,
-      border: c || COLOR_DEF,
-      highlight: { background: c || COLOR_DEF, border: c || COLOR_DEF },
-      hover: { background: c || COLOR_DEF, border: c || COLOR_DEF },
-      opacity: opacity
-    };
+    return { background:c||COLOR_DEF, border:c||COLOR_DEF,
+             highlight:{background:c||COLOR_DEF, border:c||COLOR_DEF},
+             hover:{background:c||COLOR_DEF, border:c||COLOR_DEF},
+             opacity: opacity };
   }
 
   function render(data){
@@ -569,104 +590,118 @@ async def vis_visjs(
 
     const faccaoColorById = inferFaccaoColors(rawNodes);
 
-    // índice label por id (para colorir arestas por CV/PCC)
     const labelById = {};
     rawNodes.forEach(n => { labelById[String(n.id)] = cleanLabel(n.label||''); });
 
-    // nós
-    const nodes = [];
-    const seen = new Set();
-    for (const n of rawNodes) {
+    const nodes=[]; const seen=new Set();
+    for (const n of rawNodes){
       if(!n || n.id==null) continue;
-      const id = String(n.id);
+      const id=String(n.id);
       if (seen.has(id)) continue; seen.add(id);
 
       const label = cleanLabel(n.label) || id;
       const group = String(n.group ?? n.faccao_id ?? n.type ?? '0');
       const photo = n.photo_url && /^https?:\\/\\//i.test(n.photo_url) ? n.photo_url : null;
-
       const color = colorForNode({group, type:n.type, label}, faccaoColorById);
 
-      const base = { id, label, group, color, borderWidth: 1 };
-      if (photo) { base.shape='circularImage'; base.image=photo; } else { base.shape='dot'; }
+      const base = { id, label, group, color, borderWidth:1 };
+      if (photo){ base.shape='circularImage'; base.image=photo; } else { base.shape='dot'; }
       nodes.push(base);
     }
 
     const nodeIds = new Set(nodes.map(n=>n.id));
 
-    // arestas (com cor puxada pelo label dos nós CV/PCC)
-    const edges = [];
-    for (const e of (rawEdges||[])) {
+    const edges=[];
+    for (const e of (rawEdges||[])){
       if(!e) continue;
-      const a = String(e.source ?? e.from);
-      const b = String(e.target ?? e.to);
+      const a=String(e.source ?? e.from);
+      const b=String(e.target ?? e.to);
       if(!nodeIds.has(a) || !nodeIds.has(b)) continue;
 
       const rel = e.relation || '';
       const style = edgeStyleFor(rel);
 
-      const la = String(labelById[a] || '').toUpperCase();
-      const lb = String(labelById[b] || '').toUpperCase();
+      const la = String(labelById[a]||'').toUpperCase();
+      const lb = String(labelById[b]||'').toUpperCase();
 
       let edgeColor = style.color;
       if (la.includes('CV') || lb.includes('CV')) edgeColor = COLOR_CV;
       else if (la.includes('PCC') || lb.includes('PCC')) edgeColor = COLOR_PCC;
-      // funções continuam amarelas
-      if (rel === 'EXERCE' || rel === 'FUNCAO_DA_FACCAO') edgeColor = COLOR_FUN;
+      if (rel==='EXERCE' || rel==='FUNCAO_DA_FACCAO') edgeColor = COLOR_FUN;
 
-      edges.push({ from:a, to:b, value: Number(e.weight||1), width: 0.1, color: edgeColor, title: rel });
+      edges.push({ from:a, to:b, value:Number(e.weight||1), width:0.1, color:edgeColor, title:rel });
     }
 
-    if (!nodes.length) {
-      container.innerHTML='<div style="padding:12px">Sem dados.</div>';
-      return;
-    }
+    if (!nodes.length){ container.innerHTML='<div style="padding:12px">Sem dados.</div>'; return; }
 
-    // explode nós com maior grau
     const deg = degreeMap(nodes, edges);
-    nodes.forEach(n=>{ const d=deg[n.id]||0; n.value = 14 + Math.log(d+1)*10; });
+    nodes.forEach(n=>{
+      const d = deg[n.id]||0;
+      n.value = 16 + Math.log(d+1)*14;
+      n.mass  = 1 + Math.log(d+1)*0.6;
+    });
 
     const dsNodes = new vis.DataSet(nodes);
     const dsEdges = new vis.DataSet(edges);
 
     const options = {
-      interaction: { hover:true, dragNodes:true, dragView:true, zoomView:true, multiselect:true, navigationButtons:true },
-      physics: { enabled: true, stabilization: { enabled:true, iterations: 300 } },
-      nodes: { shape:'dot', borderWidth:2 },
-      edges: { smooth:false, width:0.1, arrows: { to: { enabled: true, scaleFactor:0.5 } } }
+      layout: { improvedLayout: true, randomSeed: 7 },
+      interaction: {
+        hover:true, dragNodes:true, dragView:true, zoomView:true,
+        multiselect:true, navigationButtons:true, tooltipDelay: 120,
+        hideEdgesOnDrag:true, hideEdgesOnZoom:true
+      },
+      physics: {
+        enabled: true,
+        solver: PHYS.solver || 'forceAtlas2Based',
+        stabilization: PHYS.stabilization || { enabled:true, iterations:900, fit:true },
+        forceAtlas2Based: PHYS.forceAtlas2Based || {},
+        repulsion: PHYS.repulsion || {}
+      },
+      nodes: {
+        shape:'dot', borderWidth:1,
+        font: { size:12, strokeWidth:1, strokeColor:'#ffffff' },
+        scaling: { min:8, max:40, label: { enabled:true, min:8, max:22 } }
+      },
+      edges: { smooth:false, width:0.1, selectionWidth:0.1, arrows:{ to:{ enabled:true, scaleFactor:0.5 } } },
+      configure: { enabled: true, filter: 'physics', showButton: true }
     };
 
     const net = new vis.Network(container, { nodes: dsNodes, edges: dsEdges }, options);
-    net.once('stabilizationIterationsDone', ()=>{ net.setOptions({ physics:false }); net.fit({ animation: { duration: 300 } }); });
-    net.on('doubleClick', ()=> net.fit({ animation: { duration: 300 } }));
 
-    // Busca/destaque
+    net.once('stabilizationIterationsDone', ()=>{
+      net.setOptions({ physics:false });
+      net.fit({ animation:{ duration: 300 } });
+    });
+    net.on('doubleClick', ()=> net.fit({ animation:{ duration: 300 } }));
+
+    net.on('zoom', (p)=>{
+      const show = p.scale > 0.7;
+      net.setOptions({ nodes: { font: { size: show?12:0 } } });
+    });
+
     const q = document.getElementById('kg-search');
-    if (q) {
-      function run() {
+    if (q){
+      function run(){
         const t=(q.value||'').trim().toLowerCase(); if(!t) return;
         const all=dsNodes.get();
         const hits=all.filter(n => (n.label||'').toLowerCase().includes(t) || String(n.id)===t);
         if(!hits.length) return;
-        all.forEach(n => dsNodes.update({ id: n.id, color: colorObj(n.color, 0.25) }));
-        hits.forEach(h => {
-          const cur=dsNodes.get(h.id);
-          dsNodes.update({ id: h.id, color: colorObj(cur.color, 1) });
-        });
-        net.setOptions({ physics: false });
+        all.forEach(n => dsNodes.update({ id:n.id, color: colorObj(n.color, 0.18) }));
+        hits.forEach(h => { const cur=dsNodes.get(h.id); dsNodes.update({ id:h.id, color: colorObj(cur.color, 1) }); });
         net.fit({ nodes: hits.map(h=>h.id), animation: { duration: 300 } });
       }
       q.addEventListener('change', run);
       q.addEventListener('keyup', e=>{ if(e.key==='Enter') run(); });
     }
-    const p=document.getElementById('btn-print'); if(p) p.onclick=()=>window.print();
+    const p=document.getElementById('btn-print');  if(p) p.onclick=()=>window.print();
     const r=document.getElementById('btn-reload'); if(r) r.onclick=()=>location.reload();
   }
 
   function run(){
     if ((container.getAttribute('data-source')||'server') === 'server'){
-      const tag=document.getElementById('__KG_DATA__'); if(!tag) { container.innerHTML='<div style="padding:12px">Dados não incorporados.</div>'; return; }
-      try { render(JSON.parse(tag.textContent||'{}')); } catch(e){ container.innerHTML='<pre>'+String(e)+'</pre>'; }
+      const tag=document.getElementById('__KG_DATA__'); if(!tag){ container.innerHTML='<div style="padding:12px">Dados não incorporados.</div>'; return; }
+      try{ render(JSON.parse(tag.textContent||'{}')); }catch(e){ container.innerHTML='<pre>'+String(e)+'</pre>'; }
     } else {
       const params=new URLSearchParams(window.location.search);
       const qs=new URLSearchParams();
@@ -678,8 +713,7 @@ async def vis_visjs(
       qs.set('cache',      params.get('cache')      ?? 'true');
       const url=endpoint+'?'+qs.toString();
       fetch(url,{ headers:{ 'Accept':'application/json' } })
-        .then(r=>r.json())
-        .then(render)
+        .then(r=>r.json()).then(render)
         .catch(err=>{ container.innerHTML='<pre>'+String(err)+'</pre>'; });
     }
   }
@@ -730,6 +764,7 @@ async def vis_visjs(
     parts.append(f'         data-source="{source}"\n')
     parts.append(f'         data-debug="{str(debug).lower()}"></div>\n')
     parts.append(f"    {embedded_block}\n")
+    parts.append(f"    {embedded_cfg}\n")
     parts.append(f'    <script src="{js_href}"></script>\n')
     parts.append(script_js)
     parts.append("  </body>\n")
@@ -878,23 +913,49 @@ async def vis_pyvis(
         color = EDGE_COLORS.get(rel, "#b0bec5")
         net.add_edge(a, b, value=w, width=0.1, color=color, title=rel)
 
+    # opções (física desliga após estabilização) + painel configure somente para physics
     net.set_options(
         """
 {
+  "layout": { "improvedLayout": true, "randomSeed": 7 },
   "interaction": {
     "hover": true,
     "dragNodes": true,
     "dragView": true,
     "zoomView": true,
     "multiselect": true,
-    "navigationButtons": true
+    "navigationButtons": true,
+    "tooltipDelay": 120,
+    "hideEdgesOnDrag": true,
+    "hideEdgesOnZoom": true
   },
+  "configure": { "enabled": true, "filter": "physics", "showButton": true },
   "physics": {
     "enabled": true,
-    "stabilization": { "enabled": true, "iterations": 300 }
+    "solver": "forceAtlas2Based",
+    "stabilization": { "enabled": true, "iterations": 900, "fit": true },
+    "forceAtlas2Based": {
+      "gravitationalConstant": -18000,
+      "centralGravity": 0.02,
+      "springLength": 220,
+      "springConstant": 0.015,
+      "damping": 0.45,
+      "avoidOverlap": 1.0
+    },
+    "repulsion": {
+      "nodeDistance": 240,
+      "springLength": 200,
+      "springConstant": 0.02,
+      "damping": 0.35
+    }
   },
-  "nodes": { "shape": "dot", "borderWidth": 2 },
-  "edges": { "smooth": false, "width": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
+  "nodes": {
+    "shape": "dot",
+    "borderWidth": 2,
+    "font": { "size": 12, "strokeWidth": 1, "strokeColor": "#ffffff" },
+    "scaling": { "min": 8, "max": 40, "label": { "enabled": true, "min": 8, "max": 22 } }
+  },
+  "edges": { "smooth": false, "width": 0.1, "selectionWidth": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
 }
         """
     )
