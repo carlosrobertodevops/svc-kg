@@ -809,7 +809,8 @@ async def vis_pyvis(
         hue = abs(h) % 360
         return f"hsl({hue},70%,50%)"
 
-    height = "90vh"
+    # height = "90vh"
+    height = "100%"
     bgcolor = "#0b0f19" if theme == "dark" else "#ffffff"
     fontcolor = "#e8eaed" if theme == "dark" else "#111827"
 
@@ -860,9 +861,11 @@ async def vis_pyvis(
         "PERTENCE_A": "#9e9e9e",
         "EXERCE": "#fdd835",
         "FUNCAO_DA_FACCAO": "#fdd835",
-        "CO_FACCAO": "#8e24aa",
+        # "CO_FACCAO": "#8e24aa",
+        "CO_FACCAO": "#d32f2f",
         "CO_FUNCAO": "#546e7a",
     }
+
     for e in edges:
         if not e:
             continue

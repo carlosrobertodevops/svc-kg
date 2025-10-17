@@ -5,97 +5,102 @@
 # Funções/métodos:
 # - Pilha local para emular Supabase via PostgREST
 # =============================================================================
-version: "3.9"
-
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: kg-db
-    environment:
-      POSTGRES_DB: kgdb
-      POSTGRES_USER: kg
-      POSTGRES_PASSWORD: kg
-    ports:
-      - "5432:5432"
-    volumes:
-      - pg-data:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kg -d kgdb"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
+    db:
+        image: postgres:15-alpine
+        container_name: kg-db
+        env_file:
+            - .env.local
+        environment:
+            POSTGRES_DB: kgdb
+            POSTGRES_USER: kg
+            POSTGRES_PASSWORD: kg
+        ports:
+            - "5432:5432"
+        volumes:
+            - pg-data:/var/lib/postgresql/data
+            - ./db/init:/docker-entrypoint-initdb.d:ro
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U kg -d kgdb"]
+            interval: 10s
+            timeout: 5s
+            retries: 10
+        restart: unless-stopped
 
-  postgrest:
-    image: postgrest/postgrest:v12.2.3
-    container_name: kg-postgrest
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PGRST_DB_URI: postgres://kg:kg@db:5432/kgdb
-      PGRST_DB_SCHEMAS: public
-      PGRST_DB_ANON_ROLE: anon
-      PGRST_JWT_SECRET: devsecret
-      PGRST_DB_PREPARED_STATEMENTS: "false"
-    ports:
-      - "3000:3000"
-    restart: unless-stopped
+    postgrest:
+        image: postgrest/postgrest:v12.2.3
+        container_name: kg-postgrest
+        depends_on:
+            db:
+                condition: service_healthy
+        env_file:
+            - .env.local
+        environment:
+            PGRST_DB_URI: postgres://kg:kg@db:5432/kgdb
+            PGRST_DB_SCHEMAS: public
+            PGRST_DB_ANON_ROLE: anon
+            PGRST_JWT_SECRET: devsecret
+            PGRST_DB_PREPARED_STATEMENTS: "false"
+        ports:
+            - "3000:3000"
+        restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    container_name: kg-redis
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
+    redis:
+        image: redis:7-alpine
+        container_name: kg-redis
+        env_file:
+            - .env.local
+        command: ["redis-server", "--save", "", "--appendonly", "no"]
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        volumes:
+            - redis-data:/data
+        restart: unless-stopped
 
-  svc-kg:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: svc-kg:dev
-    container_name: kg-svc
-    env_file:
-      - .env
-    environment:
-      APP_ENV: development
-      PORT: 8080
-      WORKERS: 1
-      LOG_LEVEL: debug
-      ENABLE_REDIS_CACHE: ${ENABLE_REDIS_CACHE:-true}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    svc-kg:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: svc-kg:dev
+        container_name: kg-svc
+        env_file:
+            - .env.local
+        environment:
+            APP_ENV: development
+            PORT: 8080
+            WORKERS: 1
+            LOG_LEVEL: debug
+            ENABLE_REDIS_CACHE: ${ENABLE_REDIS_CACHE:-true}
+            REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
 
-      # 👇 aponta para o PostgREST local (emula Supabase)
-      SUPABASE_URL: http://postgrest:3000
-      SUPABASE_KEY: ${SUPABASE_KEY}
-      SUPABASE_RPC_FN: get_graph_membros
-      SUPABASE_TIMEOUT: 15
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgrest:
-        condition: service_started
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./assets:/app/assets
-      - ./static:/app/static
-      - ./docs:/app/docs:ro
-      - ./tmp:/app/tmp
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+            # 👇 aponta para o PostgREST local (emula Supabase)
+            SUPABASE_URL: ${SUPABASE_URL}
+            SUPABASE_KEY: ${SUPABASE_KEY}
+            SUPABASE_RPC_FN: get_graph_membros
+            SUPABASE_TIMEOUT: 15
+        depends_on:
+            redis:
+                condition: service_healthy
+            postgrest:
+                condition: service_started
+        ports:
+            - "8080:8080"
+        volumes:
+            - ./assets:/app/assets
+            - ./static:/app/static
+            - ./docs:/app/docs:ro
+            - ./tmp:/app/tmp
+        healthcheck:
+            test:
+                ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        restart: unless-stopped
 
 volumes:
-  redis-data:
-  pg-data:
+    redis-data:
+    pg-data:
