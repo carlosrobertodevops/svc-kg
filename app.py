@@ -725,7 +725,7 @@ async def vis_visjs(
         '      <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>\n'
     )
     parts.append("    </div>\n")
-    parts.append('    <div id="mynetwork" style="height:90vh;width:100%;"\n')
+    parts.append('    <div id="mynetwork" style="height:100%;width:100%;"\n')
     parts.append('         data-endpoint="/v1/graph/membros"\n')
     parts.append(f'         data-source="{source}"\n')
     parts.append(f'         data-debug="{str(debug).lower()}"></div>\n')
