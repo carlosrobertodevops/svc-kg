@@ -809,8 +809,8 @@ async def vis_pyvis(
         hue = abs(h) % 360
         return f"hsl({hue},70%,50%)"
 
-    # height = "90vh"
-    height = "100%"
+    height = "90vh"
+    # height = "100%"
     bgcolor = "#0b0f19" if theme == "dark" else "#ffffff"
     fontcolor = "#e8eaed" if theme == "dark" else "#111827"
 
