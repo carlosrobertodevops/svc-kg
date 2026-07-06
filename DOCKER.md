@@ -62,12 +62,21 @@ uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080} --log-level ${LOG_LEVEL:-inf
 
 # SERVER_CMD=gunicorn (default / prod)
 gunicorn -w ${WORKERS:-2} -k uvicorn.workers.UvicornWorker app:app \
-  -b 0.0.0.0:${PORT:-8080} --timeout 60 --log-level ${LOG_LEVEL:-info}
+  -b 0.0.0.0:${PORT:-8080} --timeout 120 --graceful-timeout 120 \
+  --log-level ${LOG_LEVEL:-info}
 ```
 
+> **Timeout do Gunicorn:** `--timeout 120 --graceful-timeout 120` (antes era
+> `--timeout 60`, sem graceful). Render de grafos grandes (~2000 nós) no
+> `/v1/vis/pyvis` pode passar de 60s; a montagem PyVis agora roda **fora do
+> event loop** (`asyncio.to_thread`), mas o teto de 120s evita o worker ser
+> morto por timeout durante a estabilização. Aplicado tanto no `CMD` do
+> Dockerfile quanto no `start.sh`.
+
 > `start.sh` existe como entrypoint alternativo (auto-detecta `app:app` ou
-> `src.app:app`, roda Gunicorn + UvicornWorker em `:8080`), mas o `CMD` padrão
-> do Dockerfile **não** o invoca — usa a linha `bash -lc` acima.
+> `src.app:app`, roda Gunicorn + UvicornWorker em `:8080` com o mesmo
+> `--timeout 120 --graceful-timeout 120`), mas o `CMD` padrão do Dockerfile
+> **não** o invoca — usa a linha `bash -lc` acima.
 
 `prometheus-fastapi-instrumentator` é o que expõe o endpoint **`/metrics`**
 (ver §5).
@@ -143,10 +152,18 @@ Browser (tela "Conhecimento") ──iframe──▶ svc-kg  ──psycopg3──
 - **DNS interno:** dentro da rede docker do mondaha, o serviço é alcançável em
   **`http://svc-kg:8080`** (nome do serviço `svc-kg` no
   `docker-compose.mondaha.yml`).
-- **Consumo pelo app mondaha:** a tela **"Conhecimento"** embute a visualização
-  em `<iframe>` apontando para a base pública do svc-kg
-  (`NEXT_PUBLIC_KG_SERVICE_URL`). Rotas de visualização:
+- **Consumo pelo app mondaha (BFF same-origin):** a tela **"Conhecimento"**
+  **não** embute mais o svc-kg cross-origin no browser. O mondaha expõe uma rota
+  BFF `GET /api/kg/pyvis` que faz `fetch` **server-side** em
+  `http://svc-kg:8080/v1/vis/pyvis` (DNS interno docker) e serve o HTML
+  **same-origin** (`text/html`, **sem** `X-Frame-Options` próprio). Evita
+  "connection reset"/"refused to connect" por scheme (https→http) e por
+  `X-Frame-Options`. Params repassados: `faccao_id`, `include_co`, `max_pairs`,
+  `max_nodes`, `max_edges`, `cache`, `theme`, `title`. Rotas de visualização:
   - `GET /v1/vis/pyvis?...` → **PyVis** (JS inline; pode esbarrar em CSP rígida).
+    Montagem do HTML roda **fora do event loop** (`asyncio.to_thread`); layout
+    afinado (`forceAtlas2Based` + `improvedLayout:false` + `drawThreshold`) para
+    grafos grandes não virarem "hairball".
   - `GET /v1/vis/visjs?...` → **vis-network** (assets locais, compatível com CSP).
 - **Dependência do Postgres do mondaha:** o **único** acesso a dados é a função
   SQL `public.get_graph_membros(p_faccao_id bigint, p_include_co boolean,
@@ -217,6 +234,11 @@ Arquivos de env por cenário: `.env` (deploy Coolify / mondaha), `.env.local`
   - Parâmetros: `interval: 10s`, `timeout: 5s`, `retries: 5`.
 - **Endpoints de saúde disponíveis:** `GET /live` (liveness), `GET /ready`
   (readiness — DNS/Redis/backend), `GET /health`.
+- **`GET /live` é o healthcheck do deploy principal** (`docker-compose.yaml` /
+  Coolify): responde barato e **independente** de render/DB, então o
+  `--timeout 120` do Gunicorn (necessário para render de grafo grande no
+  `/v1/vis/pyvis`) **não** atrasa o healthcheck — o `/live` continua rápido
+  mesmo com um worker ocupado montando o HTML PyVis.
 - **Redis** (nos composes que o sobem): healthcheck `redis-cli ping`.
 - **Postgres** (`docker-compose.local.yaml`): healthcheck `pg_isready`.
 

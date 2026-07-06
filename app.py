@@ -937,7 +937,7 @@ async def vis_pyvis(
       "max": 42,
       "label": { "enabled": true, "min": 9, "max": 22, "drawThreshold": 9, "maxVisible": 26 }
     },
-    "font": { "size": 12, "face": "Inter, Arial, sans-serif", "strokeWidth": 3, "strokeColor": "__STROKE__" }
+    "font": { "size": 12, "face": "Plus Jakarta Sans, Inter, Arial, sans-serif", "strokeWidth": 3, "strokeColor": "__STROKE__" }
   },
   "edges": {
     "smooth": false,
@@ -952,14 +952,21 @@ async def vis_pyvis(
         html = net.generate_html()
 
         # Toolbar minimalista
+        # Tipografia do Projeto Mondaha: Outfit (títulos) + Plus Jakarta Sans (corpo),
+        # accent primary #2B18EE. Fontes via Google Fonts (a CSP da rota BFF do mondaha
+        # libera fonts.googleapis.com / fonts.gstatic.com para este iframe).
         toolbar_css = """
 <style>
-  .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
-  .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; border:1px solid #e0e0e0; border-radius:1px; outline:none; }
-  .kg-toolbar button { padding:6px 10px; border:1px solid #e0e0e0; background:transparent; border-radius:1px; cursor:pointer; }
-  .kg-toolbar button:hover { background: rgba(0,0,0,.04); }
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
+  .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px 12px; border-bottom:1px solid rgba(127,127,127,.25); background:__BG__; color:__FC__; font-family:'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  .kg-toolbar h4 { margin:0; font-family:'Outfit', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; font-weight:700; font-size:15px; letter-spacing:-0.01em; color:__FC__; }
+  .kg-toolbar input[type="search"] { flex:1; min-width:220px; padding:7px 12px; border:1px solid rgba(127,127,127,.35); border-radius:8px; outline:none; font-family:inherit; font-size:13px; color:__FC__; background:transparent; }
+  .kg-toolbar input[type="search"]::placeholder { color:__FC__; opacity:.55; }
+  .kg-toolbar input[type="search"]:focus { border-color:#2B18EE; box-shadow:0 0 0 2px rgba(43,24,238,.25); }
+  .kg-toolbar button { padding:7px 12px; border:1px solid rgba(127,127,127,.35); background:transparent; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; font-weight:500; color:__FC__; transition:background .15s, border-color .15s, color .15s; }
+  .kg-toolbar button:hover { background:#2B18EE; border-color:#2B18EE; color:#ffffff; }
 </style>
-"""
+""".replace("__BG__", bgcolor).replace("__FC__", fontcolor)
         toolbar_html = f"""
 <div class="kg-toolbar">
   <h4 style="margin:0">{title}</h4>

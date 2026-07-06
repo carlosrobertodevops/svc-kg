@@ -9,6 +9,12 @@ e este projeto segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [Unreleased]
+### Corrigido
+- **fix:** layout PyVis legível (`forceAtlas2Based` + `improvedLayout:false` + label `drawThreshold`), geração via `asyncio.to_thread` (evita worker-kill), `gunicorn --timeout 120 --graceful-timeout 120`, `ensure_schema` autocommit (elimina log `current transaction is aborted` no boot). Consumido pelo mondaha via proxy BFF same-origin `/api/kg/pyvis` (evita connection reset/refused-to-connect por scheme/X-Frame-Options).
+
+---
+
 ## [v1.8.0] - 2026-07-06
 ### Migração Supabase → Postgres direto + cache Redis
 

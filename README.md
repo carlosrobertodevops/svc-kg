@@ -45,6 +45,25 @@ Microserviço de **Knowledge Graph** com:
   - `/v1/vis/pyvis` → **PyVis** (usa inline JS; pode ser bloqueado por CSP rígida)
   - `/v1/vis/visjs` → **vis-network** (sem inline; **assets locais**, compatível com CSP)
 
+### Layout PyVis legível (declutter)
+
+O `GET /v1/vis/pyvis` usa `net.set_options` afinado para grafos grandes não virarem "hairball":
+
+- `layout.improvedLayout:false` + solver **`forceAtlas2Based`** (`gravitationalConstant:-80`, `springLength:140`, `avoidOverlap:0.7`) — o default `improvedLayout` travava com >100 nós e produzia aglomerado ilegível.
+- `stabilization.iterations:900` — estabiliza antes de liberar interação.
+- `nodes.scaling.label.drawThreshold` — rótulos só aparecem ao dar zoom (declutter).
+- Font com **halo** sensível ao tema (`theme=light|dark`) e `edges` com `opacity:0.35`.
+
+A montagem do HTML PyVis (`add_node`/`add_edge`/`set_options`/`generate_html`) roda **fora do event loop**, via `await asyncio.to_thread(...)`, para não bloquear o worker Uvicorn nem ser morto pelo timeout do Gunicorn em grafos grandes (~2000 nós).
+
+**Tipografia Mondaha:** o toolbar HTML injetado no PyVis usa a tipografia do projeto Mondaha — **Outfit** (700) no título "Knowledge Graph (PyVis)" e **Plus Jakarta Sans** no input de busca e nos botões Imprimir/Recarregar, com cores theme-aware (`bgcolor`/`fontcolor` por `theme`) e accent **#2B18EE** (primary Mondaha) no focus do input e hover dos botões. `set_options` define `nodes.font.face = "Plus Jakarta Sans, Inter, Arial, sans-serif"`. As fontes são carregadas via **CDN Google Fonts** (`fonts.googleapis.com` / `fonts.gstatic.com`); o consumidor (mondaha, via proxy BFF `/api/kg/pyvis`) precisa permitir essas origens em `style-src`/`font-src` da CSP do iframe (já feito).
+
+### Consumo pelo mondaha (BFF same-origin)
+
+O app mondaha **não embute mais** o svc-kg cross-origin no browser. Ele expõe a rota BFF **`GET /api/kg/pyvis`** que faz `fetch` **server-side** em `http://svc-kg:8080/v1/vis/pyvis` (DNS interno docker) e serve o HTML **same-origin** (`text/html`, **sem** `X-Frame-Options` próprio). Evita "connection reset"/"refused to connect" por scheme (https→http) e por `X-Frame-Options`.
+
+Params repassados ao svc-kg: `faccao_id`, `include_co`, `max_pairs`, `max_nodes`, `max_edges`, `cache`, `theme`, `title`.
+
 ## Endpoints
 
 - `GET /live` — liveness  
