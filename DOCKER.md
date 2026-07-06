@@ -187,9 +187,13 @@ Browser (tela "Conhecimento") ──iframe──▶ svc-kg  ──psycopg3──
 
 - O svc-kg expõe **`/metrics`** (via `prometheus-fastapi-instrumentator`) na
   mesma porta HTTP **`:8080`**.
-- No `docker-compose.yaml` o serviço fica na rede external **`obs_net`**, de modo
+- No `docker-compose.yaml` o serviço fica na rede **`obs_net`**, de modo
   que o stack de observability (Prometheus) faça **scrape** em
-  **`svc-kg:8080/metrics`**.
+  **`svc-kg:8080/metrics`**. Essa rede é **owned pelo compose raiz do mondaha**
+  (`obs_net: { name: obs_net }`, não-external, criada automaticamente no `up`) —
+  quando o svc-kg roda **dentro** do stack mondaha ele apenas se anexa a
+  `obs_net` + `default`, sem `docker network create` manual. Só é preciso criar a
+  rede à mão para um deploy **standalone** do svc-kg sem o mondaha no ar.
 - **Não** duplicamos aqui a doc de Prometheus/Grafana/alertas — a configuração
   canônica de observability está em **`mondaha/docs/INFRA.md §16`**. Este guia só
   cobre o que o container do svc-kg expõe.
@@ -253,7 +257,7 @@ Arquivos de env por cenário: `.env` (deploy Coolify / mondaha), `.env.local`
 | Sintoma | Causa provável | Correção |
 | --- | --- | --- |
 | `network mondaha_default not found` | Stack mondaha não está no ar, ou subiu com `-p <projeto>` (rede vira `<projeto>_default`) | Suba o stack mondaha primeiro; ajuste `networks.mondaha.name` no `docker-compose.mondaha.yml`; confira com `docker network ls` |
-| `network obs_net not found` (deploy principal) | Rede external de observability inexistente | Crie/garanta a rede `obs_net` antes do `docker compose up` (ver `mondaha/docs/INFRA.md §16`) |
+| `network obs_net not found` (deploy principal) | Rede de observability inexistente porque o stack mondaha não está no ar | A rede `obs_net` é **owned pelo compose raiz do mondaha** (`obs_net: { name: obs_net }`, não-external, criada automaticamente no `docker compose up` do mondaha) — se o stack mondaha estiver rodando, ela já existe. Só rode `docker network create obs_net` manualmente ao subir o svc-kg **standalone** (sem o mondaha no ar). Ver `mondaha/docs/INFRA.md §16` |
 | Conexão ao Postgres falha in-network | `DATABASE_URL` com host errado | Use host = serviço `postgres` (`...@postgres:5432/mondaha`) dentro da rede; use `localhost` só ao rodar o svc-kg **fora** do Docker |
 | Grafo vazio / função ausente no banco | Migração idempotente não rodou | Garanta `KG_AUTO_MIGRATE=true`; `ensure_schema()` instala `public.get_graph_membros` no startup |
 | PyVis não renderiza no iframe (CSP) | PyVis usa JS inline | Use a rota `/v1/vis/visjs` (assets locais, compatível com CSP) |
