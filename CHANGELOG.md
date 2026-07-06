@@ -10,6 +10,9 @@ e este projeto segue [SemVer](https://semver.org/lang/pt-BR/).
 ---
 
 ## [Unreleased]
+### Alterado
+- **style:** toolbar do PyVis (`/v1/vis/pyvis`) usa a tipografia do Mondaha — Outfit (título) + Plus Jakarta Sans (input/botões/labels), accent #2B18EE, cores theme-aware; fontes via Google Fonts CDN (consumidor precisa liberar googleapis/gstatic na CSP do iframe).
+
 ### Corrigido
 - **fix:** layout PyVis legível (`forceAtlas2Based` + `improvedLayout:false` + label `drawThreshold`), geração via `asyncio.to_thread` (evita worker-kill), `gunicorn --timeout 120 --graceful-timeout 120`, `ensure_schema` autocommit (elimina log `current transaction is aborted` no boot). Consumido pelo mondaha via proxy BFF same-origin `/api/kg/pyvis` (evita connection reset/refused-to-connect por scheme/X-Frame-Options).
 

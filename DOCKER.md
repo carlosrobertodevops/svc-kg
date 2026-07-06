@@ -163,7 +163,11 @@ Browser (tela "Conhecimento") ──iframe──▶ svc-kg  ──psycopg3──
   - `GET /v1/vis/pyvis?...` → **PyVis** (JS inline; pode esbarrar em CSP rígida).
     Montagem do HTML roda **fora do event loop** (`asyncio.to_thread`); layout
     afinado (`forceAtlas2Based` + `improvedLayout:false` + `drawThreshold`) para
-    grafos grandes não virarem "hairball".
+    grafos grandes não virarem "hairball". A toolbar usa a **tipografia do
+    Mondaha** (Outfit + Plus Jakarta Sans, accent `#2B18EE`, theme-aware) via
+    **Google Fonts CDN** — a CSP do iframe consumidor precisa liberar
+    `fonts.googleapis.com` (`style-src`) e `fonts.gstatic.com` (`font-src`) para
+    as fontes renderizarem (já feito no proxy BFF `/api/kg/pyvis` do mondaha).
   - `GET /v1/vis/visjs?...` → **vis-network** (assets locais, compatível com CSP).
 - **Dependência do Postgres do mondaha:** o **único** acesso a dados é a função
   SQL `public.get_graph_membros(p_faccao_id bigint, p_include_co boolean,
