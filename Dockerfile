@@ -44,4 +44,4 @@ RUN mkdir -p /app/static/vendor \
 EXPOSE 8080
 
 ENV PORT=8080 WORKERS=2 LOG_LEVEL=info SERVER_CMD=gunicorn
-CMD ["bash","-lc","if [ \"$SERVER_CMD\" = uvicorn ]; then uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080} --log-level ${LOG_LEVEL:-info}; else gunicorn -w ${WORKERS:-2} -k uvicorn.workers.UvicornWorker app:app -b 0.0.0.0:${PORT:-8080} --timeout 60 --log-level ${LOG_LEVEL:-info}; fi"]
+CMD ["bash","-lc","if [ \"$SERVER_CMD\" = uvicorn ]; then uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080} --log-level ${LOG_LEVEL:-info}; else gunicorn -w ${WORKERS:-2} -k uvicorn.workers.UvicornWorker app:app -b 0.0.0.0:${PORT:-8080} --timeout 120 --graceful-timeout 120 --log-level ${LOG_LEVEL:-info}; fi"]

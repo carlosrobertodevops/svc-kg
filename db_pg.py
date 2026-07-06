@@ -130,18 +130,35 @@ async def ensure_schema() -> None:
         with open(sql_path, encoding="utf-8") as fh:
             sql_text = fh.read()
         pool = await _get_pool()
-        async with pool.connection() as conn, conn.cursor() as cur:
-            # Serializa a aplicação do schema entre workers: só um aplica
-            # por vez (session-level advisory lock na mesma conexão).
-            # Evita corrida no CREATE OR REPLACE FUNCTION (dup key pg_proc).
-            await cur.execute("SELECT pg_advisory_lock(%s)", (_SCHEMA_ADVISORY_LOCK,))
-            try:
-                await cur.execute(sql_text)
-            finally:
+        async with pool.connection() as conn:
+            # AUTOCOMMIT: sem transação aberta, cada statement do arquivo comita
+            # isoladamente. Assim uma falha pontual NÃO aborta os seguintes (evita
+            # "current transaction is aborted", que mascarava o erro real) e o
+            # advisory lock continua serializando os 2 workers do gunicorn.
+            await conn.set_autocommit(True)
+            async with conn.cursor() as cur:
+                # Serializa a aplicação do schema entre workers: só um aplica
+                # por vez (session-level advisory lock na mesma conexão).
+                # Evita corrida no CREATE OR REPLACE FUNCTION (dup key pg_proc).
                 await cur.execute(
-                    "SELECT pg_advisory_unlock(%s)", (_SCHEMA_ADVISORY_LOCK,)
+                    "SELECT pg_advisory_lock(%s)", (_SCHEMA_ADVISORY_LOCK,)
                 )
-        logger.info("ensure_schema: schema aplicado (%s)", sql_path)
+                try:
+                    try:
+                        await cur.execute(sql_text)
+                        logger.info("ensure_schema: schema aplicado (%s)", sql_path)
+                    except Exception as sql_exc:
+                        # Loga o erro REAL do statement (não o mascarado) e segue
+                        # fail-soft — o SQL é idempotente e outro worker já aplicou.
+                        logger.error(
+                            "ensure_schema: falha ao aplicar SQL (%s): %s",
+                            sql_path,
+                            sql_exc,
+                        )
+                finally:
+                    await cur.execute(
+                        "SELECT pg_advisory_unlock(%s)", (_SCHEMA_ADVISORY_LOCK,)
+                    )
     except Exception as exc:
         logger.error("ensure_schema falhou (%s): %s", _mask_dsn(DATABASE_URL), exc)
 

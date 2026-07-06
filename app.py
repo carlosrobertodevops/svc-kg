@@ -12,6 +12,7 @@
 # Atualização: 08/09/2025 17h51min
 # =============================================================================
 
+import asyncio
 import os
 import json
 import logging
@@ -816,98 +817,142 @@ async def vis_pyvis(
     bgcolor = "#0b0f19" if theme == "dark" else "#ffffff"
     fontcolor = "#e8eaed" if theme == "dark" else "#111827"
 
-    net = Network(
-        height=height,
-        width="100%",
-        bgcolor=bgcolor,
-        font_color=fontcolor,
-        directed=True,
-        cdn_resources="in_line",
-    )
-
-    seen = set()
-    for n in nodes:
-        if not n or n.get("id") is None:
-            continue
-        nid = str(n["id"])
-        if nid in seen:
-            continue
-        seen.add(nid)
-
-        label = str(n.get("label") or nid)
-        group = str(n.get("group") or n.get("faccao_id") or n.get("type") or "0")
-        size = n.get("size")
-        photo = (
-            n.get("photo_url")
-            if isinstance(n.get("photo_url"), str)
-            and n["photo_url"].startswith(("http://", "https://"))
-            else None
+    # A montagem do PyVis é CPU-bound e SÍNCRONA (add_node/add_edge em loop,
+    # set_options, generate_html + replaces). Em grafos grandes (~2000 nós) isso
+    # pode bloquear o event loop do uvicorn além do --timeout 60 do gunicorn e
+    # matar o worker (connection reset). Encapsulamos tudo numa função síncrona e
+    # a executamos fora do event loop via asyncio.to_thread. O comportamento é
+    # idêntico; as auxiliares (color_from_faccao, is_func, hash_color) e os
+    # locais (nodes, edges, theme, title, height, bgcolor, fontcolor) são
+    # capturados por closure.
+    def _render_pyvis_html() -> str:
+        net = Network(
+            height=height,
+            width="100%",
+            bgcolor=bgcolor,
+            font_color=fontcolor,
+            directed=True,
+            cdn_resources="in_line",
         )
 
-        fixed_color = color_from_faccao(group)
-        color = fixed_color or ("#fdd835" if is_func(n) else hash_color(group))
+        seen = set()
+        for n in nodes:
+            if not n or n.get("id") is None:
+                continue
+            nid = str(n["id"])
+            if nid in seen:
+                continue
+            seen.add(nid)
 
-        node_kwargs: Dict[str, Any] = dict(title=label, color=color, borderWidth=2)
-        if isinstance(size, (int, float)):
-            node_kwargs["value"] = float(size)
-        if photo:
-            node_kwargs["shape"] = "circularImage"
-            node_kwargs["image"] = photo
-        else:
-            node_kwargs["shape"] = "dot"
+            label = str(n.get("label") or nid)
+            group = str(n.get("group") or n.get("faccao_id") or n.get("type") or "0")
+            size = n.get("size")
+            photo = (
+                n.get("photo_url")
+                if isinstance(n.get("photo_url"), str)
+                and n["photo_url"].startswith(("http://", "https://"))
+                else None
+            )
 
-        net.add_node(nid, label=label, **node_kwargs)
+            fixed_color = color_from_faccao(group)
+            color = fixed_color or ("#fdd835" if is_func(n) else hash_color(group))
 
-    valid_nodes = set(net.get_nodes())
-    EDGE_COLORS = {
-        "PERTENCE_A": "#9e9e9e",
-        "EXERCE": "#fdd835",
-        "FUNCAO_DA_FACCAO": "#fdd835",
-        # "CO_FACCAO": "#8e24aa",
-        "CO_FACCAO": "#d32f2f",
-        "CO_FUNCAO": "#546e7a",
-    }
+            node_kwargs: Dict[str, Any] = dict(title=label, color=color, borderWidth=2)
+            if isinstance(size, (int, float)):
+                node_kwargs["value"] = float(size)
+            if photo:
+                node_kwargs["shape"] = "circularImage"
+                node_kwargs["image"] = photo
+            else:
+                node_kwargs["shape"] = "dot"
 
-    for e in edges:
-        if not e:
-            continue
-        a = str(e.get("source"))
-        b = str(e.get("target"))
-        if a not in valid_nodes or b not in valid_nodes:
-            continue
-        rel = e.get("relation") or ""
-        try:
-            w = float(e.get("weight") or 1.0)
-        except Exception:
-            w = 1.0
-        color = EDGE_COLORS.get(rel, "#b0bec5")
-        net.add_edge(a, b, value=w, width=0.1, color=color, title=rel)
+            net.add_node(nid, label=label, **node_kwargs)
 
-    net.set_options(
-        """
+        valid_nodes = set(net.get_nodes())
+        EDGE_COLORS = {
+            "PERTENCE_A": "#9e9e9e",
+            "EXERCE": "#fdd835",
+            "FUNCAO_DA_FACCAO": "#fdd835",
+            # "CO_FACCAO": "#8e24aa",
+            "CO_FACCAO": "#d32f2f",
+            "CO_FUNCAO": "#546e7a",
+        }
+
+        for e in edges:
+            if not e:
+                continue
+            a = str(e.get("source"))
+            b = str(e.get("target"))
+            if a not in valid_nodes or b not in valid_nodes:
+                continue
+            rel = e.get("relation") or ""
+            try:
+                w = float(e.get("weight") or 1.0)
+            except Exception:
+                w = 1.0
+            color = EDGE_COLORS.get(rel, "#b0bec5")
+            net.add_edge(a, b, value=w, width=0.1, color=color, title=rel)
+
+        # Layout legível para grafos densos (~2000 nós):
+        #  - improvedLayout:false  -> evita o kamada-kawai O(n^3) que trava e colapsa tudo num aglomerado
+        #  - forceAtlas2Based + avoidOverlap -> espalha os nós, sem empilhar
+        #  - scaling.label.drawThreshold -> só desenha o rótulo quando o nó tem tamanho de tela suficiente
+        #    (declutter: rótulos aparecem ao dar zoom, em vez de sobrepor todos de uma vez)
+        label_stroke = "#0b0f19" if theme == "dark" else "#ffffff"
+        net.set_options(
+            """
 {
+  "layout": { "improvedLayout": false },
   "interaction": {
     "hover": true,
     "dragNodes": true,
     "dragView": true,
     "zoomView": true,
     "multiselect": true,
-    "navigationButtons": true
+    "navigationButtons": true,
+    "hideEdgesOnDrag": true,
+    "hideEdgesOnZoom": true,
+    "tooltipDelay": 120
   },
   "physics": {
     "enabled": true,
-    "stabilization": { "enabled": true, "iterations": 300 }
+    "solver": "forceAtlas2Based",
+    "forceAtlas2Based": {
+      "gravitationalConstant": -80,
+      "centralGravity": 0.008,
+      "springLength": 140,
+      "springConstant": 0.10,
+      "damping": 0.5,
+      "avoidOverlap": 0.7
+    },
+    "maxVelocity": 40,
+    "minVelocity": 0.75,
+    "stabilization": { "enabled": true, "iterations": 900, "updateInterval": 25, "fit": true }
   },
-  "nodes": { "shape": "dot", "borderWidth": 2 },
-  "edges": { "smooth": false, "width": 0.1, "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } } }
+  "nodes": {
+    "shape": "dot",
+    "borderWidth": 2,
+    "scaling": {
+      "min": 6,
+      "max": 42,
+      "label": { "enabled": true, "min": 9, "max": 22, "drawThreshold": 9, "maxVisible": 26 }
+    },
+    "font": { "size": 12, "face": "Inter, Arial, sans-serif", "strokeWidth": 3, "strokeColor": "__STROKE__" }
+  },
+  "edges": {
+    "smooth": false,
+    "width": 0.15,
+    "color": { "opacity": 0.35 },
+    "arrows": { "to": { "enabled": true, "scaleFactor": 0.4 } }
+  }
 }
-        """
-    )
+            """.replace("__STROKE__", label_stroke)
+        )
 
-    html = net.generate_html()
+        html = net.generate_html()
 
-    # Toolbar minimalista
-    toolbar_css = """
+        # Toolbar minimalista
+        toolbar_css = """
 <style>
   .kg-toolbar { display:flex; gap:8px; align-items:center; padding:8px; border-bottom:1px solid #e0e0e0; }
   .kg-toolbar input[type="search"] { flex: 1; min-width:220px; padding:6px 10px; border:1px solid #e0e0e0; border-radius:1px; outline:none; }
@@ -915,7 +960,7 @@ async def vis_pyvis(
   .kg-toolbar button:hover { background: rgba(0,0,0,.04); }
 </style>
 """
-    toolbar_html = f"""
+        toolbar_html = f"""
 <div class="kg-toolbar">
   <h4 style="margin:0">{title}</h4>
   <input id="kg-search" type="search" placeholder="Buscar no gráfico" />
@@ -923,7 +968,7 @@ async def vis_pyvis(
   <button id="btn-reload" type="button" title="Recarregar">Recarregar</button>
 </div>
 """
-    toolbar_js = """
+        toolbar_js = """
 <script>
 (function(){
   function colorObj(c, opacity){
@@ -967,9 +1012,12 @@ async def vis_pyvis(
 })();
 </script>
 """
-    html = html.replace("</head>", toolbar_css + "\n</head>")
-    html = html.replace("<body>", "<body>\n" + toolbar_html + "\n")
-    html = html.replace("</body>", toolbar_js + "\n</body>")
+        html = html.replace("</head>", toolbar_css + "\n</head>")
+        html = html.replace("<body>", "<body>\n" + toolbar_html + "\n")
+        html = html.replace("</body>", toolbar_js + "\n</body>")
+        return html
+
+    html = await asyncio.to_thread(_render_pyvis_html)
 
     if cache and ENABLE_REDIS_CACHE:
         await _html_cache_set(cache_key, html)

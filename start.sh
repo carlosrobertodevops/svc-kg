@@ -22,4 +22,4 @@ echo "==> Using APP_MODULE=$MOD"
 echo "==> PYTHONPATH=$PYTHONPATH"
 echo "==> Listening on :8080"
 exec gunicorn -w ${WEB_CONCURRENCY:-2} -k uvicorn.workers.UvicornWorker "$MOD" \
-  -b 0.0.0.0:8080 --timeout 60 --log-level ${LOG_LEVEL:-info} --access-logfile -
+  -b 0.0.0.0:8080 --timeout 120 --graceful-timeout 120 --log-level ${LOG_LEVEL:-info} --access-logfile -
