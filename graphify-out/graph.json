@@ -1,0 +1,3761 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "app.py",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "app",
+      "community": 0,
+      "norm_label": "app.py"
+    },
+    {
+      "label": "_env_backend_ok()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L100",
+      "_origin": "ast",
+      "id": "app_env_backend_ok",
+      "community": 0,
+      "norm_label": "_env_backend_ok()"
+    },
+    {
+      "label": "_mask_db_url()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L104",
+      "_origin": "ast",
+      "id": "app_mask_db_url",
+      "community": 0,
+      "norm_label": "_mask_db_url()"
+    },
+    {
+      "label": "_html_cache_get()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L127",
+      "_origin": "ast",
+      "id": "app_html_cache_get",
+      "community": 0,
+      "norm_label": "_html_cache_get()"
+    },
+    {
+      "label": "_html_cache_set()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L138",
+      "_origin": "ast",
+      "id": "app_html_cache_set",
+      "community": 0,
+      "norm_label": "_html_cache_set()"
+    },
+    {
+      "label": "_get_redis()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L148",
+      "_origin": "ast",
+      "id": "app_get_redis",
+      "community": 0,
+      "norm_label": "_get_redis()"
+    },
+    {
+      "label": "redact()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L157",
+      "_origin": "ast",
+      "id": "app_redact",
+      "community": 0,
+      "norm_label": "redact()"
+    },
+    {
+      "label": "running_in_container()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L165",
+      "_origin": "ast",
+      "id": "app_running_in_container",
+      "community": 0,
+      "norm_label": "running_in_container()"
+    },
+    {
+      "label": "platform_info()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L176",
+      "_origin": "ast",
+      "id": "app_platform_info",
+      "community": 0,
+      "norm_label": "platform_info()"
+    },
+    {
+      "label": "Any",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L176",
+      "_origin": "ast",
+      "id": "any",
+      "community": 0,
+      "norm_label": "any"
+    },
+    {
+      "label": "_normalize_pg_text_array_label()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L191",
+      "_origin": "ast",
+      "id": "app_normalize_pg_text_array_label",
+      "community": 0,
+      "norm_label": "_normalize_pg_text_array_label()"
+    },
+    {
+      "label": "normalize_graph_labels()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L205",
+      "_origin": "ast",
+      "id": "app_normalize_graph_labels",
+      "community": 0,
+      "norm_label": "normalize_graph_labels()"
+    },
+    {
+      "label": "truncate_preview()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L240",
+      "_origin": "ast",
+      "id": "app_truncate_preview",
+      "community": 0,
+      "norm_label": "truncate_preview()"
+    },
+    {
+      "label": "fetch_graph_sanitized()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L257",
+      "_origin": "ast",
+      "id": "app_fetch_graph_sanitized",
+      "community": 0,
+      "norm_label": "fetch_graph_sanitized()"
+    },
+    {
+      "label": "_startup()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L287",
+      "_origin": "ast",
+      "id": "app_startup",
+      "community": 0,
+      "norm_label": "_startup()"
+    },
+    {
+      "label": "_shutdown()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L303",
+      "_origin": "ast",
+      "id": "app_shutdown",
+      "community": 0,
+      "norm_label": "_shutdown()"
+    },
+    {
+      "label": "live()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L318",
+      "_origin": "ast",
+      "id": "app_live",
+      "community": 0,
+      "norm_label": "live()"
+    },
+    {
+      "label": "health()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L323",
+      "_origin": "ast",
+      "id": "app_health",
+      "community": 0,
+      "norm_label": "health()"
+    },
+    {
+      "label": "ready()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L356",
+      "_origin": "ast",
+      "id": "app_ready",
+      "community": 0,
+      "norm_label": "ready()"
+    },
+    {
+      "label": "ops_status()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L379",
+      "_origin": "ast",
+      "id": "app_ops_status",
+      "community": 0,
+      "norm_label": "ops_status()"
+    },
+    {
+      "label": "graph_membros()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L401",
+      "_origin": "ast",
+      "id": "app_graph_membros",
+      "community": 0,
+      "norm_label": "graph_membros()"
+    },
+    {
+      "label": "vis_visjs()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L423",
+      "_origin": "ast",
+      "id": "app_vis_visjs",
+      "community": 0,
+      "norm_label": "vis_visjs()"
+    },
+    {
+      "label": "Response",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L423",
+      "_origin": "ast",
+      "id": "response",
+      "community": 0,
+      "norm_label": "response"
+    },
+    {
+      "label": "vis_pyvis()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L751",
+      "_origin": "ast",
+      "id": "app_vis_pyvis",
+      "community": 0,
+      "norm_label": "vis_pyvis()"
+    },
+    {
+      "label": "custom_docs()",
+      "file_type": "code",
+      "source_file": "app.py",
+      "source_location": "L984",
+      "_origin": "ast",
+      "id": "app_custom_docs",
+      "community": 0,
+      "norm_label": "custom_docs()"
+    },
+    {
+      "label": "Mascara a DATABASE_URL para status/logs: esconde user:senha, mostra s\u00f3 host/db.",
+      "file_type": "rationale",
+      "source_file": "app.py",
+      "source_location": "L105",
+      "_origin": "ast",
+      "id": "app_rationale_105",
+      "community": 0,
+      "norm_label": "mascara a database_url para status/logs: esconde user:senha, mostra so host/db."
+    },
+    {
+      "label": "GET fail-soft do cache de HTML no Redis.",
+      "file_type": "rationale",
+      "source_file": "app.py",
+      "source_location": "L128",
+      "_origin": "ast",
+      "id": "app_rationale_128",
+      "community": 0,
+      "norm_label": "get fail-soft do cache de html no redis."
+    },
+    {
+      "label": "SET fail-soft do cache de HTML no Redis (TTL = CACHE_API_TTL).",
+      "file_type": "rationale",
+      "source_file": "app.py",
+      "source_location": "L139",
+      "_origin": "ast",
+      "id": "app_rationale_139",
+      "community": 0,
+      "norm_label": "set fail-soft do cache de html no redis (ttl = cache_api_ttl)."
+    },
+    {
+      "label": "db_pg.py",
+      "file_type": "code",
+      "source_file": "db_pg.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "db_pg",
+      "community": 4,
+      "norm_label": "db_pg.py"
+    },
+    {
+      "label": "_mask_dsn()",
+      "file_type": "code",
+      "source_file": "db_pg.py",
+      "source_location": "L36",
+      "_origin": "ast",
+      "id": "db_pg_mask_dsn",
+      "community": 4,
+      "norm_label": "_mask_dsn()"
+    },
+    {
+      "label": "_get_pool()",
+      "file_type": "code",
+      "source_file": "db_pg.py",
+      "source_location": "L52",
+      "_origin": "ast",
+      "id": "db_pg_get_pool",
+      "community": 4,
+      "norm_label": "_get_pool()"
+    },
+    {
+      "label": "AsyncConnectionPool",
+      "file_type": "code",
+      "source_file": "db_pg.py",
+      "source_location": "L52",
+      "_origin": "ast",
+      "id": "asyncconnectionpool",
+      "community": 4,
+      "norm_label": "asyncconnectionpool"
+    },
+    {
+      "label": "fetch_graph()",
+      "file_type": "code",
+      "source_file": "db_pg.py",
+      "source_location": "L68",
+      "_origin": "ast",
+      "id": "db_pg_fetch_graph",
+      "community": 4,
+      "norm_label": "fetch_graph()"
+    },
+    {
+      "label": "pg_ping()",
+      "file_type": "code",
+      "source_file": "db_pg.py",
+      "source_location": "L102",
+      "_origin": "ast",
+      "id": "db_pg_pg_ping",
+      "community": 4,
+      "norm_label": "pg_ping()"
+    },
+    {
+      "label": "ensure_schema()",
+      "file_type": "code",
+      "source_file": "db_pg.py",
+      "source_location": "L115",
+      "_origin": "ast",
+      "id": "db_pg_ensure_schema",
+      "community": 4,
+      "norm_label": "ensure_schema()"
+    },
+    {
+      "label": "backend_ok()",
+      "file_type": "code",
+      "source_file": "db_pg.py",
+      "source_location": "L149",
+      "_origin": "ast",
+      "id": "db_pg_backend_ok",
+      "community": 4,
+      "norm_label": "backend_ok()"
+    },
+    {
+      "label": "close_pool()",
+      "file_type": "code",
+      "source_file": "db_pg.py",
+      "source_location": "L154",
+      "_origin": "ast",
+      "id": "db_pg_close_pool",
+      "community": 4,
+      "norm_label": "close_pool()"
+    },
+    {
+      "label": "Acesso direto ao Postgres do mondaha via psycopg 3 (async + pool).  Substitui a",
+      "file_type": "rationale",
+      "source_file": "db_pg.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "db_pg_rationale_1",
+      "community": 4,
+      "norm_label": "acesso direto ao postgres do mondaha via psycopg 3 (async + pool).  substitui a"
+    },
+    {
+      "label": "Mascara a senha da DATABASE_URL para logs seguros.",
+      "file_type": "rationale",
+      "source_file": "db_pg.py",
+      "source_location": "L37",
+      "_origin": "ast",
+      "id": "db_pg_rationale_37",
+      "community": 4,
+      "norm_label": "mascara a senha da database_url para logs seguros."
+    },
+    {
+      "label": "Retorna o pool singleton, criando-o (aberto) na 1\u00aa chamada.",
+      "file_type": "rationale",
+      "source_file": "db_pg.py",
+      "source_location": "L53",
+      "_origin": "ast",
+      "id": "db_pg_rationale_53",
+      "community": 4,
+      "norm_label": "retorna o pool singleton, criando-o (aberto) na 1a chamada."
+    },
+    {
+      "label": "Executa `get_graph_membros` e devolve `{'nodes': [...], 'edges': [...]}`.      S",
+      "file_type": "rationale",
+      "source_file": "db_pg.py",
+      "source_location": "L69",
+      "_origin": "ast",
+      "id": "db_pg_rationale_69",
+      "community": 4,
+      "norm_label": "executa `get_graph_membros` e devolve `{'nodes': [...], 'edges': [...]}`.      s"
+    },
+    {
+      "label": "Executa `SELECT 1`. True se o banco respondeu, False em qualquer erro.",
+      "file_type": "rationale",
+      "source_file": "db_pg.py",
+      "source_location": "L103",
+      "_origin": "ast",
+      "id": "db_pg_rationale_103",
+      "community": 4,
+      "norm_label": "executa `select 1`. true se o banco respondeu, false em qualquer erro."
+    },
+    {
+      "label": "Instala/atualiza a fun\u00e7\u00e3o + \u00edndices via `db/mondaha_install.sql` (idempotente).",
+      "file_type": "rationale",
+      "source_file": "db_pg.py",
+      "source_location": "L116",
+      "_origin": "ast",
+      "id": "db_pg_rationale_116",
+      "community": 4,
+      "norm_label": "instala/atualiza a funcao + indices via `db/mondaha_install.sql` (idempotente)."
+    },
+    {
+      "label": "True se DATABASE_URL est\u00e1 configurada (n\u00e3o vazia).",
+      "file_type": "rationale",
+      "source_file": "db_pg.py",
+      "source_location": "L150",
+      "_origin": "ast",
+      "id": "db_pg_rationale_150",
+      "community": 4,
+      "norm_label": "true se database_url esta configurada (nao vazia)."
+    },
+    {
+      "label": "Fecha o pool (para shutdown).",
+      "file_type": "rationale",
+      "source_file": "db_pg.py",
+      "source_location": "L155",
+      "_origin": "ast",
+      "id": "db_pg_rationale_155",
+      "community": 4,
+      "norm_label": "fecha o pool (para shutdown)."
+    },
+    {
+      "label": "graph.sh",
+      "file_type": "code",
+      "source_file": "example/graph.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "id": "example_graph",
+      "community": 12,
+      "norm_label": "graph.sh"
+    },
+    {
+      "label": "graph.sh script",
+      "file_type": "code",
+      "source_file": "example/graph.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "bash_entrypoint"
+      },
+      "_origin": "ast",
+      "id": "users_carlosroberto_workspace_projetos_mondaha_svc_kg_example_graph_sh__entry",
+      "community": 12,
+      "norm_label": "graph.sh script"
+    },
+    {
+      "label": "start.sh",
+      "file_type": "code",
+      "source_file": "start.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "id": "start",
+      "community": 11,
+      "norm_label": "start.sh"
+    },
+    {
+      "label": "start.sh script",
+      "file_type": "code",
+      "source_file": "start.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "bash_entrypoint"
+      },
+      "_origin": "ast",
+      "id": "users_carlosroberto_workspace_projetos_mondaha_svc_kg_start_sh__entry",
+      "community": 11,
+      "norm_label": "start.sh script"
+    },
+    {
+      "label": "PYTHONPATH",
+      "file_type": "code",
+      "source_file": "start.sh",
+      "source_location": "L8",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "start_pythonpath",
+      "community": 11,
+      "norm_label": "pythonpath"
+    },
+    {
+      "label": "vis-embed.js",
+      "file_type": "code",
+      "source_file": "static/vis-embed.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "static_vis_embed",
+      "community": 9,
+      "norm_label": "vis-embed.js"
+    },
+    {
+      "label": "mapColors()",
+      "file_type": "code",
+      "source_file": "static/vis-embed.js",
+      "source_location": "L21",
+      "_origin": "ast",
+      "id": "static_vis_embed_mapcolors",
+      "community": 9,
+      "norm_label": "mapcolors()"
+    },
+    {
+      "label": "buildDataFromEmbedded()",
+      "file_type": "code",
+      "source_file": "static/vis-embed.js",
+      "source_location": "L49",
+      "_origin": "ast",
+      "id": "static_vis_embed_builddatafromembedded",
+      "community": 9,
+      "norm_label": "builddatafromembedded()"
+    },
+    {
+      "label": "attachSearch()",
+      "file_type": "code",
+      "source_file": "static/vis-embed.js",
+      "source_location": "L94",
+      "_origin": "ast",
+      "id": "static_vis_embed_attachsearch",
+      "community": 9,
+      "norm_label": "attachsearch()"
+    },
+    {
+      "label": "vis-page.js",
+      "file_type": "code",
+      "source_file": "static/vis-page.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "static_vis_page",
+      "community": 13,
+      "norm_label": "vis-page.js"
+    },
+    {
+      "label": "test_svc_kg.sh",
+      "file_type": "code",
+      "source_file": "test_svc_kg.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "id": "test_svc_kg",
+      "community": 10,
+      "norm_label": "test_svc_kg.sh"
+    },
+    {
+      "label": "test_svc_kg.sh script",
+      "file_type": "code",
+      "source_file": "test_svc_kg.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "bash_entrypoint"
+      },
+      "_origin": "ast",
+      "id": "users_carlosroberto_workspace_projetos_mondaha_svc_kg_test_svc_kg_sh__entry",
+      "community": 10,
+      "norm_label": "test_svc_kg.sh script"
+    },
+    {
+      "label": "pass()",
+      "file_type": "code",
+      "source_file": "test_svc_kg.sh",
+      "source_location": "L6",
+      "metadata": {
+        "language": "bash",
+        "kind": "bash_function"
+      },
+      "_origin": "ast",
+      "id": "test_svc_kg_pass",
+      "community": 10,
+      "norm_label": "pass()"
+    },
+    {
+      "label": "fail()",
+      "file_type": "code",
+      "source_file": "test_svc_kg.sh",
+      "source_location": "L7",
+      "metadata": {
+        "language": "bash",
+        "kind": "bash_function"
+      },
+      "_origin": "ast",
+      "id": "test_svc_kg_fail",
+      "community": 10,
+      "norm_label": "fail()"
+    },
+    {
+      "label": "CHANGELOG.md",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "changelog",
+      "community": 1,
+      "norm_label": "changelog.md"
+    },
+    {
+      "label": "CHANGELOG",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "changelog_changelog",
+      "community": 1,
+      "norm_label": "changelog"
+    },
+    {
+      "label": "[v1.8.0] - 2026-07-06",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "changelog_v1_8_0_2026_07_06",
+      "community": 1,
+      "norm_label": "[v1.8.0] - 2026-07-06"
+    },
+    {
+      "label": "Migra\u00e7\u00e3o Supabase \u2192 Postgres direto + cache Redis",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "changelog_migra\u00e7\u00e3o_supabase_postgres_direto_cache_redis",
+      "community": 1,
+      "norm_label": "migracao supabase \u2192 postgres direto + cache redis"
+    },
+    {
+      "label": "Adicionado",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "changelog_adicionado",
+      "community": 1,
+      "norm_label": "adicionado"
+    },
+    {
+      "label": "Alterado",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "changelog_alterado",
+      "community": 1,
+      "norm_label": "alterado"
+    },
+    {
+      "label": "Removido",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L28",
+      "_origin": "ast",
+      "id": "changelog_removido",
+      "community": 1,
+      "norm_label": "removido"
+    },
+    {
+      "label": "N\u00e3o alterado (confirmado)",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L32",
+      "_origin": "ast",
+      "id": "changelog_n\u00e3o_alterado_confirmado",
+      "community": 1,
+      "norm_label": "nao alterado (confirmado)"
+    },
+    {
+      "label": "[v1.7.20] - 2025-09-05",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L37",
+      "_origin": "ast",
+      "id": "changelog_v1_7_20_2025_09_05",
+      "community": 1,
+      "norm_label": "[v1.7.20] - 2025-09-05"
+    },
+    {
+      "label": "Corrigido",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L38",
+      "_origin": "ast",
+      "id": "changelog_corrigido",
+      "community": 1,
+      "norm_label": "corrigido"
+    },
+    {
+      "label": "Alterado",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L46",
+      "_origin": "ast",
+      "id": "changelog_alterado_46",
+      "community": 1,
+      "norm_label": "alterado"
+    },
+    {
+      "label": "N\u00e3o alterado (confirmado)",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L52",
+      "_origin": "ast",
+      "id": "changelog_n\u00e3o_alterado_confirmado_52",
+      "community": 1,
+      "norm_label": "nao alterado (confirmado)"
+    },
+    {
+      "label": "[v1.7.19] - 2025-09-05 \u2014 _YANKED_ (n\u00e3o recomendada)",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L57",
+      "_origin": "ast",
+      "id": "changelog_v1_7_19_2025_09_05_yanked_n\u00e3o_recomendada",
+      "community": 1,
+      "norm_label": "[v1.7.19] - 2025-09-05 \u2014 _yanked_ (nao recomendada)"
+    },
+    {
+      "label": "Alterado",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L61",
+      "_origin": "ast",
+      "id": "changelog_alterado_61",
+      "community": 1,
+      "norm_label": "alterado"
+    },
+    {
+      "label": "Conhecidos",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L65",
+      "_origin": "ast",
+      "id": "changelog_conhecidos",
+      "community": 1,
+      "norm_label": "conhecidos"
+    },
+    {
+      "label": "[v1.7.18] - 2025-09-05",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L70",
+      "_origin": "ast",
+      "id": "changelog_v1_7_18_2025_09_05",
+      "community": 1,
+      "norm_label": "[v1.7.18] - 2025-09-05"
+    },
+    {
+      "label": "Corrigido",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L71",
+      "_origin": "ast",
+      "id": "changelog_corrigido_71",
+      "community": 1,
+      "norm_label": "corrigido"
+    },
+    {
+      "label": "Adicionado",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L75",
+      "_origin": "ast",
+      "id": "changelog_adicionado_75",
+      "community": 1,
+      "norm_label": "adicionado"
+    },
+    {
+      "label": "Alterado",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L79",
+      "_origin": "ast",
+      "id": "changelog_alterado_79",
+      "community": 1,
+      "norm_label": "alterado"
+    },
+    {
+      "label": "[v1.7.17] - 2025-09-05",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L85",
+      "_origin": "ast",
+      "id": "changelog_v1_7_17_2025_09_05",
+      "community": 1,
+      "norm_label": "[v1.7.17] - 2025-09-05"
+    },
+    {
+      "label": "Adicionado",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L86",
+      "_origin": "ast",
+      "id": "changelog_adicionado_86",
+      "community": 1,
+      "norm_label": "adicionado"
+    },
+    {
+      "label": "Alterado",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L93",
+      "_origin": "ast",
+      "id": "changelog_alterado_93",
+      "community": 1,
+      "norm_label": "alterado"
+    },
+    {
+      "label": "[v1.7.13] - 2025-09-04",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L98",
+      "_origin": "ast",
+      "id": "changelog_v1_7_13_2025_09_04",
+      "community": 1,
+      "norm_label": "[v1.7.13] - 2025-09-04"
+    },
+    {
+      "label": "Adicionado",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L101",
+      "_origin": "ast",
+      "id": "changelog_adicionado_101",
+      "community": 1,
+      "norm_label": "adicionado"
+    },
+    {
+      "label": "Alterado",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L109",
+      "_origin": "ast",
+      "id": "changelog_alterado_109",
+      "community": 1,
+      "norm_label": "alterado"
+    },
+    {
+      "label": "[\u2264 v1.7.12] - Hist\u00f3rico anterior",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L115",
+      "_origin": "ast",
+      "id": "changelog_v1_7_12_hist\u00f3rico_anterior",
+      "community": 1,
+      "norm_label": "[\u2264 v1.7.12] - historico anterior"
+    },
+    {
+      "label": "Notas de Compatibilidade / Migra\u00e7\u00e3o",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L120",
+      "_origin": "ast",
+      "id": "changelog_notas_de_compatibilidade_migra\u00e7\u00e3o",
+      "community": 1,
+      "norm_label": "notas de compatibilidade / migracao"
+    },
+    {
+      "label": "Links \u00fateis",
+      "file_type": "document",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L134",
+      "_origin": "ast",
+      "id": "changelog_links_\u00fateis",
+      "community": 1,
+      "norm_label": "links uteis"
+    },
+    {
+      "label": "CLAUDE.md",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "claude",
+      "community": 6,
+      "norm_label": "claude.md"
+    },
+    {
+      "label": "CLAUDE.md \u2014 svc-kg",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "claude_claude_md_svc_kg",
+      "community": 6,
+      "norm_label": "claude.md \u2014 svc-kg"
+    },
+    {
+      "label": "1. Vis\u00e3o geral",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "claude_1_vis\u00e3o_geral",
+      "community": 6,
+      "norm_label": "1. visao geral"
+    },
+    {
+      "label": "2. Stack",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "claude_2_stack",
+      "community": 6,
+      "norm_label": "2. stack"
+    },
+    {
+      "label": "3. Arquitetura (1 par\u00e1grafo)",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L27",
+      "_origin": "ast",
+      "id": "claude_3_arquitetura_1_par\u00e1grafo",
+      "community": 6,
+      "norm_label": "3. arquitetura (1 paragrafo)"
+    },
+    {
+      "label": "4. Gerado vs edit\u00e1vel / cuidado",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L33",
+      "_origin": "ast",
+      "id": "claude_4_gerado_vs_edit\u00e1vel_cuidado",
+      "community": 6,
+      "norm_label": "4. gerado vs editavel / cuidado"
+    },
+    {
+      "label": "5. Comandos",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L48",
+      "_origin": "ast",
+      "id": "claude_5_comandos",
+      "community": 6,
+      "norm_label": "5. comandos"
+    },
+    {
+      "label": "6. Vari\u00e1veis de ambiente principais",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L68",
+      "_origin": "ast",
+      "id": "claude_6_vari\u00e1veis_de_ambiente_principais",
+      "community": 6,
+      "norm_label": "6. variaveis de ambiente principais"
+    },
+    {
+      "label": "7. Rotas",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L84",
+      "_origin": "ast",
+      "id": "claude_7_rotas",
+      "community": 6,
+      "norm_label": "7. rotas"
+    },
+    {
+      "label": "8. Conven\u00e7\u00f5es",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L90",
+      "_origin": "ast",
+      "id": "claude_8_conven\u00e7\u00f5es",
+      "community": 6,
+      "norm_label": "8. convencoes"
+    },
+    {
+      "label": "9. MCP / ferramentas",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": "L97",
+      "_origin": "ast",
+      "id": "claude_9_mcp_ferramentas",
+      "community": 6,
+      "norm_label": "9. mcp / ferramentas"
+    },
+    {
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "readme",
+      "community": 8,
+      "norm_label": "readme.md"
+    },
+    {
+      "label": "svc-kg (v1.8.0)",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "readme_svc_kg_v1_8_0",
+      "community": 8,
+      "norm_label": "svc-kg (v1.8.0)"
+    },
+    {
+      "label": "Endpoints",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L48",
+      "_origin": "ast",
+      "id": "readme_endpoints",
+      "community": 8,
+      "norm_label": "endpoints"
+    },
+    {
+      "label": "Rodando LOCAL (Postgres + Redis)",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L59",
+      "_origin": "ast",
+      "id": "readme_rodando_local_postgres_redis",
+      "community": 8,
+      "norm_label": "rodando local (postgres + redis)"
+    },
+    {
+      "label": "1. Crie `.env` a partir de `.env.example` e defina:",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L61",
+      "_origin": "ast",
+      "id": "readme_1_crie_env_a_partir_de_env_example_e_defina",
+      "community": 8,
+      "norm_label": "1. crie `.env` a partir de `.env.example` e defina:"
+    },
+    {
+      "label": "Rodando contra o Postgres do mondaha",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L85",
+      "_origin": "ast",
+      "id": "readme_rodando_contra_o_postgres_do_mondaha",
+      "community": 8,
+      "norm_label": "rodando contra o postgres do mondaha"
+    },
+    {
+      "label": "Env vars principais",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L94",
+      "_origin": "ast",
+      "id": "readme_env_vars_principais",
+      "community": 8,
+      "norm_label": "env vars principais"
+    },
+    {
+      "label": "API.md",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_api",
+      "community": 2,
+      "norm_label": "api.md"
+    },
+    {
+      "label": "svc-kg \u2014 Refer\u00eancia HTTP da API",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_api_svc_kg_refer\u00eancia_http_da_api",
+      "community": 2,
+      "norm_label": "svc-kg \u2014 referencia http da api"
+    },
+    {
+      "label": "Base URL",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "docs_api_base_url",
+      "community": 2,
+      "norm_label": "base url"
+    },
+    {
+      "label": "Autentica\u00e7\u00e3o",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "docs_api_autentica\u00e7\u00e3o",
+      "community": 2,
+      "norm_label": "autenticacao"
+    },
+    {
+      "label": "Sem\u00e2ntica de `cache`",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "docs_api_sem\u00e2ntica_de_cache",
+      "community": 2,
+      "norm_label": "semantica de `cache`"
+    },
+    {
+      "label": "Rotas de opera\u00e7\u00e3o (`ops`)",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L34",
+      "_origin": "ast",
+      "id": "docs_api_rotas_de_opera\u00e7\u00e3o_ops",
+      "community": 2,
+      "norm_label": "rotas de operacao (`ops`)"
+    },
+    {
+      "label": "`GET /live` \u2014 Liveness",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L36",
+      "_origin": "ast",
+      "id": "docs_api_get_live_liveness",
+      "community": 2,
+      "norm_label": "`get /live` \u2014 liveness"
+    },
+    {
+      "label": "`GET /health` \u2014 Health check",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L50",
+      "_origin": "ast",
+      "id": "docs_api_get_health_health_check",
+      "community": 2,
+      "norm_label": "`get /health` \u2014 health check"
+    },
+    {
+      "label": "`GET /ready` \u2014 Readiness",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L74",
+      "_origin": "ast",
+      "id": "docs_api_get_ready_readiness",
+      "community": 2,
+      "norm_label": "`get /ready` \u2014 readiness"
+    },
+    {
+      "label": "`GET /ops/status` \u2014 Status operacional",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L88",
+      "_origin": "ast",
+      "id": "docs_api_get_ops_status_status_operacional",
+      "community": 2,
+      "norm_label": "`get /ops/status` \u2014 status operacional"
+    },
+    {
+      "label": "Rota de dados do grafo (`graph`)",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L104",
+      "_origin": "ast",
+      "id": "docs_api_rota_de_dados_do_grafo_graph",
+      "community": 2,
+      "norm_label": "rota de dados do grafo (`graph`)"
+    },
+    {
+      "label": "`GET /v1/graph/membros` \u2014 Grafo em JSON",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L106",
+      "_origin": "ast",
+      "id": "docs_api_get_v1_graph_membros_grafo_em_json",
+      "community": 2,
+      "norm_label": "`get /v1/graph/membros` \u2014 grafo em json"
+    },
+    {
+      "label": "Rotas de visualiza\u00e7\u00e3o (`viz`)",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L136",
+      "_origin": "ast",
+      "id": "docs_api_rotas_de_visualiza\u00e7\u00e3o_viz",
+      "community": 2,
+      "norm_label": "rotas de visualizacao (`viz`)"
+    },
+    {
+      "label": "`GET /v1/vis/visjs` \u2014 Visualiza\u00e7\u00e3o vis-network (HTML)",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L138",
+      "_origin": "ast",
+      "id": "docs_api_get_v1_vis_visjs_visualiza\u00e7\u00e3o_vis_network_html",
+      "community": 2,
+      "norm_label": "`get /v1/vis/visjs` \u2014 visualizacao vis-network (html)"
+    },
+    {
+      "label": "`GET /v1/vis/pyvis` \u2014 Visualiza\u00e7\u00e3o PyVis (HTML)",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L164",
+      "_origin": "ast",
+      "id": "docs_api_get_v1_vis_pyvis_visualiza\u00e7\u00e3o_pyvis_html",
+      "community": 2,
+      "norm_label": "`get /v1/vis/pyvis` \u2014 visualizacao pyvis (html)"
+    },
+    {
+      "label": "Documenta\u00e7\u00e3o e est\u00e1ticos",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L188",
+      "_origin": "ast",
+      "id": "docs_api_documenta\u00e7\u00e3o_e_est\u00e1ticos",
+      "community": 2,
+      "norm_label": "documentacao e estaticos"
+    },
+    {
+      "label": "`GET /docs` \u2014 Swagger UI custom",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L190",
+      "_origin": "ast",
+      "id": "docs_api_get_docs_swagger_ui_custom",
+      "community": 2,
+      "norm_label": "`get /docs` \u2014 swagger ui custom"
+    },
+    {
+      "label": "Mounts est\u00e1ticos",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L203",
+      "_origin": "ast",
+      "id": "docs_api_mounts_est\u00e1ticos",
+      "community": 2,
+      "norm_label": "mounts estaticos"
+    },
+    {
+      "label": "Embed no app mondaha",
+      "file_type": "document",
+      "source_file": "docs/API.md",
+      "source_location": "L212",
+      "_origin": "ast",
+      "id": "docs_api_embed_no_app_mondaha",
+      "community": 2,
+      "norm_label": "embed no app mondaha"
+    },
+    {
+      "label": "ARCHITECTURE.md",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_architecture",
+      "community": 7,
+      "norm_label": "architecture.md"
+    },
+    {
+      "label": "Arquitetura \u2014 svc-kg (Knowledge Graph)",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_architecture_arquitetura_svc_kg_knowledge_graph",
+      "community": 7,
+      "norm_label": "arquitetura \u2014 svc-kg (knowledge graph)"
+    },
+    {
+      "label": "1. Contexto",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "docs_architecture_1_contexto",
+      "community": 7,
+      "norm_label": "1. contexto"
+    },
+    {
+      "label": "2. Diagrama de componentes",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L35",
+      "_origin": "ast",
+      "id": "docs_architecture_2_diagrama_de_componentes",
+      "community": 7,
+      "norm_label": "2. diagrama de componentes"
+    },
+    {
+      "label": "3. Fluxo de request de dados",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L84",
+      "_origin": "ast",
+      "id": "docs_architecture_3_fluxo_de_request_de_dados",
+      "community": 7,
+      "norm_label": "3. fluxo de request de dados"
+    },
+    {
+      "label": "4. Constru\u00e7\u00e3o do grafo",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L117",
+      "_origin": "ast",
+      "id": "docs_architecture_4_constru\u00e7\u00e3o_do_grafo",
+      "community": 7,
+      "norm_label": "4. construcao do grafo"
+    },
+    {
+      "label": "5. Camadas de render",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L166",
+      "_origin": "ast",
+      "id": "docs_architecture_5_camadas_de_render",
+      "community": 7,
+      "norm_label": "5. camadas de render"
+    },
+    {
+      "label": "6. Cache (Redis)",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L200",
+      "_origin": "ast",
+      "id": "docs_architecture_6_cache_redis",
+      "community": 7,
+      "norm_label": "6. cache (redis)"
+    },
+    {
+      "label": "7. Camada de dados (`db_pg.py`)",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L222",
+      "_origin": "ast",
+      "id": "docs_architecture_7_camada_de_dados_db_pg_py",
+      "community": 7,
+      "norm_label": "7. camada de dados (`db_pg.py`)"
+    },
+    {
+      "label": "8. Decis\u00f5es / hist\u00f3rico",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L249",
+      "_origin": "ast",
+      "id": "docs_architecture_8_decis\u00f5es_hist\u00f3rico",
+      "community": 7,
+      "norm_label": "8. decisoes / historico"
+    },
+    {
+      "label": "9. Pontos de aten\u00e7\u00e3o",
+      "file_type": "document",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L268",
+      "_origin": "ast",
+      "id": "docs_architecture_9_pontos_de_aten\u00e7\u00e3o",
+      "community": 7,
+      "norm_label": "9. pontos de atencao"
+    },
+    {
+      "label": "DATABASE.md",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_database",
+      "community": 5,
+      "norm_label": "database.md"
+    },
+    {
+      "label": "Camada de dados \u2014 svc-kg",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_database_camada_de_dados_svc_kg",
+      "community": 5,
+      "norm_label": "camada de dados \u2014 svc-kg"
+    },
+    {
+      "label": "1. Vis\u00e3o",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "docs_database_1_vis\u00e3o",
+      "community": 5,
+      "norm_label": "1. visao"
+    },
+    {
+      "label": "2. Tabelas lidas (no banco `mondaha`)",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L29",
+      "_origin": "ast",
+      "id": "docs_database_2_tabelas_lidas_no_banco_mondaha",
+      "community": 5,
+      "norm_label": "2. tabelas lidas (no banco `mondaha`)"
+    },
+    {
+      "label": "3. Fun\u00e7\u00e3o `public.get_graph_membros`",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L45",
+      "_origin": "ast",
+      "id": "docs_database_3_fun\u00e7\u00e3o_public_get_graph_membros",
+      "community": 5,
+      "norm_label": "3. funcao `public.get_graph_membros`"
+    },
+    {
+      "label": "Assinatura",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L47",
+      "_origin": "ast",
+      "id": "docs_database_assinatura",
+      "community": 5,
+      "norm_label": "assinatura"
+    },
+    {
+      "label": "Retorno",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L63",
+      "_origin": "ast",
+      "id": "docs_database_retorno",
+      "community": 5,
+      "norm_label": "retorno"
+    },
+    {
+      "label": "L\u00f3gica",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L76",
+      "_origin": "ast",
+      "id": "docs_database_l\u00f3gica",
+      "community": 5,
+      "norm_label": "logica"
+    },
+    {
+      "label": "4. Instala\u00e7\u00e3o idempotente",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L114",
+      "_origin": "ast",
+      "id": "docs_database_4_instala\u00e7\u00e3o_idempotente",
+      "community": 5,
+      "norm_label": "4. instalacao idempotente"
+    },
+    {
+      "label": "\u00cdndices de suporte",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L125",
+      "_origin": "ast",
+      "id": "docs_database_\u00edndices_de_suporte",
+      "community": 5,
+      "norm_label": "indices de suporte"
+    },
+    {
+      "label": "Como aplicar",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L133",
+      "_origin": "ast",
+      "id": "docs_database_como_aplicar",
+      "community": 5,
+      "norm_label": "como aplicar"
+    },
+    {
+      "label": "5. Interface `db_pg.py`",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L146",
+      "_origin": "ast",
+      "id": "docs_database_5_interface_db_pg_py",
+      "community": 5,
+      "norm_label": "5. interface `db_pg.py`"
+    },
+    {
+      "label": "Pool",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L159",
+      "_origin": "ast",
+      "id": "docs_database_pool",
+      "community": 5,
+      "norm_label": "pool"
+    },
+    {
+      "label": "6. Diferen\u00e7as vs Supabase (migra\u00e7\u00e3o)",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L173",
+      "_origin": "ast",
+      "id": "docs_database_6_diferen\u00e7as_vs_supabase_migra\u00e7\u00e3o",
+      "community": 5,
+      "norm_label": "6. diferencas vs supabase (migracao)"
+    },
+    {
+      "label": "Arquivos legados (refer\u00eancia/emula\u00e7\u00e3o local \u2014 n\u00e3o usados contra o mondaha)",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L186",
+      "_origin": "ast",
+      "id": "docs_database_arquivos_legados_refer\u00eancia_emula\u00e7\u00e3o_local_n\u00e3o_usados_contra_o_mondaha",
+      "community": 5,
+      "norm_label": "arquivos legados (referencia/emulacao local \u2014 nao usados contra o mondaha)"
+    },
+    {
+      "label": "7. Paridade de schema",
+      "file_type": "document",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L199",
+      "_origin": "ast",
+      "id": "docs_database_7_paridade_de_schema",
+      "community": 5,
+      "norm_label": "7. paridade de schema"
+    },
+    {
+      "label": "OPS.md",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_ops",
+      "community": 3,
+      "norm_label": "ops.md"
+    },
+    {
+      "label": "OPS \u2014 svc-kg (Knowledge Graph)",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_ops_ops_svc_kg_knowledge_graph",
+      "community": 3,
+      "norm_label": "ops \u2014 svc-kg (knowledge graph)"
+    },
+    {
+      "label": "1. Vari\u00e1veis de ambiente",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "docs_ops_1_vari\u00e1veis_de_ambiente",
+      "community": 3,
+      "norm_label": "1. variaveis de ambiente"
+    },
+    {
+      "label": "App",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "docs_ops_app",
+      "community": 3,
+      "norm_label": "app"
+    },
+    {
+      "label": "CORS",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L25",
+      "_origin": "ast",
+      "id": "docs_ops_cors",
+      "community": 3,
+      "norm_label": "cors"
+    },
+    {
+      "label": "Cache (Redis)",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L34",
+      "_origin": "ast",
+      "id": "docs_ops_cache_redis",
+      "community": 3,
+      "norm_label": "cache (redis)"
+    },
+    {
+      "label": "Postgres (stack mondaha)",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L43",
+      "_origin": "ast",
+      "id": "docs_ops_postgres_stack_mondaha",
+      "community": 3,
+      "norm_label": "postgres (stack mondaha)"
+    },
+    {
+      "label": "Tabela de fotos (opcional)",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L52",
+      "_origin": "ast",
+      "id": "docs_ops_tabela_de_fotos_opcional",
+      "community": 3,
+      "norm_label": "tabela de fotos (opcional)"
+    },
+    {
+      "label": "DEPRECATED \u2014 n\u00e3o usadas (migrado para Postgres direto)",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L60",
+      "_origin": "ast",
+      "id": "docs_ops_deprecated_n\u00e3o_usadas_migrado_para_postgres_direto",
+      "community": 3,
+      "norm_label": "deprecated \u2014 nao usadas (migrado para postgres direto)"
+    },
+    {
+      "label": "2. Rodar local (sem Docker)",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L74",
+      "_origin": "ast",
+      "id": "docs_ops_2_rodar_local_sem_docker",
+      "community": 3,
+      "norm_label": "2. rodar local (sem docker)"
+    },
+    {
+      "label": "3. Rodar com Docker contra o stack mondaha (recomendado)",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L99",
+      "_origin": "ast",
+      "id": "docs_ops_3_rodar_com_docker_contra_o_stack_mondaha_recomendado",
+      "community": 3,
+      "norm_label": "3. rodar com docker contra o stack mondaha (recomendado)"
+    },
+    {
+      "label": "Rede externa `mondaha_default`",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L115",
+      "_origin": "ast",
+      "id": "docs_ops_rede_externa_mondaha_default",
+      "community": 3,
+      "norm_label": "rede externa `mondaha_default`"
+    },
+    {
+      "label": "4. Outros arquivos compose (quando usar cada um)",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L139",
+      "_origin": "ast",
+      "id": "docs_ops_4_outros_arquivos_compose_quando_usar_cada_um",
+      "community": 3,
+      "norm_label": "4. outros arquivos compose (quando usar cada um)"
+    },
+    {
+      "label": "5. Healthchecks",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L153",
+      "_origin": "ast",
+      "id": "docs_ops_5_healthchecks",
+      "community": 3,
+      "norm_label": "5. healthchecks"
+    },
+    {
+      "label": "Healthcheck do Docker",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L174",
+      "_origin": "ast",
+      "id": "docs_ops_healthcheck_do_docker",
+      "community": 3,
+      "norm_label": "healthcheck do docker"
+    },
+    {
+      "label": "6. KG_AUTO_MIGRATE",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L182",
+      "_origin": "ast",
+      "id": "docs_ops_6_kg_auto_migrate",
+      "community": 3,
+      "norm_label": "6. kg_auto_migrate"
+    },
+    {
+      "label": "7. Cache Redis",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L199",
+      "_origin": "ast",
+      "id": "docs_ops_7_cache_redis",
+      "community": 3,
+      "norm_label": "7. cache redis"
+    },
+    {
+      "label": "8. Troubleshooting",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L225",
+      "_origin": "ast",
+      "id": "docs_ops_8_troubleshooting",
+      "community": 3,
+      "norm_label": "8. troubleshooting"
+    },
+    {
+      "label": "9. Smoke test",
+      "file_type": "document",
+      "source_file": "docs/OPS.md",
+      "source_location": "L240",
+      "_origin": "ast",
+      "id": "docs_ops_9_smoke_test",
+      "community": 3,
+      "norm_label": "9. smoke test"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L984",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_custom_docs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L100",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_env_backend_ok",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L257",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_fetch_graph_sanitized",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L148",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_get_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L401",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_graph_membros",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L323",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_health",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L127",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_html_cache_get",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L138",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_html_cache_set",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L318",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_live",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L104",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_mask_db_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L205",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_normalize_graph_labels",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L191",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_normalize_pg_text_array_label",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L379",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_ops_status",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L176",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_platform_info",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L356",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_ready",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L157",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_redact",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L165",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_running_in_container",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L303",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_shutdown",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L287",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_startup",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L240",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_truncate_preview",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L751",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_vis_pyvis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L423",
+      "weight": 1.0,
+      "source": "app",
+      "target": "app_vis_visjs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L26",
+      "weight": 1.0,
+      "source": "app",
+      "target": "db_pg",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L329",
+      "weight": 1.0,
+      "source": "app_health",
+      "target": "app_env_backend_ok",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L390",
+      "weight": 1.0,
+      "source": "app_ops_status",
+      "target": "app_env_backend_ok",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L368",
+      "weight": 1.0,
+      "source": "app_ready",
+      "target": "app_env_backend_ok",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L297",
+      "weight": 1.0,
+      "source": "app_startup",
+      "target": "app_env_backend_ok",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L350",
+      "weight": 1.0,
+      "source": "app_health",
+      "target": "app_mask_db_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L391",
+      "weight": 1.0,
+      "source": "app_ops_status",
+      "target": "app_mask_db_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L105",
+      "weight": 1.0,
+      "source": "app_rationale_105",
+      "target": "app_mask_db_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L130",
+      "weight": 1.0,
+      "source": "app_html_cache_get",
+      "target": "app_get_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L128",
+      "weight": 1.0,
+      "source": "app_rationale_128",
+      "target": "app_html_cache_get",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L766",
+      "weight": 1.0,
+      "source": "app_vis_pyvis",
+      "target": "app_html_cache_get",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L441",
+      "weight": 1.0,
+      "source": "app_vis_visjs",
+      "target": "app_html_cache_get",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L141",
+      "weight": 1.0,
+      "source": "app_html_cache_set",
+      "target": "app_get_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L139",
+      "weight": 1.0,
+      "source": "app_rationale_139",
+      "target": "app_html_cache_set",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L975",
+      "weight": 1.0,
+      "source": "app_vis_pyvis",
+      "target": "app_html_cache_set",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L735",
+      "weight": 1.0,
+      "source": "app_vis_visjs",
+      "target": "app_html_cache_set",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L262",
+      "weight": 1.0,
+      "source": "app_fetch_graph_sanitized",
+      "target": "app_get_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L333",
+      "weight": 1.0,
+      "source": "app_health",
+      "target": "app_get_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L384",
+      "weight": 1.0,
+      "source": "app_ops_status",
+      "target": "app_get_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L359",
+      "weight": 1.0,
+      "source": "app_ready",
+      "target": "app_get_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L294",
+      "weight": 1.0,
+      "source": "app_startup",
+      "target": "app_get_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L179",
+      "weight": 1.0,
+      "source": "app_platform_info",
+      "target": "app_running_in_container",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L324",
+      "weight": 1.0,
+      "source": "app_health",
+      "target": "app_platform_info",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L380",
+      "weight": 1.0,
+      "source": "app_ops_status",
+      "target": "app_platform_info",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L176",
+      "weight": 1.0,
+      "source": "app_platform_info",
+      "target": "any",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L358",
+      "weight": 1.0,
+      "source": "app_ready",
+      "target": "app_platform_info",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L257",
+      "weight": 1.0,
+      "source": "app_fetch_graph_sanitized",
+      "target": "any",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L205",
+      "weight": 1.0,
+      "source": "app_normalize_graph_labels",
+      "target": "any",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L240",
+      "weight": 1.0,
+      "source": "app_truncate_preview",
+      "target": "any",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L218",
+      "weight": 1.0,
+      "source": "app_normalize_graph_labels",
+      "target": "app_normalize_pg_text_array_label",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L272",
+      "weight": 1.0,
+      "source": "app_fetch_graph_sanitized",
+      "target": "app_normalize_graph_labels",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L775",
+      "weight": 1.0,
+      "source": "app_vis_pyvis",
+      "target": "app_normalize_graph_labels",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L455",
+      "weight": 1.0,
+      "source": "app_vis_visjs",
+      "target": "app_normalize_graph_labels",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L413",
+      "weight": 1.0,
+      "source": "app_graph_membros",
+      "target": "app_truncate_preview",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L774",
+      "weight": 1.0,
+      "source": "app_vis_pyvis",
+      "target": "app_truncate_preview",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L454",
+      "weight": 1.0,
+      "source": "app_vis_visjs",
+      "target": "app_truncate_preview",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L410",
+      "weight": 1.0,
+      "source": "app_graph_membros",
+      "target": "app_fetch_graph_sanitized",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L771",
+      "weight": 1.0,
+      "source": "app_vis_pyvis",
+      "target": "app_fetch_graph_sanitized",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L451",
+      "weight": 1.0,
+      "source": "app_vis_visjs",
+      "target": "app_fetch_graph_sanitized",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "app.py",
+      "source_location": "L423",
+      "weight": 1.0,
+      "source": "app_vis_visjs",
+      "target": "response",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L149",
+      "weight": 1.0,
+      "source": "db_pg",
+      "target": "db_pg_backend_ok",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L154",
+      "weight": 1.0,
+      "source": "db_pg",
+      "target": "db_pg_close_pool",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L115",
+      "weight": 1.0,
+      "source": "db_pg",
+      "target": "db_pg_ensure_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L68",
+      "weight": 1.0,
+      "source": "db_pg",
+      "target": "db_pg_fetch_graph",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "db_pg",
+      "target": "db_pg_get_pool",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "db_pg",
+      "target": "db_pg_mask_dsn",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L102",
+      "weight": 1.0,
+      "source": "db_pg",
+      "target": "db_pg_pg_ping",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "db_pg_rationale_1",
+      "target": "db_pg",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L146",
+      "weight": 1.0,
+      "source": "db_pg_ensure_schema",
+      "target": "db_pg_mask_dsn",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L37",
+      "weight": 1.0,
+      "source": "db_pg_rationale_37",
+      "target": "db_pg_mask_dsn",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L132",
+      "weight": 1.0,
+      "source": "db_pg_ensure_schema",
+      "target": "db_pg_get_pool",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L73",
+      "weight": 1.0,
+      "source": "db_pg_fetch_graph",
+      "target": "db_pg_get_pool",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "return_type",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "db_pg_get_pool",
+      "target": "asyncconnectionpool",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L105",
+      "weight": 1.0,
+      "source": "db_pg_pg_ping",
+      "target": "db_pg_get_pool",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L53",
+      "weight": 1.0,
+      "source": "db_pg_rationale_53",
+      "target": "db_pg_get_pool",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L69",
+      "weight": 1.0,
+      "source": "db_pg_rationale_69",
+      "target": "db_pg_fetch_graph",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L103",
+      "weight": 1.0,
+      "source": "db_pg_rationale_103",
+      "target": "db_pg_pg_ping",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L116",
+      "weight": 1.0,
+      "source": "db_pg_rationale_116",
+      "target": "db_pg_ensure_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L150",
+      "weight": 1.0,
+      "source": "db_pg_rationale_150",
+      "target": "db_pg_backend_ok",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "db_pg.py",
+      "source_location": "L155",
+      "weight": 1.0,
+      "source": "db_pg_rationale_155",
+      "target": "db_pg_close_pool",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "example/graph.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "example_graph",
+      "target": "users_carlosroberto_workspace_projetos_mondaha_svc_kg_example_graph_sh__entry",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "start.sh",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "start",
+      "target": "start_pythonpath",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "start.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "start",
+      "target": "users_carlosroberto_workspace_projetos_mondaha_svc_kg_start_sh__entry",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "static/vis-embed.js",
+      "source_location": "L94",
+      "weight": 1.0,
+      "source": "static_vis_embed",
+      "target": "static_vis_embed_attachsearch",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "static/vis-embed.js",
+      "source_location": "L49",
+      "weight": 1.0,
+      "source": "static_vis_embed",
+      "target": "static_vis_embed_builddatafromembedded",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "static/vis-embed.js",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "static_vis_embed",
+      "target": "static_vis_embed_mapcolors",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "test_svc_kg.sh",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "test_svc_kg",
+      "target": "test_svc_kg_fail",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "test_svc_kg.sh",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "test_svc_kg",
+      "target": "test_svc_kg_pass",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "test_svc_kg.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "test_svc_kg",
+      "target": "users_carlosroberto_workspace_projetos_mondaha_svc_kg_test_svc_kg_sh__entry",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "test_svc_kg.sh",
+      "source_location": "L13",
+      "weight": 1.0,
+      "context": "call",
+      "source": "users_carlosroberto_workspace_projetos_mondaha_svc_kg_test_svc_kg_sh__entry",
+      "target": "test_svc_kg_fail",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "test_svc_kg.sh",
+      "source_location": "L13",
+      "weight": 1.0,
+      "context": "call",
+      "source": "users_carlosroberto_workspace_projetos_mondaha_svc_kg_test_svc_kg_sh__entry",
+      "target": "test_svc_kg_pass",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "changelog",
+      "target": "changelog_changelog",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L134",
+      "weight": 1.0,
+      "source": "changelog_changelog",
+      "target": "changelog_links_\u00fateis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L120",
+      "weight": 1.0,
+      "source": "changelog_changelog",
+      "target": "changelog_notas_de_compatibilidade_migra\u00e7\u00e3o",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L115",
+      "weight": 1.0,
+      "source": "changelog_changelog",
+      "target": "changelog_v1_7_12_hist\u00f3rico_anterior",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L98",
+      "weight": 1.0,
+      "source": "changelog_changelog",
+      "target": "changelog_v1_7_13_2025_09_04",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L85",
+      "weight": 1.0,
+      "source": "changelog_changelog",
+      "target": "changelog_v1_7_17_2025_09_05",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L70",
+      "weight": 1.0,
+      "source": "changelog_changelog",
+      "target": "changelog_v1_7_18_2025_09_05",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L57",
+      "weight": 1.0,
+      "source": "changelog_changelog",
+      "target": "changelog_v1_7_19_2025_09_05_yanked_n\u00e3o_recomendada",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L37",
+      "weight": 1.0,
+      "source": "changelog_changelog",
+      "target": "changelog_v1_7_20_2025_09_05",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "changelog_changelog",
+      "target": "changelog_v1_8_0_2026_07_06",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "changelog_v1_8_0_2026_07_06",
+      "target": "changelog_adicionado",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "changelog_v1_8_0_2026_07_06",
+      "target": "changelog_alterado",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "changelog_v1_8_0_2026_07_06",
+      "target": "changelog_migra\u00e7\u00e3o_supabase_postgres_direto_cache_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L32",
+      "weight": 1.0,
+      "source": "changelog_v1_8_0_2026_07_06",
+      "target": "changelog_n\u00e3o_alterado_confirmado",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "changelog_v1_8_0_2026_07_06",
+      "target": "changelog_removido",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "changelog_v1_7_20_2025_09_05",
+      "target": "changelog_alterado_46",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "changelog_v1_7_20_2025_09_05",
+      "target": "changelog_corrigido",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "changelog_v1_7_20_2025_09_05",
+      "target": "changelog_n\u00e3o_alterado_confirmado_52",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L61",
+      "weight": 1.0,
+      "source": "changelog_v1_7_19_2025_09_05_yanked_n\u00e3o_recomendada",
+      "target": "changelog_alterado_61",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L65",
+      "weight": 1.0,
+      "source": "changelog_v1_7_19_2025_09_05_yanked_n\u00e3o_recomendada",
+      "target": "changelog_conhecidos",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L75",
+      "weight": 1.0,
+      "source": "changelog_v1_7_18_2025_09_05",
+      "target": "changelog_adicionado_75",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L79",
+      "weight": 1.0,
+      "source": "changelog_v1_7_18_2025_09_05",
+      "target": "changelog_alterado_79",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L71",
+      "weight": 1.0,
+      "source": "changelog_v1_7_18_2025_09_05",
+      "target": "changelog_corrigido_71",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L86",
+      "weight": 1.0,
+      "source": "changelog_v1_7_17_2025_09_05",
+      "target": "changelog_adicionado_86",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L93",
+      "weight": 1.0,
+      "source": "changelog_v1_7_17_2025_09_05",
+      "target": "changelog_alterado_93",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L101",
+      "weight": 1.0,
+      "source": "changelog_v1_7_13_2025_09_04",
+      "target": "changelog_adicionado_101",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CHANGELOG.md",
+      "source_location": "L109",
+      "weight": 1.0,
+      "source": "changelog_v1_7_13_2025_09_04",
+      "target": "changelog_alterado_109",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "claude",
+      "target": "claude_claude_md_svc_kg",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "claude_claude_md_svc_kg",
+      "target": "claude_1_vis\u00e3o_geral",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "claude_claude_md_svc_kg",
+      "target": "claude_2_stack",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "claude_claude_md_svc_kg",
+      "target": "claude_3_arquitetura_1_par\u00e1grafo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "claude_claude_md_svc_kg",
+      "target": "claude_4_gerado_vs_edit\u00e1vel_cuidado",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "claude_claude_md_svc_kg",
+      "target": "claude_5_comandos",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L68",
+      "weight": 1.0,
+      "source": "claude_claude_md_svc_kg",
+      "target": "claude_6_vari\u00e1veis_de_ambiente_principais",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L84",
+      "weight": 1.0,
+      "source": "claude_claude_md_svc_kg",
+      "target": "claude_7_rotas",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L90",
+      "weight": 1.0,
+      "source": "claude_claude_md_svc_kg",
+      "target": "claude_8_conven\u00e7\u00f5es",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "CLAUDE.md",
+      "source_location": "L97",
+      "weight": 1.0,
+      "source": "claude_claude_md_svc_kg",
+      "target": "claude_9_mcp_ferramentas",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "readme",
+      "target": "readme_svc_kg_v1_8_0",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "readme_svc_kg_v1_8_0",
+      "target": "readme_endpoints",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L85",
+      "weight": 1.0,
+      "source": "readme_svc_kg_v1_8_0",
+      "target": "readme_rodando_contra_o_postgres_do_mondaha",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L59",
+      "weight": 1.0,
+      "source": "readme_svc_kg_v1_8_0",
+      "target": "readme_rodando_local_postgres_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L61",
+      "weight": 1.0,
+      "source": "readme_rodando_local_postgres_redis",
+      "target": "readme_1_crie_env_a_partir_de_env_example_e_defina",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L94",
+      "weight": 1.0,
+      "source": "readme_rodando_contra_o_postgres_do_mondaha",
+      "target": "readme_env_vars_principais",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_api",
+      "target": "docs_api_svc_kg_refer\u00eancia_http_da_api",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "docs_api_svc_kg_refer\u00eancia_http_da_api",
+      "target": "docs_api_autentica\u00e7\u00e3o",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "docs_api_svc_kg_refer\u00eancia_http_da_api",
+      "target": "docs_api_base_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L188",
+      "weight": 1.0,
+      "source": "docs_api_svc_kg_refer\u00eancia_http_da_api",
+      "target": "docs_api_documenta\u00e7\u00e3o_e_est\u00e1ticos",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L212",
+      "weight": 1.0,
+      "source": "docs_api_svc_kg_refer\u00eancia_http_da_api",
+      "target": "docs_api_embed_no_app_mondaha",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L104",
+      "weight": 1.0,
+      "source": "docs_api_svc_kg_refer\u00eancia_http_da_api",
+      "target": "docs_api_rota_de_dados_do_grafo_graph",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "docs_api_svc_kg_refer\u00eancia_http_da_api",
+      "target": "docs_api_rotas_de_opera\u00e7\u00e3o_ops",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L136",
+      "weight": 1.0,
+      "source": "docs_api_svc_kg_refer\u00eancia_http_da_api",
+      "target": "docs_api_rotas_de_visualiza\u00e7\u00e3o_viz",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "docs_api_svc_kg_refer\u00eancia_http_da_api",
+      "target": "docs_api_sem\u00e2ntica_de_cache",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L50",
+      "weight": 1.0,
+      "source": "docs_api_rotas_de_opera\u00e7\u00e3o_ops",
+      "target": "docs_api_get_health_health_check",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "docs_api_rotas_de_opera\u00e7\u00e3o_ops",
+      "target": "docs_api_get_live_liveness",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L88",
+      "weight": 1.0,
+      "source": "docs_api_rotas_de_opera\u00e7\u00e3o_ops",
+      "target": "docs_api_get_ops_status_status_operacional",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L74",
+      "weight": 1.0,
+      "source": "docs_api_rotas_de_opera\u00e7\u00e3o_ops",
+      "target": "docs_api_get_ready_readiness",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L106",
+      "weight": 1.0,
+      "source": "docs_api_rota_de_dados_do_grafo_graph",
+      "target": "docs_api_get_v1_graph_membros_grafo_em_json",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L164",
+      "weight": 1.0,
+      "source": "docs_api_rotas_de_visualiza\u00e7\u00e3o_viz",
+      "target": "docs_api_get_v1_vis_pyvis_visualiza\u00e7\u00e3o_pyvis_html",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L138",
+      "weight": 1.0,
+      "source": "docs_api_rotas_de_visualiza\u00e7\u00e3o_viz",
+      "target": "docs_api_get_v1_vis_visjs_visualiza\u00e7\u00e3o_vis_network_html",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L190",
+      "weight": 1.0,
+      "source": "docs_api_documenta\u00e7\u00e3o_e_est\u00e1ticos",
+      "target": "docs_api_get_docs_swagger_ui_custom",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/API.md",
+      "source_location": "L203",
+      "weight": 1.0,
+      "source": "docs_api_documenta\u00e7\u00e3o_e_est\u00e1ticos",
+      "target": "docs_api_mounts_est\u00e1ticos",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_architecture",
+      "target": "docs_architecture_arquitetura_svc_kg_knowledge_graph",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "docs_architecture_arquitetura_svc_kg_knowledge_graph",
+      "target": "docs_architecture_1_contexto",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L35",
+      "weight": 1.0,
+      "source": "docs_architecture_arquitetura_svc_kg_knowledge_graph",
+      "target": "docs_architecture_2_diagrama_de_componentes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L84",
+      "weight": 1.0,
+      "source": "docs_architecture_arquitetura_svc_kg_knowledge_graph",
+      "target": "docs_architecture_3_fluxo_de_request_de_dados",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L117",
+      "weight": 1.0,
+      "source": "docs_architecture_arquitetura_svc_kg_knowledge_graph",
+      "target": "docs_architecture_4_constru\u00e7\u00e3o_do_grafo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L166",
+      "weight": 1.0,
+      "source": "docs_architecture_arquitetura_svc_kg_knowledge_graph",
+      "target": "docs_architecture_5_camadas_de_render",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L200",
+      "weight": 1.0,
+      "source": "docs_architecture_arquitetura_svc_kg_knowledge_graph",
+      "target": "docs_architecture_6_cache_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L222",
+      "weight": 1.0,
+      "source": "docs_architecture_arquitetura_svc_kg_knowledge_graph",
+      "target": "docs_architecture_7_camada_de_dados_db_pg_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L249",
+      "weight": 1.0,
+      "source": "docs_architecture_arquitetura_svc_kg_knowledge_graph",
+      "target": "docs_architecture_8_decis\u00f5es_hist\u00f3rico",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/ARCHITECTURE.md",
+      "source_location": "L268",
+      "weight": 1.0,
+      "source": "docs_architecture_arquitetura_svc_kg_knowledge_graph",
+      "target": "docs_architecture_9_pontos_de_aten\u00e7\u00e3o",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_database",
+      "target": "docs_database_camada_de_dados_svc_kg",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "docs_database_camada_de_dados_svc_kg",
+      "target": "docs_database_1_vis\u00e3o",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L29",
+      "weight": 1.0,
+      "source": "docs_database_camada_de_dados_svc_kg",
+      "target": "docs_database_2_tabelas_lidas_no_banco_mondaha",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "docs_database_camada_de_dados_svc_kg",
+      "target": "docs_database_3_fun\u00e7\u00e3o_public_get_graph_membros",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L114",
+      "weight": 1.0,
+      "source": "docs_database_camada_de_dados_svc_kg",
+      "target": "docs_database_4_instala\u00e7\u00e3o_idempotente",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L146",
+      "weight": 1.0,
+      "source": "docs_database_camada_de_dados_svc_kg",
+      "target": "docs_database_5_interface_db_pg_py",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L173",
+      "weight": 1.0,
+      "source": "docs_database_camada_de_dados_svc_kg",
+      "target": "docs_database_6_diferen\u00e7as_vs_supabase_migra\u00e7\u00e3o",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L199",
+      "weight": 1.0,
+      "source": "docs_database_camada_de_dados_svc_kg",
+      "target": "docs_database_7_paridade_de_schema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "docs_database_3_fun\u00e7\u00e3o_public_get_graph_membros",
+      "target": "docs_database_assinatura",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L76",
+      "weight": 1.0,
+      "source": "docs_database_3_fun\u00e7\u00e3o_public_get_graph_membros",
+      "target": "docs_database_l\u00f3gica",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L63",
+      "weight": 1.0,
+      "source": "docs_database_3_fun\u00e7\u00e3o_public_get_graph_membros",
+      "target": "docs_database_retorno",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L133",
+      "weight": 1.0,
+      "source": "docs_database_4_instala\u00e7\u00e3o_idempotente",
+      "target": "docs_database_como_aplicar",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L125",
+      "weight": 1.0,
+      "source": "docs_database_4_instala\u00e7\u00e3o_idempotente",
+      "target": "docs_database_\u00edndices_de_suporte",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L159",
+      "weight": 1.0,
+      "source": "docs_database_5_interface_db_pg_py",
+      "target": "docs_database_pool",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/DATABASE.md",
+      "source_location": "L186",
+      "weight": 1.0,
+      "source": "docs_database_6_diferen\u00e7as_vs_supabase_migra\u00e7\u00e3o",
+      "target": "docs_database_arquivos_legados_refer\u00eancia_emula\u00e7\u00e3o_local_n\u00e3o_usados_contra_o_mondaha",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_ops",
+      "target": "docs_ops_ops_svc_kg_knowledge_graph",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "docs_ops_ops_svc_kg_knowledge_graph",
+      "target": "docs_ops_1_vari\u00e1veis_de_ambiente",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L74",
+      "weight": 1.0,
+      "source": "docs_ops_ops_svc_kg_knowledge_graph",
+      "target": "docs_ops_2_rodar_local_sem_docker",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L99",
+      "weight": 1.0,
+      "source": "docs_ops_ops_svc_kg_knowledge_graph",
+      "target": "docs_ops_3_rodar_com_docker_contra_o_stack_mondaha_recomendado",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L139",
+      "weight": 1.0,
+      "source": "docs_ops_ops_svc_kg_knowledge_graph",
+      "target": "docs_ops_4_outros_arquivos_compose_quando_usar_cada_um",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L153",
+      "weight": 1.0,
+      "source": "docs_ops_ops_svc_kg_knowledge_graph",
+      "target": "docs_ops_5_healthchecks",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L182",
+      "weight": 1.0,
+      "source": "docs_ops_ops_svc_kg_knowledge_graph",
+      "target": "docs_ops_6_kg_auto_migrate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L199",
+      "weight": 1.0,
+      "source": "docs_ops_ops_svc_kg_knowledge_graph",
+      "target": "docs_ops_7_cache_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L225",
+      "weight": 1.0,
+      "source": "docs_ops_ops_svc_kg_knowledge_graph",
+      "target": "docs_ops_8_troubleshooting",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L240",
+      "weight": 1.0,
+      "source": "docs_ops_ops_svc_kg_knowledge_graph",
+      "target": "docs_ops_9_smoke_test",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "docs_ops_1_vari\u00e1veis_de_ambiente",
+      "target": "docs_ops_app",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "docs_ops_1_vari\u00e1veis_de_ambiente",
+      "target": "docs_ops_cache_redis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "docs_ops_1_vari\u00e1veis_de_ambiente",
+      "target": "docs_ops_cors",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L60",
+      "weight": 1.0,
+      "source": "docs_ops_1_vari\u00e1veis_de_ambiente",
+      "target": "docs_ops_deprecated_n\u00e3o_usadas_migrado_para_postgres_direto",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L43",
+      "weight": 1.0,
+      "source": "docs_ops_1_vari\u00e1veis_de_ambiente",
+      "target": "docs_ops_postgres_stack_mondaha",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "docs_ops_1_vari\u00e1veis_de_ambiente",
+      "target": "docs_ops_tabela_de_fotos_opcional",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L115",
+      "weight": 1.0,
+      "source": "docs_ops_3_rodar_com_docker_contra_o_stack_mondaha_recomendado",
+      "target": "docs_ops_rede_externa_mondaha_default",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/OPS.md",
+      "source_location": "L174",
+      "weight": 1.0,
+      "source": "docs_ops_5_healthchecks",
+      "target": "docs_ops_healthcheck_do_docker",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": [],
+  "built_at_commit": "5cde76d7fd715497a1883d347bcec4a3dc640c51"
+}

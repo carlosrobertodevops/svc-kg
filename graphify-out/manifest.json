@@ -1,0 +1,137 @@
+{
+  "app.py": {
+    "mtime": 1783349623.4648664,
+    "ast_hash": "201c4c7ecb9f5f74cd630fe4ee435681",
+    "semantic_hash": ""
+  },
+  "db/00_init.sql": {
+    "mtime": 1783344009.359442,
+    "ast_hash": "bea916fae0b65a9170747ab77d03958b",
+    "semantic_hash": ""
+  },
+  "db/01_indexes.sql": {
+    "mtime": 1783344009.359543,
+    "ast_hash": "c735237c8847da6bf68990c58599f370",
+    "semantic_hash": ""
+  },
+  "db/02_alias.sql": {
+    "mtime": 1783344009.359669,
+    "ast_hash": "0ba316f9e8163da2da44643ca6d3d8c7",
+    "semantic_hash": ""
+  },
+  "db/mondaha_install.sql": {
+    "mtime": 1783345749.2386827,
+    "ast_hash": "afbf101b0cc3028b1c566e3a0ccfb37f",
+    "semantic_hash": ""
+  },
+  "db_pg.py": {
+    "mtime": 1783349640.0700455,
+    "ast_hash": "3bfdce42259b3223cc76e8ad7a985324",
+    "semantic_hash": ""
+  },
+  "example/graph.json": {
+    "mtime": 1783344009.3604088,
+    "ast_hash": "fb115282622beda00e209cde51464846",
+    "semantic_hash": ""
+  },
+  "example/graph.sh": {
+    "mtime": 1783344009.3605351,
+    "ast_hash": "4c009ca91a177c1bee68bf4ee647ca28",
+    "semantic_hash": ""
+  },
+  "example/membros.json": {
+    "mtime": 1783344009.36075,
+    "ast_hash": "6e817c94d4da67b6f84657e7a5b82149",
+    "semantic_hash": ""
+  },
+  "start.sh": {
+    "mtime": 1783344009.3610122,
+    "ast_hash": "4070565801e15c2c9084c175944ae410",
+    "semantic_hash": ""
+  },
+  "static/vis-embed.js": {
+    "mtime": 1783344009.3612273,
+    "ast_hash": "d308fd39fd31e9b14d31ab3c89cbf452",
+    "semantic_hash": ""
+  },
+  "static/vis-page.js": {
+    "mtime": 1783344009.3613718,
+    "ast_hash": "2c4b9108c55fadd6a286b33ff05d2298",
+    "semantic_hash": ""
+  },
+  "test_svc_kg.sh": {
+    "mtime": 1783344009.3615808,
+    "ast_hash": "35078cd7643f89d00bbaccd89771aabd",
+    "semantic_hash": ""
+  },
+  "utils/get_membros_graph.sql": {
+    "mtime": 1783344009.3617516,
+    "ast_hash": "d40557b75671cd4db86a1c88cd1f5d6a",
+    "semantic_hash": ""
+  },
+  "CHANGELOG.md": {
+    "mtime": 1783345876.683517,
+    "ast_hash": "1a33f3759b1043482608f1218232453c",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1783346338.7251704,
+    "ast_hash": "9eb49d305e09b5c0ae7ce69315e6d027",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1783345847.8778496,
+    "ast_hash": "f21b6fe5504df1ca5d6522fface552bb",
+    "semantic_hash": ""
+  },
+  "docker-compose.coolify.yml": {
+    "mtime": 1783344009.3597987,
+    "ast_hash": "ddf0f283e7fa2ba8d2a9facedebf168c",
+    "semantic_hash": ""
+  },
+  "docker-compose.local.yaml": {
+    "mtime": 1783344009.3599114,
+    "ast_hash": "ef48af12f6ff90717bfadee5d013c8f3",
+    "semantic_hash": ""
+  },
+  "docker-compose.mondaha.yml": {
+    "mtime": 1783345867.2865052,
+    "ast_hash": "50fc8e729d200802095f2a2278cc136c",
+    "semantic_hash": ""
+  },
+  "docker-compose.yaml": {
+    "mtime": 1783345893.1055355,
+    "ast_hash": "0b77f3c058820e914bf257d18a935360",
+    "semantic_hash": ""
+  },
+  "docs/API.md": {
+    "mtime": 1783346365.9660552,
+    "ast_hash": "8a80449674103e9d5807cf45ae4b9e11",
+    "semantic_hash": ""
+  },
+  "docs/ARCHITECTURE.md": {
+    "mtime": 1783346412.8417666,
+    "ast_hash": "18060fe13ffc55c9adb5824dd26ba04a",
+    "semantic_hash": ""
+  },
+  "docs/DATABASE.md": {
+    "mtime": 1783346380.226679,
+    "ast_hash": "937f141467411c552b0ba61227fdd843",
+    "semantic_hash": ""
+  },
+  "docs/OPS.md": {
+    "mtime": 1783346449.3817084,
+    "ast_hash": "a16aea22a9ad2378a10899a7c24e5dcc",
+    "semantic_hash": ""
+  },
+  "docs/openapi.yaml": {
+    "mtime": 1783344009.3602293,
+    "ast_hash": "63668c58d6eb3c8c6a1b5358a11eca23",
+    "semantic_hash": ""
+  },
+  "requirements.txt": {
+    "mtime": 1783349620.659402,
+    "ast_hash": "9b05dd36984b3922bfee43a059e94f69",
+    "semantic_hash": ""
+  }
+}
