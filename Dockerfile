@@ -24,12 +24,15 @@ RUN pip install --no-cache-dir \
     redis==5.0.7 \
     PyYAML==6.0.2 \
     networkx==3.3 \
-    pyvis==0.3.2
+    pyvis==0.3.2 \
+    prometheus-fastapi-instrumentator==6.1.0
 
 WORKDIR /app
 
 # Copia código e estáticos
 COPY app.py /app/app.py
+COPY db_pg.py /app/db_pg.py
+COPY db /app/db
 COPY static /app/static
 COPY docs /app/docs
 

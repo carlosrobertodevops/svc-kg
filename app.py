@@ -4,7 +4,7 @@
 # Objetivo: API FastAPI do micro-serviço svc-kg (graph + visualizações + ops)
 # Funções/métodos:
 # - live/health/ready/ops_status: sondas e status operacional
-# - graph_membros: retorna grafo (nós/arestas) via Supabase RPC (fallback com e sem p_)
+# - graph_membros: retorna grafo (nós/arestas) via Postgres direto (db_pg.fetch_graph)
 # - vis_visjs: página HTML com vis-network (sem f-string ao redor do JS; arestas ultrafinas; busca; cores CV/PCC/funções; física OFF após estabilizar)
 # - vis_pyvis: página HTML com PyVis (arestas ultrafinas; física OFF após estabilizar; busca)
 # - /docs: Swagger UI custom usando /openapi.json do FastAPI
@@ -18,11 +18,12 @@ import logging
 import socket
 from typing import Any, Dict, List, Optional
 
-import httpx
 from fastapi import FastAPI, Query, Response, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+
+import db_pg
 
 try:
     from redis import asyncio as aioredis  # redis 5.x
@@ -35,14 +36,8 @@ except Exception:  # pragma: no cover
 APP_ENV = os.getenv("APP_ENV", "production")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info").upper()
 
-SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").strip()
-SUPABASE_SERVICE_KEY = (
-    os.getenv("SUPABASE_SERVICE_KEY", "").strip()
-    or os.getenv("SUPABASE_KEY", "").strip()
-    or os.getenv("SUPABASE_ANON_KEY", "").strip()
-)
-SUPABASE_RPC_FN = os.getenv("SUPABASE_RPC_FN", "get_graph_membros")
-SUPABASE_TIMEOUT = float(os.getenv("SUPABASE_TIMEOUT", "15"))
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
+KG_AUTO_MIGRATE = os.getenv("KG_AUTO_MIGRATE", "true").lower() in ("1", "true", "yes")
 
 ENABLE_REDIS_CACHE = os.getenv("ENABLE_REDIS_CACHE", "false").lower() == "true"
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
@@ -62,6 +57,13 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
     openapi_url="/openapi.json",
+)
+
+# Observabilidade: expõe /metrics em formato Prometheus (text exposition)
+from prometheus_fastapi_instrumentator import Instrumentator
+
+Instrumentator().instrument(app).expose(
+    app, endpoint="/metrics", include_in_schema=False
 )
 
 os.makedirs("static", exist_ok=True)
@@ -92,19 +94,55 @@ app.add_middleware(
 # -----------------------------------------------------------------------------
 # Helpers (HTTP/Redis)
 # -----------------------------------------------------------------------------
-_http: Optional[httpx.AsyncClient] = None
 _redis = None  # type: ignore
 
 
 def _env_backend_ok() -> bool:
-    return bool(SUPABASE_URL and SUPABASE_SERVICE_KEY and SUPABASE_RPC_FN)
+    return db_pg.backend_ok()
 
 
-async def _get_http() -> httpx.AsyncClient:
-    global _http
-    if _http is None:
-        _http = httpx.AsyncClient(timeout=SUPABASE_TIMEOUT)
-    return _http
+def _mask_db_url(dsn: str) -> Optional[str]:
+    """Mascara a DATABASE_URL para status/logs: esconde user:senha, mostra só host/db."""
+    if not dsn:
+        return None
+    try:
+        rest = dsn.split("://", 1)[1] if "://" in dsn else dsn
+        if "@" in rest:
+            rest = rest.split("@", 1)[1]
+        return rest
+    except Exception:
+        return "<dsn>"
+
+
+# CSP reutilizada nas respostas HTML do vis.js (imagens http/https p/ photo_url)
+_VISJS_CSP = (
+    "default-src 'self'; "
+    "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+    "script-src 'self' 'unsafe-inline' https://unpkg.com; "
+    "img-src 'self' data: https: http:; "
+    "connect-src 'self';"
+)
+
+
+async def _html_cache_get(key: str) -> Optional[str]:
+    """GET fail-soft do cache de HTML no Redis."""
+    try:
+        r = await _get_redis()
+        if r:
+            return await r.get(key)
+    except Exception as e:  # pragma: no cover
+        log.warning("html cache get falhou (%s): %s", key, e)
+    return None
+
+
+async def _html_cache_set(key: str, html: str) -> None:
+    """SET fail-soft do cache de HTML no Redis (TTL = CACHE_API_TTL)."""
+    try:
+        r = await _get_redis()
+        if r:
+            await r.set(key, html, ex=CACHE_API_TTL)
+    except Exception as e:  # pragma: no cover
+        log.warning("html cache set falhou (%s): %s", key, e)
 
 
 async def _get_redis():
@@ -214,62 +252,8 @@ def truncate_preview(
 
 
 # -----------------------------------------------------------------------------
-# Backend (Supabase RPC) com fallback
+# Backend (Postgres direto via db_pg)
 # -----------------------------------------------------------------------------
-async def _rpc_call(payload: Dict[str, Any]) -> Dict[str, Any]:
-    url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/rpc/{SUPABASE_RPC_FN}"
-    headers = {
-        "apikey": SUPABASE_SERVICE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
-    client = await _get_http()
-    resp = await client.post(url, json=payload, headers=headers)
-    if resp.status_code != 200:
-        raise RuntimeError(f"{resp.status_code}: {resp.text}")
-    return resp.json()
-
-
-async def supabase_rpc_get_graph(
-    faccao_id: Optional[int], include_co: bool, max_pairs: int
-) -> Dict[str, Any]:
-    if not _env_backend_ok():
-        raise RuntimeError(
-            "backend_not_configured: defina SUPABASE_URL/SUPABASE_SERVICE_KEY"
-        )
-    try:
-        data = await _rpc_call(
-            {"faccao_id": faccao_id, "include_co": include_co, "max_pairs": max_pairs}
-        )
-    except Exception as e1:
-        msg = str(e1)
-        # Fallback para versões do RPC que usam parâmetros prefixados com p_
-        if "PGRST202" not in msg and "404" not in msg:
-            raise RuntimeError(f"Supabase RPC {SUPABASE_RPC_FN} falhou: {msg}")
-        data = await _rpc_call(
-            {
-                "p_faccao_id": faccao_id,
-                "p_include_co": include_co,
-                "p_max_pairs": max_pairs,
-            }
-        )
-
-    if not isinstance(data, dict):
-        if (
-            isinstance(data, list)
-            and data
-            and isinstance(data[0], dict)
-            and "nodes" in data[0]
-        ):
-            data = data[0]
-        else:
-            raise RuntimeError(
-                "Formato inesperado do RPC (esperado objeto com nodes/edges)"
-            )
-    return data
-
-
 async def fetch_graph_sanitized(
     faccao_id: Optional[int], include_co: bool, max_pairs: int, use_cache: bool = True
 ) -> Dict[str, Any]:
@@ -284,7 +268,7 @@ async def fetch_graph_sanitized(
                 except Exception:
                     pass
 
-    raw = await supabase_rpc_get_graph(faccao_id, include_co, max_pairs)
+    raw = await db_pg.fetch_graph(faccao_id, include_co, max_pairs)
     fixed = normalize_graph_labels(raw)
 
     if use_cache:
@@ -301,22 +285,27 @@ async def fetch_graph_sanitized(
 # -----------------------------------------------------------------------------
 @app.on_event("startup")
 async def _startup():
-    await _get_http()
+    if KG_AUTO_MIGRATE:
+        try:
+            await db_pg.ensure_schema()
+        except Exception as e:  # fail-soft: não derruba o serviço
+            log.warning("ensure_schema falhou (KG_AUTO_MIGRATE): %s", e)
     if ENABLE_REDIS_CACHE and aioredis:
         await _get_redis()
     log.info(
         "svc-kg iniciado (backend: %s, cache: %s)",
-        "supabase" if _env_backend_ok() else "none",
+        "postgres" if _env_backend_ok() else "none",
         "redis" if ENABLE_REDIS_CACHE else "none",
     )
 
 
 @app.on_event("shutdown")
 async def _shutdown():
-    global _http, _redis
-    if _http:
-        await _http.aclose()
-        _http = None
+    global _redis
+    try:
+        await db_pg.close_pool()
+    except Exception as e:  # pragma: no cover
+        log.warning("close_pool falhou: %s", e)
     if _redis:
         await _redis.close()  # type: ignore
         _redis = None
@@ -337,7 +326,7 @@ async def health(deep: bool = Query(default=False)):
         {
             "status": "ok",
             "redis": False,
-            "backend": "supabase" if _env_backend_ok() else "none",
+            "backend": "postgres" if _env_backend_ok() else "none",
         }
     )
     r_ok = True
@@ -351,16 +340,14 @@ async def health(deep: bool = Query(default=False)):
     b_ok = _env_backend_ok()
     if deep and b_ok:
         try:
-            _ = await supabase_rpc_get_graph(None, False, 1)
+            b_ok = await db_pg.pg_ping()
         except Exception as e:
             b_ok = False
             out["backend_error"] = str(e)
     out["ok"] = (not ENABLE_REDIS_CACHE or r_ok) and b_ok
-    out["supabase"] = {
-        "url": SUPABASE_URL,
-        "rpc_fn": SUPABASE_RPC_FN,
-        "timeout": SUPABASE_TIMEOUT,
-        "service_key_tail": redact(SUPABASE_SERVICE_KEY),
+    out["postgres"] = {
+        "configured": _env_backend_ok(),
+        "database_url": _mask_db_url(DATABASE_URL),
     }
     return JSONResponse(out, status_code=200 if out["ok"] else 503)
 
@@ -380,8 +367,7 @@ async def ready():
     b_ok = False
     if _env_backend_ok():
         try:
-            _ = await supabase_rpc_get_graph(None, False, 1)
-            b_ok = True
+            b_ok = await db_pg.pg_ping()
         except Exception as e:
             out["backend_error"] = str(e)
 
@@ -400,14 +386,11 @@ async def ops_status():
                 redis_cfg["ping"] = bool(await r.ping())
         except Exception as e:
             redis_cfg["error"] = str(e)
-    supa = {
+    postgres = {
         "configured": _env_backend_ok(),
-        "url": SUPABASE_URL,
-        "rpc_fn": SUPABASE_RPC_FN,
-        "timeout": SUPABASE_TIMEOUT,
-        "service_key_tail": redact(SUPABASE_SERVICE_KEY),
+        "database_url": _mask_db_url(DATABASE_URL),
     }
-    info.update({"redis": redis_cfg, "supabase": supa})
+    info.update({"redis": redis_cfg, "postgres": postgres})
     return JSONResponse(info, status_code=200)
 
 
@@ -450,6 +433,18 @@ async def vis_visjs(
     debug: bool = Query(default=False),
     source: str = Query(default="server", pattern="^(server|client)$"),
 ):
+    cache_key = (
+        f"kg:html:visjs:{faccao_id}:{include_co}:{max_pairs}:{max_nodes}:{max_edges}:"
+        f"{theme}:{title}:{source}:{debug}"
+    )
+    if cache and ENABLE_REDIS_CACHE:
+        cached_html = await _html_cache_get(cache_key)
+        if cached_html is not None:
+            resp = HTMLResponse(cached_html, status_code=200)
+            resp.headers["Content-Security-Policy"] = _VISJS_CSP
+            resp.headers["X-Content-Type-Options"] = "nosniff"
+            return resp
+
     embedded_block = ""
     if source == "server":
         try:
@@ -736,16 +731,14 @@ async def vis_visjs(
     parts.append("</html>\n")
     html = "".join(parts)
 
+    if cache and ENABLE_REDIS_CACHE:
+        await _html_cache_set(cache_key, html)
+
     # CSP: permitir imagens http/https (para photo_url)
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "style-src 'self' 'unsafe-inline' https://unpkg.com; "
-        "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-        "img-src 'self' data: https: http:; "
-        "connect-src 'self';"
-    )
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    return HTMLResponse(html, status_code=200)
+    resp = HTMLResponse(html, status_code=200)
+    resp.headers["Content-Security-Policy"] = _VISJS_CSP
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    return resp
 
 
 # -----------------------------------------------------------------------------
@@ -765,6 +758,15 @@ async def vis_pyvis(
     theme: str = Query(default="light"),
     title: str = Query(default="Knowledge Graph (PyVis)"),
 ):
+    cache_key = (
+        f"kg:html:pyvis:{faccao_id}:{include_co}:{max_pairs}:{max_nodes}:{max_edges}:"
+        f"{theme}:{title}"
+    )
+    if cache and ENABLE_REDIS_CACHE:
+        cached_html = await _html_cache_get(cache_key)
+        if cached_html is not None:
+            return HTMLResponse(cached_html, status_code=200)
+
     try:
         data = await fetch_graph_sanitized(
             faccao_id, include_co, max_pairs, use_cache=cache
@@ -968,6 +970,10 @@ async def vis_pyvis(
     html = html.replace("</head>", toolbar_css + "\n</head>")
     html = html.replace("<body>", "<body>\n" + toolbar_html + "\n")
     html = html.replace("</body>", toolbar_js + "\n</body>")
+
+    if cache and ENABLE_REDIS_CACHE:
+        await _html_cache_set(cache_key, html)
+
     return HTMLResponse(html, status_code=200)
 
 
@@ -1020,9 +1026,9 @@ async def custom_docs():
           <div class="ops-kv"><b>Platform</b><div id="kv-platform">—</div></div>
           <div class="ops-kv"><b>Host</b><div id="kv-host">—</div></div>
           <div class="ops-kv"><b>Redis</b><div id="kv-redis">—</div></div>
-          <div class="ops-kv"><b>Supabase URL</b><div id="kv-supa">—</div></div>
-          <div class="ops-kv"><b>RPC</b><div id="kv-rpc">—</div></div>
-          <div class="ops-kv"><b>Timeout</b><div id="kv-timeout">—</div></div>
+          <div class="ops-kv"><b>Backend</b><div id="kv-backend">—</div></div>
+          <div class="ops-kv"><b>Postgres</b><div id="kv-pg">—</div></div>
+          <div class="ops-kv"><b>Configured</b><div id="kv-pgcfg">—</div></div>
         </div>
         <div class="note">Links rápidos: <a href="/docs-static/openapi.yaml" target="_blank">openapi.yaml</a></div>
       </div>
@@ -1048,9 +1054,9 @@ async def custom_docs():
         setKV('kv-platform', ops.coolify_proxy_network ? 'coolify' : (ops.container ? 'container' : 'host'));
         setKV('kv-host', ops.hostname || location.hostname);
         setKV('kv-redis', (ops.redis && ops.redis.enabled) ? (ops.redis.ping ? 'ok' : 'enabled') : 'disabled');
-        setKV('kv-supa', (ops.supabase && ops.supabase.url) ? ops.supabase.url : '—');
-        setKV('kv-rpc', (ops.supabase && ops.supabase.rpc_fn) ? ops.supabase.rpc_fn : '—');
-        setKV('kv-timeout', (ops.supabase && ops.supabase.timeout) ? ops.supabase.timeout : '—');
+        setKV('kv-backend', (ops.postgres && ops.postgres.configured) ? 'postgres' : 'none');
+        setKV('kv-pg', (ops.postgres && ops.postgres.database_url) ? ops.postgres.database_url : '—');
+        setKV('kv-pgcfg', (ops.postgres) ? String(!!ops.postgres.configured) : '—');
         const pills = document.querySelectorAll('.ops-right .ops-pill');
         pills.forEach(p => p.classList.remove('ok','err'));
         if (health && health.ok) pills.forEach(p => p.classList.add('ok')); else pills.forEach(p => p.classList.add('err'));

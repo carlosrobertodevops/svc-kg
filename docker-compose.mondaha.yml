@@ -1,0 +1,47 @@
+# =============================================================================
+# Arquivo: docker-compose.mondaha.yml
+# Versão: v1.8.0
+# Objetivo: Sobe SOMENTE o serviço svc-kg, reutilizando o Postgres + Redis
+#           do stack mondaha JÁ EM EXECUÇÃO. Não sobe DB próprio: conecta-se
+#           à rede externa do docker-compose do projeto mondaha, onde os
+#           serviços "postgres" (postgis:17-3.5) e "redis" (7-alpine) já rodam.
+# Uso:
+#   1) suba o stack mondaha (postgres + redis) no outro projeto
+#   2) docker compose -f docker-compose.mondaha.yml up --build
+# =============================================================================
+services:
+  svc-kg:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: svc-kg:mondaha
+    container_name: svc-kg
+    env_file:
+      - .env
+    environment:
+      # Postgres do stack mondaha (in-network, host = serviço "postgres")
+      DATABASE_URL: "postgresql://mondaha:mondaha@postgres:5432/mondaha"
+      # Redis do stack mondaha (in-network, host = serviço "redis")
+      REDIS_URL: "redis://redis:6379/0"
+      ENABLE_REDIS_CACHE: "true"
+      KG_AUTO_MIGRATE: "true"
+      PORT: 8080
+      APP_ENV: production
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - mondaha
+
+networks:
+  mondaha:
+    # Rede default do docker-compose do projeto mondaha. O nome padrão é
+    # "<nome-do-projeto>_default" => "mondaha_default". Se você subir o stack
+    # com "-p <projeto>", ajuste o nome abaixo. Confirme com: docker network ls
+    external: true
+    name: mondaha_default

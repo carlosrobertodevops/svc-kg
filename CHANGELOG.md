@@ -9,6 +9,31 @@ e este projeto segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [v1.8.0] - 2026-07-06
+### Migração Supabase → Postgres direto + cache Redis
+
+O serviço deixou de acessar o Supabase via HTTP (PostgREST RPC) e passou a ler os dados **direto do Postgres do stack mondaha**.
+
+### Adicionado
+- Novo módulo **`db_pg.py`**: pool **psycopg 3** async com `fetch_graph`, `pg_ping`, `ensure_schema`, `backend_ok` e `close_pool`.
+- **`db/mondaha_install.sql`**: instala a função `public.get_graph_membros($1,$2,$3)` de forma **idempotente** no startup (flag `KG_AUTO_MIGRATE=true`).
+- **Cache de HTML renderizado** no Redis (`kg:html:{rota}:...` com todos os params), além do cache do grafo já existente (`kg:graph:{faccao_id}:{include_co}:{max_pairs}`).
+- **`docker-compose.mondaha.yml`**: sobe o serviço contra o `postgres` + `redis` do mondaha (rede externa `mondaha_default`).
+
+### Alterado
+- Leitura do grafo agora via `SELECT public.get_graph_membros($1,$2,$3)` no Postgres `mondaha` (tabelas `membros`, `faccoes`, `funcoes`).
+- **`/health`** e **`/ready`** verificam o backend via **`pg_ping`** (não mais RPC HTTP no Supabase).
+- Novas variáveis de ambiente: `DATABASE_URL`, `REDIS_URL`, `ENABLE_REDIS_CACHE`, `CACHE_API_TTL`, `PG_POOL_MAX`, `PG_POOL_TIMEOUT`, `KG_AUTO_MIGRATE`.
+
+### Removido
+- Transporte **PostgREST / httpx** para o Supabase.
+- Variáveis `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` **deprecadas** (não mais utilizadas).
+
+### Não alterado (confirmado)
+- Rotas preservadas: `/live`, `/health`, `/ready`, `/ops/status`, `/v1/graph/membros`, `/v1/vis/visjs`, `/v1/vis/pyvis`.
+
+---
+
 ## [v1.7.20] - 2025-09-05
 ### Corrigido
 - **/v1/vis/visjs** não renderizava e gerava `500` devido a `ValueError: Single '}' encountered in format string`.  
@@ -115,6 +140,7 @@ e este projeto segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ---
 
+[v1.8.0]: #
 [v1.7.20]: #
 [v1.7.19]: #
 [v1.7.18]: #
