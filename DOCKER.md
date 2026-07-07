@@ -207,7 +207,7 @@ Extraídas de `.env.exemple` e do `CLAUDE.md`/README:
 | Var | Função | Exemplo / default |
 | --- | --- | --- |
 | `APP_ENV` | Ambiente | `production` \| `development` |
-| `APP_HOST` | Host público (deploy) | `svc-kg.mondaha.com` |
+| `APP_HOST` | Host público (deploy) — **cosmético, não lido pelo código** | `svc-kg` (DNS interno, no `.env`) / `svc-kg.mondaha.com` (deploy público, `.env.exemple`) |
 | `PORT` | Porta HTTP | `8080` |
 | `WORKERS` | Nº de workers Gunicorn | `2` (prod) / `1` (local) |
 | `LOG_LEVEL` | Nível de log | `info` \| `debug` |
@@ -224,12 +224,27 @@ Extraídas de `.env.exemple` e do `CLAUDE.md`/README:
 | `CORS_ALLOW_METHODS` | CORS: métodos | `GET,POST,OPTIONS` |
 | `CORS_ALLOW_HEADERS` | CORS: headers | `Authorization,Content-Type` |
 | `CORS_ALLOW_CREDENTIALS` | CORS: credenciais | `false` |
-| `MEMBERS_TABLE` / `MEMBERS_ID_COL` / `MEMBERS_PHOTO_COL` | Config tabela de fotos | `membros` / `id` / `photo_url` |
-| `COOLIFY_PROXY_NETWORK` | Rede do proxy (só se usar compose coolify-proxy) | `coolify-proxy` |
+| `MEMBERS_TABLE` / `MEMBERS_ID_COL` / `MEMBERS_PHOTO_COL` | Config tabela de fotos — **não lido pelo código (morto)** | `membros` / `id` / `photo_url` |
+| `COOLIFY_PROXY_NETWORK` | Rede do proxy — **não lido pelo código (morto)**; só se usar compose coolify-proxy | `coolify-proxy` |
 | `SUPABASE_*` | **DEPRECADO** — migrado p/ Postgres direto | (ignorado) |
 
-Arquivos de env por cenário: `.env` (deploy Coolify / mondaha), `.env.local`
-(compose local legado). Referência: `.env.exemple`.
+Arquivos de env por cenário (**os dois têm `DATABASE_URL` distintos de propósito
+— não misturar**):
+
+- **`.env`** → `docker-compose.mondaha.yml` (acoplar ao stack mondaha): creds do
+  mondaha, `DATABASE_URL=postgresql://mondaha:mondaha@postgres:5432/mondaha`,
+  `APP_HOST=svc-kg`.
+- **`.env.local`** → `docker-compose.local.yaml` (dev **isolado**, sobe o próprio
+  `kg-db`/serviço `db`): creds `kg/kg`,
+  `DATABASE_URL=postgresql://kg:kg@db:5432/kgdb` **de propósito** — **NÃO** deve
+  virar mondaha.
+
+Lista de vars lidas de fato pelo código: `DATABASE_URL`, `REDIS_URL`,
+`ENABLE_REDIS_CACHE`, `KG_AUTO_MIGRATE`, `PG_POOL_MAX`, `PG_POOL_TIMEOUT`,
+`APP_ENV`, `LOG_LEVEL`, `CACHE_API_TTL`, `CACHE_STATIC_MAX_AGE`, `CORS_ALLOW_*`
+(`SERVER_CMD` é lido só pelo `CMD`/`start.sh`, não pelo Python). Referência:
+`.env.exemple` (mantém `APP_HOST=svc-kg.mondaha.com` como onboarding de deploy
+público).
 
 ---
 
